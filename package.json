@@ -1,0 +1,27 @@
+{
+  "name": "ventichat",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node app.js",
+    "init": "node scripts/init.js",
+    "dev": "nodemon app.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.1",
+    "inquirer": "^9.2.15",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.15.3",
+    "node-cron": "^3.0.3",
+    "sequelize": "^6.37.7",
+    "socket.io": "^4.8.1"
+  }
+}
