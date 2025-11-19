@@ -4,8 +4,8 @@ module.exports = (sequelize) => {
     const Message = sequelize.define('Message', {
         content: { type: DataTypes.TEXT },
         type: { type: DataTypes.ENUM('text', 'image', 'video', 'file'), defaultValue: 'text' },
-        fileUrl: { type: DataTypes.STRING(255) },
-        isDeleted: { type: DataTypes.BOOLEAN, defaultValue: false }
+        fileUrl: { type: DataTypes.STRING(255), field: 'file_url' },
+        isDeleted: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_deleted' }
     }, {
         tableName: 'Messages',
         createdAt: 'sent_at',
@@ -19,6 +19,8 @@ module.exports = (sequelize) => {
 
     return Message;
 };
+
+
 
 
 

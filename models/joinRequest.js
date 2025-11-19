@@ -7,7 +7,7 @@ module.exports = (sequelize) => {
             type: DataTypes.ENUM('pending', 'approved', 'rejected'),
             defaultValue: 'pending'
         },
-        message: { type: DataTypes.STRING(255) }
+        message: { type: DataTypes.STRING(255), field: 'message' }
     }, {
         tableName: 'JoinRequests',
         createdAt: 'request_time',

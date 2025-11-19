@@ -32,8 +32,14 @@ async function init() {
             password: answers.dbPassword
         });
 
-        // 创建数据库
-        await connection.query(`CREATE DATABASE IF NOT EXISTS \`${answers.dbName}\`;`);
+        // 检查并删除同名数据库（如果存在）
+        await connection.query(`DROP DATABASE IF EXISTS \`${answers.dbName}\`;`);
+        console.log(`已删除现有数据库 ${answers.dbName}（如果存在）`);
+
+        // 创建新数据库
+        await connection.query(`CREATE DATABASE \`${answers.dbName}\`;`);
+        console.log(`已创建新数据库 ${answers.dbName}`);
+
         await connection.changeUser({ database: answers.dbName });
 
         // 创建用户表
@@ -74,6 +80,7 @@ async function init() {
                 is_moderator BOOLEAN DEFAULT false,
                 join_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 note VARCHAR(100),
+                last_read_message_id INT DEFAULT 0,
                 PRIMARY KEY (user_id, room_id),
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                 FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE

@@ -5,7 +5,7 @@ module.exports = (sequelize) => {
     const User = sequelize.define('User', {
         username: { type: DataTypes.STRING(50), unique: true, allowNull: false },
         nickname: { type: DataTypes.STRING(50), allowNull: false },
-        passwordHash: { type: DataTypes.STRING(255), allowNull: false },
+        passwordHash: { type: DataTypes.STRING(255), allowNull: false, field: 'password_hash' },
         avatarUrl: { type: DataTypes.STRING(255) },
         status: { type: DataTypes.ENUM('active', 'banned'), defaultValue: 'active' }
     }, {

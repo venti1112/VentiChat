@@ -26,15 +26,18 @@ const RoomMember = require('./models/roomMember')(sequelize);
 const Message = require('./models/message')(sequelize);
 const JoinRequest = require('./models/joinRequest')(sequelize);
 
-// 设置模型关联
-User.associate({ Room, RoomMember, Message, JoinRequest });
-Room.associate({ User, RoomMember, Message });
-RoomMember.associate({ User, Room });
-Message.associate({ User, Room });
-JoinRequest.associate({ User, Room });
+// 创建models对象
+const models = { User, Room, RoomMember, Message, JoinRequest };
 
-// 将模型挂载到app上
-app.set('models', { User, Room, RoomMember, Message, JoinRequest });
+// 先将模型挂载到app上
+app.set('models', models);
+
+// 再设置模型关联 - 使用集中式方法
+Object.values(models).forEach(model => {
+    if (model.associate) {
+        model.associate(models);
+    }
+});
 
 // 启动定时清理任务
 const startCleanupScheduler = require('./utils/cleanupScheduler');

@@ -3,12 +3,12 @@ module.exports = (sequelize) => {
     
     const Room = sequelize.define('Room', {
         name: { type: DataTypes.STRING(100), allowNull: false },
-        isPrivate: { type: DataTypes.BOOLEAN, defaultValue: false },
-        requireApproval: { type: DataTypes.BOOLEAN, defaultValue: true },
-        allowImages: { type: DataTypes.BOOLEAN, defaultValue: true },
-        allowVideos: { type: DataTypes.BOOLEAN, defaultValue: true },
-        allowFiles: { type: DataTypes.BOOLEAN, defaultValue: true },
-        retentionDays: { type: DataTypes.INTEGER, defaultValue: 180 }
+        isPrivate: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_private' },
+        requireApproval: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'require_approval' },
+        allowImages: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'allow_images' },
+        allowVideos: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'allow_videos' },
+        allowFiles: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'allow_files' },
+        retentionDays: { type: DataTypes.INTEGER, defaultValue: 180, field: 'retention_days' }
     }, {
         tableName: 'Rooms',
         createdAt: 'created_at',

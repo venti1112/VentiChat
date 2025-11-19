@@ -20,7 +20,7 @@ exports.login = async (req, res) => {
         }
         
         // 验证密码
-        const isPasswordValid = await bcrypt.compare(password, user.password);
+        const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
         if (!isPasswordValid) {
             return res.status(401).json({ message: '用户名或密码错误' });
         }
@@ -83,7 +83,7 @@ exports.register = async (req, res) => {
         const newUser = await User.create({
             username,
             nickname,
-            password: hashedPassword,
+            passwordHash: hashedPassword,
             avatarUrl: '/images/default-avatar.jpg' // 默认头像
         });
         
