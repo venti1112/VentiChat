@@ -1,6 +1,7 @@
 const { User } = require('../models');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const config = require('../config/config.json');
 
 // 登录
 exports.login = async (req, res) => {
@@ -31,7 +32,7 @@ exports.login = async (req, res) => {
                 username: user.username,
                 isAdmin: user.isAdmin 
             }, 
-            process.env.ENCRYPTION_KEY, 
+            config.encryptionKey, 
             { expiresIn: '24h' }
         );
         

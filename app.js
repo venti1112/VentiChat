@@ -98,6 +98,9 @@ const upload = multer({ storage });
 // 将upload实例挂载到app上
 app.set('upload', upload);
 
+// 用户Socket映射
+const userSocketMap = new Map();
+
 // 设置Socket.IO
 const io = socketIo(server, {
     cors: {

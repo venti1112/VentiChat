@@ -21,10 +21,11 @@ router.delete('/rooms/:roomId/members/:userId', roomController.kickUser);
 
 // 消息相关路由
 const messageController = require('../controllers/messageController');
-router.get('/messages', messageController.getMessages);
+const fileController = require('../controllers/fileController');
+router.get('/messages/:roomId', messageController.getRoomMessages);
 router.post('/messages', messageController.sendMessage);
-router.put('/messages/:messageId/retract', messageController.retractMessage);
-router.post('/messages/file', messageController.uploadFile);
+router.put('/messages/:messageId/retract', messageController.recallMessage);
+router.post('/messages/file', fileController.handleUpload);
 
 // 管理后台路由
 const adminController = require('../controllers/adminController');
