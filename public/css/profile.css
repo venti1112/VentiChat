@@ -1,0 +1,20 @@
+/* 个人中心页样式 - 仅在profile.html中使用 */
+
+.profile-container { max-width: 800px; margin: 20px auto; }
+.avatar-upload { position: relative; display: inline-block; }
+.avatar-upload img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; }
+.avatar-upload .change-avatar {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: #0b93f6;
+    color: white;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.form-label { font-weight: bold; }
