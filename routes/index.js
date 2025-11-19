@@ -3,8 +3,9 @@ const router = express.Router();
 
 // 用户相关路由
 const authController = require('../controllers/authController');
-router.post('/users/login', authController.login);
-router.post('/users/register', authController.register);
+router.post('/auth/login', authController.login);
+router.post('/auth/register', authController.register);
+router.post('/auth/logout', authController.logout);
 // 修复：引入authMiddleware
 const authMiddleware = require('../middleware/authMiddleware').authMiddleware;
 const userController = require('../controllers/userController');

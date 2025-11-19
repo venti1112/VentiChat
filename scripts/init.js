@@ -115,14 +115,14 @@ async function init() {
         const [admin] = await connection.query('SELECT id FROM users WHERE username = ?', [answers.adminUsername]);
         await connection.query(
             `INSERT INTO rooms (name, creator_id, is_private, require_approval, retention_days) 
-             VALUES ('默认大聊天室', ?, false, false, 180)`,
+             VALUES ('VentiChat大厅', ?, false, false, 180)`,
             [admin[0].id]
         );
 
         // 将所有用户加入默认聊天室（包括后续注册的）
         await connection.query(
             `INSERT INTO room_members (user_id, room_id, is_moderator) 
-             SELECT id, (SELECT id FROM rooms WHERE name = '默认大聊天室'), true FROM users`
+             SELECT id, (SELECT id FROM rooms WHERE name = 'VentiChat大厅'), true FROM users`
         );
 
         // 保存配置

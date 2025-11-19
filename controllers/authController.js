@@ -94,3 +94,18 @@ exports.register = async (req, res) => {
         res.status(500).json({ message: '服务器内部错误' });
     }
 };
+
+// 退出登录
+exports.logout = async (req, res) => {
+    try {
+        // 对于JWT token，由于是无状态的，我们无法直接使token失效
+        // 但可以记录token到黑名单（如果实现的话）或让前端清除本地存储
+        // 这里简单返回成功，让前端清除本地存储
+        
+        res.json({ message: '退出登录成功' });
+        
+    } catch (error) {
+        console.error('退出登录错误:', error);
+        res.status(500).json({ message: '服务器内部错误' });
+    }
+};

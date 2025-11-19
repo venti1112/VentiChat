@@ -97,9 +97,34 @@ exports.toggleUserStatus = async (req, res) => {
 exports.getRooms = async (req, res) => {
     try {
         const rooms = await models.Room.findAll({
-            attributes: ['id', 'name', 'type', 'created_at']
+            attributes: ['id', 'name', 'type', 'created_at', 'retention_days'],
+            include: [
+                {
+                    model: models.User,
+                    as: 'creator',
+                    attributes: ['id', 'nickname']
+                },
+                {
+                    model: models.RoomMember,
+                    attributes: ['id']
+                }
+            ]
         });
-        res.json(rooms);
+        
+        // 格式化返回数据
+        const formattedRooms = rooms.map(room => ({
+            id: room.id,
+            name: room.name,
+            creator: room.creator ? {
+                id: room.creator.id,
+                nickname: room.creator.nickname
+            } : null,
+            memberCount: room.RoomMembers ? room.RoomMembers.length : 0,
+            createdAt: room.created_at,
+            retentionDays: room.retention_days || 180
+        }));
+        
+        res.json(formattedRooms);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
