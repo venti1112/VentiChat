@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/css/common.css">
     <link rel="stylesheet" href="/css/index.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="/socket.io/socket.io.js" defer></script>
     <script src="/js/bootstrap.min.js" defer></script>
     <script src="/js/common.js" defer></script>
     <script src="/js/index.js" defer></script>
@@ -38,8 +39,7 @@
                     </li>
                 </ul>
                 <div class="d-flex">
-                    <button class="btn btn-outline-light me-2" id="createRoomBtn">创建聊天室</button>
-                    <button class="btn btn-light" id="logoutBtn">退出登录</button>
+                    <button class="btn btn-light" id="logoutBtn"><i class="bi bi-box-arrow-right"></i></button>
                 </div>
             </div>
         </div>
@@ -52,7 +52,10 @@
                 <div class="card room-list">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">聊天室</h5>
-                        <button class="btn btn-sm btn-primary" id="searchRoomBtn"><i class="bi bi-search"></i></button>
+                        <div>
+                            <button class="btn btn-sm btn-primary me-1" id="createRoomBtn"><i class="bi bi-plus-circle"></i></button>
+                            <button class="btn btn-sm btn-primary" id="searchRoomBtn"><i class="bi bi-search"></i></button>
+                        </div>
                     </div>
                     <ul class="list-group list-group-flush" id="roomList">
                         <!-- 聊天室列表项将通过JavaScript动态生成 -->
@@ -81,14 +84,14 @@
                     <!-- 输入区域 -->
                     <div class="card-footer input-area">
                         <div class="input-group">
-                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">文件</button>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="#" id="sendImageBtn"><i class="bi bi-image me-2"></i>发送图片</a></li>
-                                <li><a class="dropdown-item" href="#" id="sendVideoBtn"><i class="bi bi-camera-video me-2"></i>发送视频</a></li>
-                                <li><a class="dropdown-item" href="#" id="sendFileBtn"><i class="bi bi-file-earmark me-2"></i>发送文件</a></li>
-                            </ul>
+                            <input type="file" id="fileInput" style="display: none;">
+                            <button class="btn btn-primary" id="attachFileBtn">
+                                <i class="bi bi-paperclip"></i>
+                            </button>
                             <input type="text" class="form-control" placeholder="输入消息..." id="messageInput">
-                            <button class="btn btn-primary" id="sendBtn">发送</button>
+                            <button class="btn btn-primary" id="sendBtn">
+                                <i class="bi bi-send"></i>
+                            </button>
                         </div>
                     </div>
                 </div>

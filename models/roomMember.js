@@ -12,7 +12,7 @@ module.exports = (sequelize) => {
     });
 
     RoomMember.associate = function(models) {
-        // 多对多关系的关联在User和Room模型中定义
+        // 移除可能导致循环依赖的关联，在需要的地方使用原始查询
     };
 
     return RoomMember;

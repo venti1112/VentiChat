@@ -16,8 +16,7 @@ module.exports = (sequelize) => {
     });
 
     Room.associate = function(models) {
-        Room.belongsTo(models.User, { foreignKey: 'creatorId', as: 'Creator' });
-        Room.belongsToMany(models.User, { through: models.RoomMember, as: 'Participants' });
+        // 移除可能导致循环依赖的关联，在需要的地方使用原始查询
     };
 
     return Room;

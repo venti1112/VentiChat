@@ -127,7 +127,7 @@ Invoke-RestMethod -Uri "http://localhost:3011/api/auth/verify" ` -Method Post ` 
 
 # 3. 测试无效token
 Invoke-RestMethod -Uri "http://localhost:3011/api/auth/verify" ` -Method Post ` -Body '{"token":"invalid.token.here"}' ` -ContentType "application/json" ` -ErrorAction SilentlyContinue
-```
+
 Invoke-RestMethod -Uri "http://localhost:3011/api/auth/verify" `
   -Method Post `
   -Body '{"token":"invalid.token.here"}' `

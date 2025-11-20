@@ -5,10 +5,10 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 router.post('/auth/login', authController.login);
 router.post('/auth/register', authController.register);
-router.post('/auth/logout', authController.logout);
+router.get('/auth/logout', authController.logout);
 
 // 添加token验证路由
-router.post('/auth/verify', authController.verifyToken);
+router.get('/auth/verify', authController.verifyToken);
 
 // 修复：引入authMiddleware
 const authMiddleware = require('../middleware/authMiddleware').authMiddleware;

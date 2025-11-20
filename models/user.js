@@ -6,7 +6,7 @@ module.exports = (sequelize) => {
         username: { type: DataTypes.STRING(50), unique: true, allowNull: false },
         nickname: { type: DataTypes.STRING(50), allowNull: false },
         passwordHash: { type: DataTypes.STRING(255), allowNull: false, field: 'password_hash' },
-        avatarUrl: { type: DataTypes.STRING(255) },
+        avatarUrl: { type: DataTypes.STRING(255), field: 'avatar_url' },
         status: { type: DataTypes.ENUM('active', 'banned'), defaultValue: 'active' }
     }, {
         tableName: 'Users',
@@ -15,8 +15,7 @@ module.exports = (sequelize) => {
     });
 
     User.associate = function(models) {
-        User.hasMany(models.Room, { foreignKey: 'creatorId', as: 'CreatedRooms' });
-        User.belongsToMany(models.Room, { through: models.RoomMember, as: 'JoinedRooms' });
+        // 移除可能导致循环依赖的关联，在需要的地方使用原始查询
     };
 
     return User;

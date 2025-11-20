@@ -13,12 +13,13 @@ module.exports = (sequelize) => {
     });
 
     Message.associate = function(models) {
-        Message.belongsTo(models.User, { foreignKey: 'senderId', as: 'Sender' });
-        Message.belongsTo(models.Room, { foreignKey: 'roomId', as: 'MessageRoom' });
+        // 移除可能导致循环依赖的关联，在需要的地方使用原始查询
     };
 
     return Message;
 };
+
+
 
 
 

@@ -34,7 +34,7 @@ function setupEventListeners() {
   document.getElementById('editUserForm').addEventListener('submit', editUser);
   
   // 按钮点击
-  document.getElementById('logoutBtn').addEventListener('click', logout);
+  document.getElementById('logoutBtn').addEventListener('click', window.logout);
   document.getElementById('cleanupRoomsBtn').addEventListener('click', cleanupRooms);
   document.getElementById('resetSettingsBtn').addEventListener('click', resetSettings);
   
@@ -430,40 +430,6 @@ async function cleanupRooms() {
     
   } catch (error) {
     window.showError('清理失败：' + error.message);
-  }
-}
-
-// 退出登录
-async function logout() {
-  if (confirm('确定要退出登录吗？')) {
-    try {
-      // 调用后端退出登录接口
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error('退出登录失败');
-      }
-      
-      // 清除本地存储的认证信息
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('currentUser');
-      
-      // 重定向到登录页
-      window.location.href = '/login.html';
-      
-    } catch (error) {
-      console.error('退出登录错误:', error);
-      // 即使后端调用失败，也清除本地存储
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('currentUser');
-      window.location.href = '/login.html';
-    }
   }
 }
 

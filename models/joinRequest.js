@@ -15,8 +15,7 @@ module.exports = (sequelize) => {
     });
 
     JoinRequest.associate = function(models) {
-        JoinRequest.belongsTo(models.User, { foreignKey: 'userId' });
-        JoinRequest.belongsTo(models.Room, { foreignKey: 'roomId' });
+        // 移除可能导致循环依赖的关联，在需要的地方使用原始查询
     };
 
     return JoinRequest;

@@ -36,11 +36,16 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     }
     
     const result = await response.json();
+    
+    // 保存token和用户信息到localStorage
+    localStorage.setItem('authToken', result.token);
+    localStorage.setItem('currentUser', JSON.stringify(result.user));
+    
     window.showSuccess('注册成功！请登录');
     
-    // 重定向到登录页
+    // 重定向到主页而不是登录页
     setTimeout(() => {
-      window.location.href = '/login.html';
+      window.location.href = '/';
     }, 1500);
     
   } catch (error) {

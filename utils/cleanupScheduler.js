@@ -62,6 +62,13 @@ const cleanupExpiredData = async (models, app) => {
             }
         });
         
+        // 清理过期的token
+        const tokensDeleted = await models.Token.destroy({
+          where: {
+            expiresAt: { $lt: cutoffDate }
+          }
+        });
+        
         console.log(`清理完成：删除了 ${messagesDeleted} 条消息，${filesDeleted} 个文件`);
         
         // 可选：通过Socket.IO通知管理员

@@ -102,13 +102,17 @@ exports.getRooms = async (req, res) => {
         const rooms = await req.user.getJoinedRooms({
             include: [{
                 model: RoomMember,
+                as: 'RoomMembers',  // 添加as别名
                 attributes: ['note', 'lastReadMessageId']
             }]
         });
         
         // 添加未读消息计数
         const enrichedRooms = await Promise.all(rooms.map(async (room) => {
-            const lastReadMessageId = room.RoomMember.lastReadMessageId;
+            // 修复：正确访问roomMembers数组中的第一个元素
+            const roomMember = room.roomMembers && room.roomMembers[0];
+            const lastReadMessageId = roomMember ? roomMember.lastReadMessageId : 0;
+            
             if (!lastReadMessageId) {
                 return { ...room.get({ plain: true }), unreadCount: 0 };
             }
@@ -128,6 +132,7 @@ exports.getRooms = async (req, res) => {
         
         res.json(enrichedRooms);
     } catch (error) {
+        console.error('Error in getRooms:', error);
         res.status(500).json({ error: error.message });
     }
 };

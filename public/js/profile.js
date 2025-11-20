@@ -32,7 +32,7 @@ function setupEventListeners() {
   document.getElementById('resetBtn').addEventListener('click', resetForm);
   
   // 退出登录
-  document.getElementById('logoutBtn').addEventListener('click', logout);
+  document.getElementById('logoutBtn').addEventListener('click', window.logout);
   
   // 头像上传
   avatarInput.addEventListener('change', handleAvatarUpload);

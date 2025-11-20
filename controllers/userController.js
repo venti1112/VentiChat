@@ -20,7 +20,7 @@ exports.login = async (req, res) => {
         // 生成JWT令牌
         const token = jwt.sign(
             { id: user.id, username: user.username },
-            process.env.ENCRYPTION_KEY || 'your-secret-key',
+            config.encryptionKey,
             { expiresIn: '24h' }
         );
         

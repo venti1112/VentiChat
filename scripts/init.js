@@ -103,6 +103,30 @@ async function init() {
             ) ENGINE=InnoDB;
         `);
 
+        // 创建加入请求表
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS JoinRequests (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+                message VARCHAR(255),
+                user_id INT NOT NULL,
+                room_id INT NOT NULL,
+                request_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB;
+        `);
+
+        // 创建token表
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS tokens (
+                token_str VARCHAR(255) PRIMARY KEY,
+                user_id INT NOT NULL,
+                expires_at DATETIME NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB;
+        `);
+
         // 创建默认管理员
         const hashedPassword = bcrypt.hashSync(answers.adminPassword, 10);
         await connection.query(

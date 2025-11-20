@@ -1,1 +1,21 @@
 /* 管理后台页样式 - 仅在admin.html中使用 */
+
+.admin-container {
+    width: 100%;
+    min-height: calc(100vh - 80px - 20px); /* 确保内容不足时也能铺满窗口 */
+    padding: 0 15px;
+    margin: 80px 0 20px;
+    box-sizing: border-box;
+}
+
+/* 确保内部网格系统正确铺满 */
+.admin-container > .row {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.admin-container > .row > .col-12 {
+    padding-left: 0;
+    padding-right: 0;
+}

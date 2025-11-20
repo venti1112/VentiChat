@@ -7,7 +7,8 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   const formData = new FormData(e.target);
   const credentials = {
     username: formData.get('username'),
-    password: formData.get('password')
+    password: formData.get('password'),
+    rememberMe: document.getElementById('rememberMe')?.checked || false // 添加rememberMe参数
   };
   
   try {
@@ -24,19 +25,17 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     
     const { token, user } = await response.json();
     
-    // 保存用户信息和认证token
-    localStorage.setItem('authToken', token);
+    // 保存用户信息
     localStorage.setItem('currentUser', JSON.stringify({
       id: user.id,
       username: user.username,
       isAdmin: user.isAdmin
     }));
-    
+
     // 登录成功，跳转到主页
     window.location.href = '/';
   } catch (error) {
     window.showError(error.message);
   }
 });
-
 

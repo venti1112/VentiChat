@@ -60,27 +60,31 @@ window.checkAuth = function(needAdmin = false) {
 
 // 验证token有效性
 window.verifyToken = async function() {
-  const token = localStorage.getItem('authToken');
-  if (!token) {
-    window.location.href = '/login';
-  }
-
   try {
-    const response = await fetch('/api/auth/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token })
-    });
-    if (response.ok) {
-      const data = await response.json();
-      // 验证通过，确保currentUser信息最新
-      localStorage.setItem('currentUser', JSON.stringify(data.user));
-    } else {
-      throw new Error('Token无效');
+    // 从cookie获取token
+    const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
+    if (!token) {
+      throw new Error('未找到token');
     }
+
+    const response = await fetch('/api/auth/verify', {
+      method: 'get',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error('Token验证失败');
+    }
+    
+    const data = await response.json();
+    // 验证通过，确保currentUser信息最新
+    localStorage.setItem('currentUser', JSON.stringify(data.user));
+    return true;
   } catch (error) {
     console.error('Token验证失败:', error);
-    localStorage.removeItem('authToken');
     localStorage.removeItem('currentUser');
     window.location.href = '/login';
     return false;
@@ -88,41 +92,38 @@ window.verifyToken = async function() {
 }
 
 // 格式化日期时间显示
-function formatDateTime(dateTimeStr) {
+window.formatDateTime = function formatDateTime(dateTimeStr) {
   const date = new Date(dateTimeStr);
   return date.toLocaleString();
 }
 
 // 退出登录
-async function logout() {
+window.logout = async function() {
   if (confirm('确定要退出登录吗？')) {
     try {
       // 调用后端退出登录接口
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
+      const response = await fetch('/api/auth/logout', {method: 'get'});
       
       if (!response.ok) {
         throw new Error('退出登录失败');
       }
       
       // 清除本地存储的认证信息
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('currentUser');
+      res.clearCookie('token', {
+            httpOnly: false,
+            secure: false,
+            sameSite: 'lax'
+        });
       
       // 重定向到登录页
-      window.location.href = '/login.html';
+	      window.location.href = '/login';
       
     } catch (error) {
       console.error('退出登录错误:', error);
       // 即使后端调用失败，也清除本地存储
       localStorage.removeItem('authToken');
       localStorage.removeItem('currentUser');
-      window.location.href = '/login.html';
+	      window.location.href = '/login';
     }
   }
 }

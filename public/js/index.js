@@ -12,7 +12,7 @@ let messages = [];
 let hasMoreMessages = true;
 let loadingMessages = false;
 let unreadCounts = {};
-const socket = io();
+let socket = null; // 延迟初始化
 
 // DOM元素引用
 const roomList = document.getElementById('roomList');
@@ -33,10 +33,77 @@ function setLoadingHistory(loading) {
 
 // 初始化
 document.addEventListener('DOMContentLoaded', async () => {
-  window.verifyToken()
-  initChat();
-  loadRooms();
-  setupEventListeners();
+  try {
+    // 1. 先验证token
+    const verified = await window.verifyToken();
+    if (!verified) return;
+
+    // 2. 初始化当前用户
+    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+    if (!currentUser) {
+      window.location.href = '/login';
+      return;
+    }
+
+    // 3. 初始化socket连接
+    socket = io({
+      query: {
+        token: document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1]
+      }
+    });
+
+    // 检查socket连接状态
+    socket.on('connect', () => {
+      console.log('Socket connected');
+      // 设置事件监听器
+      setupEventListeners();
+      // 加载聊天室列表
+      loadRooms();
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Socket连接错误:', error);
+      showError('实时通信连接失败，请刷新重试');
+    });
+
+    // 监听断开连接事件
+    socket.on('disconnect', () => {
+      console.log('Socket disconnected');
+    });
+
+  } catch (error) {
+    console.error('初始化失败:', error);
+    if (error.response && error.response.status === 403) {
+      window.location.href = '/login';
+    } else {
+      showError('页面初始化失败，请刷新重试');
+    }
+  }
+
+  /* 文件上传功能修复 */
+  const fileInput = document.getElementById('fileInput');
+  const attachFileBtn = document.getElementById('attachFileBtn');
+
+  if (fileInput && attachFileBtn) {
+    attachFileBtn.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const fileType = file.type;
+      if (fileType.startsWith('image/')) {
+        sendImage(file);
+      } else if (fileType.startsWith('video/')) {
+        sendVideo(file);
+      } else {
+        sendFile(file);
+      }
+      e.target.value = '';
+    });
+  }
 });
 
 // 设置事件监听器
@@ -62,18 +129,29 @@ function setupEventListeners() {
   document.getElementById('membersBtn').addEventListener('click', showMembers);
   
   // 退出登录按钮
-  document.getElementById('logoutBtn').addEventListener('click', logout);
+  document.getElementById('logoutBtn').addEventListener('click', window.logout);
 }
 
 // 加载聊天室列表
 function loadRooms() {
-  fetch('/api/rooms')
+  console.log('正在加载聊天室列表...');
+  
+  fetch('/api/rooms', {
+    method: 'GET',
+    credentials: 'include' // 确保携带Cookie
+  })
     .then(response => {
-      if (!response.ok) throw new Error('加载失败');
+      console.log('聊天室列表请求响应:', response.status);
+      if (!response.ok) throw new Error('加载失败: ' + response.statusText);
       return response.json();
     })
     .then(rooms => {
+      console.log('收到聊天室列表:', rooms);
       roomList.innerHTML = '';
+      if (rooms.length === 0) {
+        roomList.innerHTML = '<li class="list-group-item text-muted">暂无聊天室</li>';
+        return;
+      }
       rooms.forEach(room => {
         const li = document.createElement('li');
         li.className = 'list-group-item d-flex justify-content-between align-items-center';
@@ -160,8 +238,14 @@ function loadHistoryMessages(append = false) {
     });
 }
 
+// 为当前用户设置消息气泡样式
+function setCurrentUser(user) {
+    currentUser = user;
+    document.getElementById('currentUsername').textContent = user.username;
+}
+
 // 添加消息到聊天界面
-function addMessageToChat(message, position = 'append') {
+function addMessage(message) {
   if (message.isDeleted) return;
 
   const isCurrentUser = message.senderId === currentUser.id;
@@ -217,7 +301,7 @@ function addMessageToChat(message, position = 'append') {
   }
 }
 
-// 发送消息
+// 发送消息函数
 function sendMessage() {
   const content = messageInput.value.trim();
   if (!content || !currentRoomId) return;
@@ -252,6 +336,78 @@ function sendMessage() {
     console.error('发送消息失败:', error);
     window.showError('发送失败，请检查网络连接');
   });
+}
+
+// 发送图片
+function sendImage(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('roomId', currentRoomId);
+    
+    fetch('/api/messages/image', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            addMessage(data.message);
+        } else {
+            showError('发送图片失败');
+        }
+    })
+    .catch(error => {
+        showError('发送图片失败');
+        console.error('Error:', error);
+    });
+}
+
+// 发送视频
+function sendVideo(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('roomId', currentRoomId);
+    
+    fetch('/api/messages/video', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            addMessage(data.message);
+        } else {
+            showError('发送视频失败');
+        }
+    })
+    .catch(error => {
+        showError('发送视频失败');
+        console.error('Error:', error);
+    });
+}
+
+// 发送文件
+function sendFile(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('roomId', currentRoomId);
+    
+    fetch('/api/messages/file', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            addMessage(data.message);
+        } else {
+            showError('发送文件失败');
+        }
+    })
+    .catch(error => {
+        showError('发送文件失败');
+        console.error('Error:', error);
+    });
 }
 
 // 撤回消息
@@ -572,6 +728,12 @@ socket.on('messageRetracted', (data) => {
     }
   }
 });
+
+
+
+
+
+
 
 
 
