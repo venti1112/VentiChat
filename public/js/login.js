@@ -24,23 +24,19 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     
     const { token, user } = await response.json();
     
-    // 保存token和用户信息
+    // 保存用户信息和认证token
     localStorage.setItem('authToken', token);
     localStorage.setItem('currentUser', JSON.stringify({
       id: user.id,
       username: user.username,
-      nickname: user.nickname,
-      avatarUrl: user.avatarUrl
+      isAdmin: user.isAdmin
     }));
     
-    showSuccess('登录成功！');
-    
-    // 重定向到主页面
-    setTimeout(() => {
-      window.location.href = '/';
-    }, 1000);
-    
+    // 登录成功，跳转到主页
+    window.location.href = '/';
   } catch (error) {
-    showError('登录失败：' + error.message);
+    window.showError(error.message);
   }
 });
+
+

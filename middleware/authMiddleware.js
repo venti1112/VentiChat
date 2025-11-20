@@ -3,17 +3,22 @@ const { models } = require('../app');
 
 // 认证中间件
 exports.authMiddleware = async (req, res, next) => {
+    // 跳过所有认证相关的请求
+    if (req.path.startsWith('/auth/')) {
+        return next();
+    }
+    
     try {
-        const token = req.headers.authorization?.split(' ')[1];
+        const token = req.cookies.token;
         if (!token) {
-            return res.status(401).json({ error: '未提供认证令牌' });
+            return res.status(403).json({ error: '未提供认证令牌' });
         }
         
         const decoded = jwt.verify(token, process.env.ENCRYPTION_KEY || 'your-secret-key');
         const user = await models.User.findByPk(decoded.id);
         
         if (!user) {
-            return res.status(401).json({ error: '用户不存在' });
+            return res.status(403).json({ error: '用户不存在' });
         }
         
         if (user.status === 'banned') {
@@ -23,7 +28,7 @@ exports.authMiddleware = async (req, res, next) => {
         req.user = user;
         next();
     } catch (error) {
-        res.status(401).json({ error: '无效的认证令牌' });
+        res.status(403).json({ error: '无效的认证令牌' });
     }
 };
 

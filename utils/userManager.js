@@ -44,34 +44,40 @@ const register = async (userData) => {
 // 用户登录
 const login = async (username, password) => {
     try {
-        // 查找用户
-        const user = await User.findOne({
-            where: { username: username }
-        });
+        console.log('开始登录流程，用户名:', username);
+        
+        const user = await User.findOne({ where: { username } });
         
         if (!user) {
+            console.log('用户不存在:', username);
             throw new Error('用户名或密码错误');
         }
         
-        // 检查账户状态
+        console.log('找到用户，检查状态:', user.status);
         if (user.status === 'banned') {
             throw new Error('该账户已被封禁');
         }
         
-        // 验证密码
         const isMatch = await bcrypt.compare(password, user.passwordHash);
+        console.log('密码验证结果:', isMatch);
         
         if (!isMatch) {
             throw new Error('用户名或密码错误');
         }
         
-        // 生成JWT令牌
-        const config = require('../config/config.json');
+        // 检查配置
+        if (!config.encryptionKey) {
+            console.error('JWT密钥未配置');
+            throw new Error('系统配置错误');
+        }
+        
         const token = jwt.sign(
             { userId: user.id, username: user.username },
             config.encryptionKey,
             { expiresIn: '7d' }
         );
+        
+        console.log('Token生成成功，长度:', token.length);
         
         return {
             token: token,
@@ -84,7 +90,7 @@ const login = async (username, password) => {
             }
         };
     } catch (error) {
-        console.error('用户登录失败:', error);
+        console.error('用户登录失败:', error.message);
         throw error;
     }
 };

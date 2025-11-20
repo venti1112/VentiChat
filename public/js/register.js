@@ -14,12 +14,12 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
   
   // 前端验证
   if (userData.password !== userData.confirmPassword) {
-    showError('两次输入的密码不一致');
+    window.showError('两次输入的密码不一致');
     return;
   }
   
   if (!/^[a-zA-Z0-9_]{3,20}$/.test(userData.username)) {
-    showError('用户名格式不正确');
+    window.showError('用户名格式不正确');
     return;
   }
   
@@ -36,7 +36,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     }
     
     const result = await response.json();
-    showSuccess('注册成功！请登录');
+    window.showSuccess('注册成功！请登录');
     
     // 重定向到登录页
     setTimeout(() => {
@@ -44,6 +44,6 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     }, 1500);
     
   } catch (error) {
-    showError('注册失败：' + error.message);
+    window.showError('注册失败：' + error.message);
   }
 });

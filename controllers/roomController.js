@@ -1,3 +1,4 @@
+const { Sequelize } = require('sequelize');
 const { Room, RoomMember, User, Message, JoinRequest } = require('../models');
 
 // 创建聊天室
@@ -96,16 +97,36 @@ exports.createPrivateRoom = async (req, res) => {
 };
 
 // 获取用户所在聊天室列表
-exports.getUserRooms = async (req, res) => {
+exports.getRooms = async (req, res) => {
     try {
         const rooms = await req.user.getJoinedRooms({
             include: [{
                 model: RoomMember,
-                where: { userId: req.user.id },
-                attributes: ['note']
+                attributes: ['note', 'lastReadMessageId']
             }]
         });
-        res.json(rooms);
+        
+        // 添加未读消息计数
+        const enrichedRooms = await Promise.all(rooms.map(async (room) => {
+            const lastReadMessageId = room.RoomMember.lastReadMessageId;
+            if (!lastReadMessageId) {
+                return { ...room.get({ plain: true }), unreadCount: 0 };
+            }
+            
+            const unreadCount = await Message.count({
+                where: {
+                    roomId: room.id,
+                    id: { [Sequelize.Op.gt]: lastReadMessageId }
+                }
+            });
+            
+            return { 
+                ...room.get({ plain: true }), 
+                unreadCount 
+            };
+        }));
+        
+        res.json(enrichedRooms);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

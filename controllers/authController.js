@@ -32,13 +32,22 @@ exports.login = async (req, res) => {
                 username: user.username,
                 isAdmin: user.isAdmin 
             }, 
-            config.encryptionKey, 
+            process.env.ENCRYPTION_KEY || config.encryptionKey, // 使用环境变量优先，降级到配置文件
             { expiresIn: '24h' }
         );
         
-        // 返回token和用户信息（排除敏感信息）
+        // 将token写入Cookie
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 24 * 60 * 60 * 1000,
+            sameSite: 'strict'
+        });
+        
+        // 返回用户信息和token（新增token字段）
         res.json({ 
-            token, 
+            message: '登录成功',
+            token, // 新增：将token包含在响应体中
             user: {
                 id: user.id,
                 username: user.username,
@@ -87,8 +96,37 @@ exports.register = async (req, res) => {
             avatarUrl: '/images/default-avatar.jpg' // 默认头像
         });
         
-        res.status(201).json({ message: '注册成功，请登录' });
+        // 生成JWT token
+        const token = jwt.sign(
+            { 
+                id: newUser.id, 
+                username: newUser.username,
+                isAdmin: newUser.isAdmin 
+            }, 
+            config.encryptionKey, 
+            { expiresIn: '24h' }
+        );
         
+        // 将token写入Cookie
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 24 * 60 * 60 * 1000,
+            sameSite: 'strict'
+        });
+        
+        // 返回用户信息和token（新增token字段）
+        res.json({
+            message: '注册成功',
+            token, // 新增：将token包含在响应体中
+            user: {
+                id: newUser.id,
+                username: newUser.username,
+                nickname: newUser.nickname,
+                avatarUrl: newUser.avatarUrl,
+                isAdmin: newUser.isAdmin
+            }
+        });
     } catch (error) {
         console.error('注册错误:', error);
         res.status(500).json({ message: '服务器内部错误' });
@@ -108,4 +146,26 @@ exports.logout = async (req, res) => {
         console.error('退出登录错误:', error);
         res.status(500).json({ message: '服务器内部错误' });
     }
+};
+
+// 新增token验证接口
+exports.verifyToken = (req, res) => {
+  const token = req.body.token;
+  if (!token) {
+    return res.status(403).json({ message: 'Token缺失' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.ENCRYPTION_KEY || config.encryptionKey);
+    res.json({ 
+      valid: true, 
+      user: {
+        id: decoded.id,
+        username: decoded.username,
+        isAdmin: decoded.isAdmin
+      }
+    });
+  } catch (err) {
+    res.status(403).json({ valid: false, message: '无效的Token' });
+  }
 };

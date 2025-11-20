@@ -1,9 +1,5 @@
 VentiChat// 个人中心页脚本 - 仅在profile.html中使用
 
-// 检查登录状态
-function checkAuth() {
-  return checkAuth(false); // 使用common.js中的通用函数
-}
 
 // 全局变量
 let currentUserId = null;
@@ -15,15 +11,16 @@ const avatarInput = document.getElementById('avatarInput');
 const currentAvatar = document.getElementById('currentAvatar');
 
 // 页面初始化
-document.addEventListener('DOMContentLoaded', () => {
-  if (!checkAuth()) return;
-  
+document.addEventListener('DOMContentLoaded', async () => {
+  // 页面加载时自动验证token
+  if (!(await verifyToken())) return;
+
   // 从localStorage获取当前用户信息
   currentUserData = JSON.parse(localStorage.getItem('currentUser'));
   currentUserId = currentUserData.id;
   
-  loadUserProfile();
-  setupEventListeners();
+  loadProfileData();
+  setupProfileForm();
 });
 
 // 设置事件监听器
@@ -107,7 +104,7 @@ function loadProfileData() {
     })
     .catch(error => {
       console.error('加载个人资料失败:', error);
-      showError('加载资料失败：' + error.message);
+      window.showError('加载资料失败：' + error.message);
     });
 }
 
@@ -133,13 +130,13 @@ async function updateProfile(e) {
       throw new Error(error.message || '更新失败');
     }
     
-    showSuccess('资料更新成功！');
+    window.showSuccess('资料更新成功！');
     
     // 刷新页面数据
     loadProfileData();
     
   } catch (error) {
-    showError('更新失败：' + error.message);
+    window.showError('更新失败：' + error.message);
   }
 }
 
@@ -150,14 +147,14 @@ async function handleAvatarUpload(e) {
   
   // 验证文件类型
   if (!file.type.match('image.*')) {
-    showError('请选择图片文件');
+    window.showError('请选择图片文件');
     avatarInput.value = '';
     return;
   }
   
   // 验证文件大小（限制5MB）
   if (file.size > 5 * 1024 * 1024) {
-    showError('图片大小不能超过5MB');
+    window.showError('图片大小不能超过5MB');
     avatarInput.value = '';
     return;
   }
@@ -185,13 +182,13 @@ async function handleAvatarUpload(e) {
     }
     
     const result = await response.json();
-    showSuccess('头像更新成功！');
+    window.showSuccess('头像更新成功！');
     
     // 更新页面显示
     currentAvatar.src = result.avatarUrl;
     
   } catch (error) {
-    showError('头像上传失败：' + error.message);
+    window.showError('头像上传失败：' + error.message);
     // 如果上传失败，恢复原来的头像
     loadUserProfile();
   }
@@ -234,17 +231,17 @@ async function changePassword(e) {
   
   // 验证输入
   if (!oldPassword || !newPassword || !confirmPassword) {
-    showError('请填写所有字段');
+    window.showError('请填写所有字段');
     return;
   }
   
   if (newPassword.length < 6) {
-    showError('新密码至少需要6位字符');
+    window.showError('新密码至少需要6位字符');
     return;
   }
   
   if (newPassword !== confirmPassword) {
-    showError('两次输入的新密码不一致');
+    window.showError('两次输入的新密码不一致');
     return;
   }
   
@@ -260,12 +257,12 @@ async function changePassword(e) {
       throw new Error(error.message || '修改失败');
     }
     
-    showSuccess('密码修改成功！');
+    window.showSuccess('密码修改成功！');
     
     // 重置表单
     e.target.reset();
     
   } catch (error) {
-    showError('密码修改失败：' + error.message);
+    window.showError('密码修改失败：' + error.message);
   }
 }

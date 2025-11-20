@@ -1,41 +1,5 @@
 // 管理后台页脚本 - 仅在admin.html中使用
 
-// 检查登录状态和权限
-function checkAuth() {
-  const token = localStorage.getItem('authToken');
-  const currentUser = localStorage.getItem('currentUser');
-  
-  if (!token || !currentUser) {
-    window.location.href = '/login.html';
-    return false;
-  }
-  
-  try {
-    // 验证token有效性（简单检查）
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    if (payload.exp * 1000 < Date.now()) {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('currentUser');
-      window.location.href = '/login.html';
-      return false;
-    }
-    
-    // 检查管理员权限
-    const user = JSON.parse(currentUser);
-    if (!user.isAdmin) {
-      alert('您没有访问管理后台的权限');
-      window.location.href = '/';
-      return false;
-    }
-    
-    return true;
-  } catch (e) {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('currentUser');
-    window.location.href = '/login.html';
-    return false;
-  }
-}
 
 // 全局变量
 let currentUserId = null;
@@ -51,7 +15,7 @@ let loadingRooms = false;
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
-  if (!checkAuth()) return;
+  if (!window.checkAuth()) return;
   
   // 从localStorage获取当前用户信息
   currentUserData = JSON.parse(localStorage.getItem('currentUser'));
@@ -97,7 +61,7 @@ async function loadAdminData() {
     loadSettings();
     
   } catch (error) {
-    showError('加载管理数据失败：' + error.message);
+    window.showError('加载管理数据失败：' + error.message);
   }
 }
 
@@ -145,7 +109,7 @@ function loadUsers() {
     })
     .catch(error => {
       console.error('加载用户列表失败:', error);
-      showError('加载用户列表失败：' + error.message);
+      window.showError('加载用户列表失败：' + error.message);
     });
 }
 
@@ -184,7 +148,7 @@ function loadRooms() {
     })
     .catch(error => {
       console.error('加载聊天室列表失败:', error);
-      showError('加载聊天室列表失败：' + error.message);
+      window.showError('加载聊天室列表失败：' + error.message);
     });
 }
 
@@ -202,7 +166,7 @@ async function updateSettings(e) {
   const retentionDays = parseInt(document.getElementById('retentionDays').value);
   
   if (retentionDays < 1 || retentionDays > 3650) {
-    showError('保存期限必须在1-3650天之间');
+    window.showError('保存期限必须在1-3650天之间');
     return;
   }
   
@@ -211,10 +175,10 @@ async function updateSettings(e) {
     console.log('更新系统设置:', { retentionDays });
     
     // 模拟成功响应
-    showSuccess('系统设置更新成功！');
+    window.showSuccess('系统设置更新成功！');
     
   } catch (error) {
-    showError('更新设置失败：' + error.message);
+    window.showError('更新设置失败：' + error.message);
   }
 }
 
@@ -232,12 +196,12 @@ async function addUser(e) {
   
   // 验证输入
   if (!userData.username || !userData.nickname || !userData.password) {
-    showError('请填写所有必填字段');
+    window.showError('请填写所有必填字段');
     return;
   }
   
   if (userData.password.length < 6) {
-    showError('密码至少需要6位字符');
+    window.showError('密码至少需要6位字符');
     return;
   }
   
@@ -254,7 +218,7 @@ async function addUser(e) {
     }
     
     const newUser = await response.json();
-    showSuccess(`用户 ${newUser.username} 添加成功！`);
+    window.showSuccess(`用户 ${newUser.username} 添加成功！`);
     
     // 关闭模态框
     bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
@@ -263,7 +227,7 @@ async function addUser(e) {
     loadUsers();
     
   } catch (error) {
-    showError('添加用户失败：' + error.message);
+    window.showError('添加用户失败：' + error.message);
   }
 }
 
@@ -292,7 +256,7 @@ async function editUser(e) {
       throw new Error(error.message || '更新失败');
     }
     
-    showSuccess('用户信息更新成功！');
+    window.showSuccess('用户信息更新成功！');
     
     // 关闭模态框
     bootstrap.Modal.getInstance(document.getElementById('editUserModal')).hide();
@@ -301,7 +265,7 @@ async function editUser(e) {
     loadUsers();
     
   } catch (error) {
-    showError('更新用户失败：' + error.message);
+    window.showError('更新用户失败：' + error.message);
   }
 }
 
@@ -321,13 +285,13 @@ async function deleteUser(userId) {
       throw new Error(error.message || '删除失败');
     }
     
-    showSuccess('用户删除成功！');
+    window.showSuccess('用户删除成功！');
     
     // 刷新用户列表
     loadUsers();
     
   } catch (error) {
-    showError('删除用户失败：' + error.message);
+    window.showError('删除用户失败：' + error.message);
   }
 }
 
@@ -352,20 +316,20 @@ async function toggleUserStatus(userId, currentStatus) {
       throw new Error(error.message || `${action}失败`);
     }
     
-    showSuccess(`用户已${action}！`);
+    window.showSuccess(`用户已${action}！`);
     
     // 刷新用户列表
     loadUsers();
     
   } catch (error) {
-    showError(`${action}失败：` + error.message);
+    window.showError(`${action}失败：` + error.message);
   }
 }
 
 // 删除聊天室
 async function deleteRoom(roomId, roomName) {
   if (roomId === 1) {
-    showError('默认大聊天室不能被解散');
+    window.showError('默认大聊天室不能被解散');
     return;
   }
   
@@ -383,13 +347,13 @@ async function deleteRoom(roomId, roomName) {
       throw new Error(error.message || '解散失败');
     }
     
-    showSuccess('聊天室已解散！');
+    window.showSuccess('聊天室已解散！');
     
     // 刷新聊天室列表
     loadRooms();
     
   } catch (error) {
-    showError('解散聊天室失败：' + error.message);
+    window.showError('解散聊天室失败：' + error.message);
   }
 }
 
@@ -444,7 +408,7 @@ function viewRoomDetails(roomId) {
     })
     .catch(error => {
       console.error('加载聊天室详情失败:', error);
-      showError('加载详情失败：' + error.message);
+      window.showError('加载详情失败：' + error.message);
     });
 }
 
@@ -459,13 +423,13 @@ async function cleanupRooms() {
     console.log('清理异常聊天室');
     
     // 模拟成功响应
-    showSuccess('异常聊天室清理完成！');
+    window.showSuccess('异常聊天室清理完成！');
     
     // 刷新聊天室列表
     loadRooms();
     
   } catch (error) {
-    showError('清理失败：' + error.message);
+    window.showError('清理失败：' + error.message);
   }
 }
 
@@ -560,28 +524,4 @@ function filterRooms() {
 function formatDateTime(dateTimeStr) {
   const date = new Date(dateTimeStr);
   return date.toLocaleString();
-}
-
-// 显示成功消息
-function showSuccess(message) {
-  const msgDiv = document.getElementById('globalMessage');
-  msgDiv.className = 'alert alert-success fixed-top text-center';
-  msgDiv.textContent = message;
-  msgDiv.style.display = 'block';
-  
-  setTimeout(() => {
-    msgDiv.style.display = 'none';
-  }, 3000);
-}
-
-// 显示错误消息
-function showError(message) {
-  const msgDiv = document.getElementById('globalMessage');
-  msgDiv.className = 'alert alert-danger fixed-top text-center';
-  msgDiv.textContent = message;
-  msgDiv.style.display = 'block';
-  
-  setTimeout(() => {
-    msgDiv.style.display = 'none';
-  }, 5000);
 }

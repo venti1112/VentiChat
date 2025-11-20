@@ -6,6 +6,8 @@ const config = require('./config/config.json');
 const { Sequelize } = require('sequelize'); // 移到顶部
 const multer = require('multer');
 const socketIo = require('socket.io');
+const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
 
 // 创建应用和服务器
 const app = express();
@@ -58,17 +60,10 @@ sequelize.sync({ alter: true })
 
 // 中间件
 app.use(express.json());
+app.use(cookieParser());
 
 // 确保API路由在静态文件服务之前
 app.use('/api', require('./routes/index'));
-
-// 静态文件服务 - 放在所有路由之后
-app.use(express.static(path.join(__dirname, 'public')));
-
-// 添加HTML页面路由
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
 
 app.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
@@ -78,6 +73,11 @@ app.get('/register', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'register.html'));
 });
 
+// 添加HTML页面路由 - 放在静态文件服务之前
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 app.get('/profile', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'profile.html'));
 });
@@ -85,6 +85,9 @@ app.get('/profile', (req, res) => {
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
+
+// 静态文件服务 - 放在所有路由之后
+app.use(express.static(path.join(__dirname, 'public')));
 
 // 文件上传配置
 const storage = multer.diskStorage({

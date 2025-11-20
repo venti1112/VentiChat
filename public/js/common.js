@@ -3,7 +3,7 @@
  */
 
 // 显示成功消息
-function showSuccess(message) {
+window.showSuccess = function(message) {
   const msgDiv = document.getElementById('globalMessage');
   msgDiv.className = 'alert alert-success fixed-top text-center';
   msgDiv.textContent = message;
@@ -15,7 +15,7 @@ function showSuccess(message) {
 }
 
 // 显示错误消息
-function showError(message) {
+window.showError = function(message) {
   const msgDiv = document.getElementById('globalMessage');
   msgDiv.className = 'alert alert-danger fixed-top text-center';
   msgDiv.textContent = message;
@@ -27,28 +27,22 @@ function showError(message) {
 }
 
 // 检查登录状态和权限
-function checkAuth(needAdmin = false) {
-  const token = localStorage.getItem('authToken');
+window.checkAuth = function(needAdmin = false) {
   const currentUser = localStorage.getItem('currentUser');
   
-  if (!token || !currentUser) {
-    window.location.href = '/login.html';
+  // 如果没有用户信息，则认为未登录
+  if (!currentUser) {
+    window.location.href = '/login';
     return false;
   }
   
+  // 只检查用户信息是否存在，信任服务端对Cookie的验证
+  // （页面加载时服务端已验证过Cookie）
   try {
-    // 验证token有效性（简单检查）
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    if (payload.exp * 1000 < Date.now()) {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('currentUser');
-      window.location.href = '/login.html';
-      return false;
-    }
+    const user = JSON.parse(currentUser);
     
     // 如果需要管理员权限，检查用户角色
     if (needAdmin) {
-      const user = JSON.parse(currentUser);
       if (!user.isAdmin) {
         alert('您没有访问管理后台的权限');
         window.location.href = '/';
@@ -58,9 +52,37 @@ function checkAuth(needAdmin = false) {
     
     return true;
   } catch (e) {
+    localStorage.removeItem('currentUser');
+    window.location.href = '/login';
+    return false;
+  }
+}
+
+// 验证token有效性
+window.verifyToken = async function() {
+  const token = localStorage.getItem('authToken');
+  if (!token) {
+    window.location.href = '/login';
+  }
+
+  try {
+    const response = await fetch('/api/auth/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+    if (response.ok) {
+      const data = await response.json();
+      // 验证通过，确保currentUser信息最新
+      localStorage.setItem('currentUser', JSON.stringify(data.user));
+    } else {
+      throw new Error('Token无效');
+    }
+  } catch (error) {
+    console.error('Token验证失败:', error);
     localStorage.removeItem('authToken');
     localStorage.removeItem('currentUser');
-    window.location.href = '/login.html';
+    window.location.href = '/login';
     return false;
   }
 }

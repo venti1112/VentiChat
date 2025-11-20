@@ -1,39 +1,17 @@
 // 主页脚本 - 仅在index.html中使用
 
 // 检查登录状态
-function checkAuth() {
-  const token = localStorage.getItem('authToken');
-  const currentUser = localStorage.getItem('currentUser');
-  
-  if (!token || !currentUser) {
-    window.location.href = '/login.html';
-    return false;
-  }
-  
-  try {
-    // 验证token有效性（简单检查）
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    if (payload.exp * 1000 < Date.now()) {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('currentUser');
-      window.location.href = '/login.html';
-      return false;
-    }
-    
-    // 设置当前用户
-    currentUserData = JSON.parse(currentUser);
-    return true;
-  } catch (e) {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('currentUser');
-    window.location.href = '/login.html';
-    return false;
-  }
-}
+// 删除错误的递归定义，直接使用common.js中的全局函数
 
 // 全局变量
 let currentRoomId = null;
 let currentUserData = null;
+let currentUserId = null;
+let rooms = [];
+let messages = [];
+let hasMoreMessages = true;
+let loadingMessages = false;
+let unreadCounts = {};
 const socket = io();
 
 // DOM元素引用
@@ -54,12 +32,9 @@ function setLoadingHistory(loading) {
 }
 
 // 初始化
-document.addEventListener('DOMContentLoaded', () => {
-  if (!checkAuth()) return;
-  
-  // 从localStorage获取当前用户信息
-  currentUser = JSON.parse(localStorage.getItem('currentUser'));
-  
+document.addEventListener('DOMContentLoaded', async () => {
+  window.verifyToken()
+  initChat();
   loadRooms();
   setupEventListeners();
 });
@@ -178,7 +153,7 @@ function loadHistoryMessages(append = false) {
     })
     .catch(error => {
       console.error('加载历史消息失败:', error);
-      showError('加载历史消息失败：' + error.message);
+      window.showError('加载历史消息失败：' + error.message);
     })
     .finally(() => {
       setLoadingHistory(false);
@@ -275,7 +250,7 @@ function sendMessage() {
   })
   .catch(error => {
     console.error('发送消息失败:', error);
-    showError('发送失败，请检查网络连接');
+    window.showError('发送失败，请检查网络连接');
   });
 }
 
@@ -298,10 +273,10 @@ function retractMessage(messageId) {
       bubble.innerHTML = '<em class="text-muted">[已撤回]</em>';
       messageElement.querySelector('.retract-btn')?.remove();
     }
-    showSuccess('消息已撤回');
+    window.showSuccess('消息已撤回');
   })
   .catch(error => {
-    showError('撤回失败：' + error.message);
+    window.showError('撤回失败：' + error.message);
   });
 }
 
@@ -341,7 +316,7 @@ function triggerFileUpload(type) {
       addMessageToChat(message);
       
     } catch (error) {
-      showError('文件上传失败：' + error.message);
+      window.showError('文件上传失败：' + error.message);
     }
   };
   
@@ -373,7 +348,7 @@ async function createRoom(e) {
     }
     
     const newRoom = await response.json();
-    showSuccess(`聊天室 ${newRoom.name} 创建成功！`);
+    window.showSuccess(`聊天室 ${newRoom.name} 创建成功！`);
     
     // 关闭模态框
     bootstrap.Modal.getInstance(document.getElementById('createRoomModal')).hide();
@@ -382,7 +357,7 @@ async function createRoom(e) {
     loadRooms();
     
   } catch (error) {
-    showError('创建聊天室失败：' + error.message);
+    window.showError('创建聊天室失败：' + error.message);
   }
 }
 
@@ -421,7 +396,7 @@ function searchUser() {
     })
     .catch(error => {
       console.error('搜索用户失败:', error);
-      showError('搜索失败，请重试');
+      window.showError('搜索失败，请重试');
     });
 }
 
@@ -443,7 +418,7 @@ function startPrivateChat(user) {
     bootstrap.Modal.getInstance(document.getElementById('searchUserModal')).hide();
   })
   .catch(error => {
-    showError('无法创建私聊：' + error.message);
+    window.showError('无法创建私聊：' + error.message);
   });
 }
 
@@ -492,7 +467,7 @@ function showMembers() {
     })
     .catch(error => {
       console.error('加载成员列表失败:', error);
-      showError('加载成员失败，请重试');
+      window.showError('加载成员失败，请重试');
     });
   
   // 显示模态框
@@ -510,14 +485,14 @@ function kickUser(userId) {
   })
   .then(response => {
     if (!response.ok) throw new Error('踢出失败');
-    showSuccess('用户已踢出');
+    window.showSuccess('用户已踢出');
     // 刷新成员列表
     if (document.getElementById('membersModal').classList.contains('show')) {
       showMembers();
     }
   })
   .catch(error => {
-    showError('踢出用户失败：' + error.message);
+    window.showError('踢出用户失败：' + error.message);
   });
 }
 
@@ -552,29 +527,6 @@ function formatTime(timestamp) {
   return date.toLocaleString();
 }
 
-// 显示成功消息
-function showSuccess(message) {
-  const msgDiv = document.getElementById('globalMessage');
-  msgDiv.className = 'alert alert-success fixed-top text-center';
-  msgDiv.textContent = message;
-  msgDiv.style.display = 'block';
-  
-  setTimeout(() => {
-    msgDiv.style.display = 'none';
-  }, 3000);
-}
-
-// 显示错误消息
-function showError(message) {
-  const msgDiv = document.getElementById('globalMessage');
-  msgDiv.className = 'alert alert-danger fixed-top text-center';
-  msgDiv.textContent = message;
-  msgDiv.style.display = 'block';
-  
-  setTimeout(() => {
-    msgDiv.style.display = 'none';
-  }, 5000);
-}
 
 // 监听Socket.IO事件
 socket.on('receiveMessage', (message) => {
@@ -620,6 +572,10 @@ socket.on('messageRetracted', (data) => {
     }
   }
 });
+
+
+
+
 
 
 
