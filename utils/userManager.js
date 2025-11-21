@@ -38,7 +38,7 @@ const register = async (userData) => {
         
         return user;
     } catch (error) {
-        console.error('用户注册失败:', error);
+        log('ERROR', `用户注册失败: ` + error);
         throw error;
     }
 };
@@ -51,7 +51,7 @@ const login = async (username, password) => {
         const user = await User.findOne({ where: { username } });
         
         if (!user) {
-            log('INFO', `用户不存在: ${username}`);
+            log('ERROR', `用户不存在: ${username}`);
             throw new Error('用户名或密码错误');
         }
         
@@ -159,7 +159,7 @@ const updateUserInfo = async (userId, updateData) => {
             status: user.status
         };
     } catch (error) {
-        console.error('更新用户信息失败:', error);
+        log('ERROR', `更新用户信息失败: ` + error);
         throw error;
     }
 };
@@ -187,7 +187,7 @@ const searchUsers = async (query) => {
             avatarUrl: user.avatarUrl
         }));
     } catch (error) {
-        console.error('搜索用户失败:', error);
+        log('ERROR', `搜索用户失败: ` + error);
         throw error;
     }
 };
@@ -247,7 +247,7 @@ const createPrivateChat = async (userId1, userId2) => {
         
         return room;
     } catch (error) {
-        console.error('创建私聊失败:', error);
+        log('ERROR', `创建私聊失败: ` + error);
         throw error;
     }
 };
@@ -264,7 +264,7 @@ const getUserRoomNote = async (userId, roomId) => {
         
         return member ? member.note : null;
     } catch (error) {
-        console.error('获取用户备注失败:', error);
+        log('ERROR', `获取用户备注失败: ` + error);
         throw error;
     }
 };
@@ -288,7 +288,7 @@ const setUserRoomNote = async (userId, roomId, note) => {
         
         return { success: true };
     } catch (error) {
-        console.error('设置备注失败:', error);
+        log('ERROR', `设置用户备注失败: ` + error);
         throw error;
     }
 };

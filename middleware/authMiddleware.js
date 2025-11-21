@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const models = require('../models');
 const config = require('../config/config.json');
-const { logUnauthorizedAccess } = require('../utils/logger');
+const { logUnauthorizedAccess, log, LOG_LEVELS } = require('../utils/logger');
 
 // 认证中间件
 exports.authMiddleware = async (req, res, next) => {
@@ -131,7 +131,7 @@ exports.adminMiddleware = async (req, res, next) => {
         }
         next();
     } catch (dbError) {
-        console.error('管理员权限验证过程中发生数据库错误:', dbError);
+        log(LOG_LEVELS.ERROR, `管理员权限验证过程中发生数据库错误: ${dbError.message}`);
         // 发生数据库错误时，默认拒绝访问
         const clientIP = req.ip || req.connection.remoteAddress || 
                         (req.headers['x-forwarded-for'] || '').split(',')[0] || '未知用户';

@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="/css/bootstrap.min.css">
     <link rel="stylesheet" href="/css/main.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" >
+    <!-- 引入前端日志工具 -->
+    <script src="/js/logger.js"></script>
     <script src="/socket.io/socket.io.js" defer></script>
     <script src="/js/bootstrap.min.js" defer></script>
     <script src="/js/main.js" defer></script>
@@ -89,6 +91,37 @@
                     <button type="submit" class="btn btn-primary">保存更改</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- 自定义确认框 -->
+    <div class="modal-overlay" id="confirmOverlay">
+        <div class="custom-modal" id="confirmModal">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmTitle">确认</h5>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-modal btn-modal-secondary" id="confirmCancel">取消</button>
+                <button type="button" class="btn btn-modal btn-modal-primary" id="confirmOK">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 自定义消息框 -->
+    <div class="modal-overlay" id="messageOverlay">
+        <div class="custom-modal" id="messageModal">
+            <div class="modal-header">
+                <h5 class="modal-title" id="messageTitle">提示</h5>
+            </div>
+            <div class="modal-body">
+                <p id="messageContent"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-modal btn-modal-primary" id="messageOK">确定</button>
+            </div>
         </div>
     </div>
 
@@ -347,7 +380,7 @@
         </div>
     </div>
 
-    <!-- 搜索房间模态框 -->
+    <!-- 搜索聊天室模态框 -->
     <div class="modal fade" id="searchRoomModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -357,7 +390,7 @@
                 </div>
                 <div class="modal-body">
                     <div class="input-group mb-3">
-                        <input type="text" class="form-control" placeholder="房间ID/房间名称" id="searchRoomInput">
+                        <input type="text" class="form-control" placeholder="聊天室ID/聊天室名称" id="searchRoomInput">
                         <button class="btn btn-primary" id="searchRoomButton">搜索</button>
                     </div>
                     <ul class="list-group" id="searchRoomResults">

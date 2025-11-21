@@ -111,18 +111,13 @@ function log(level, message) {
     const coloredLevel = `${levelColors[level] || ''}[${level}]${colors.reset}`;
     const coloredMessage = `[${timestamp}] ${coloredLevel} ${colorizeConsoleMessage(message)}`;
     
-    switch (level) {
-        case LOG_LEVELS.INFO:
-            console.info(coloredMessage);
-            break;
-        case LOG_LEVELS.WARN:
-            console.warn(coloredMessage);
-            break;
-        case LOG_LEVELS.ERROR:
-            console.error(coloredMessage);
-            break;
-        default:
-            console.log(coloredMessage);
+    // 直接输出到控制台，避免递归调用
+    if (level === LOG_LEVELS.ERROR) {
+        console.error(coloredMessage);
+    } else if (level === LOG_LEVELS.WARN) {
+        console.warn(coloredMessage);
+    } else {
+        console.log(coloredMessage);
     }
     
     // 异步写入文件（不带颜色）
@@ -131,7 +126,8 @@ function log(level, message) {
     
     fs.appendFile(logFilePath, logMessage, { encoding: 'utf8' }, (err) => {
         if (err) {
-            console.error('日志写入文件失败:', err);
+            // 使用console直接输出文件写入错误，避免再次调用log函数
+            console.error(`[${getFormattedTimestamp()}] [ERROR] 日志写入文件失败: ${err.message}`);
         }
     });
 }
@@ -245,9 +241,16 @@ function logDatabaseQuery(query) {
     
     fs.appendFile(logFilePath, logMessage, { encoding: 'utf8' }, (err) => {
         if (err) {
-            console.error('日志写入文件失败:', err);
+            log(LOG_LEVELS.ERROR, `日志写入文件失败: ${err.message}`);
         }
     });
+}
+
+/**
+ * 记录数据库重试日志
+ */
+function logDatabaseRetry() {
+    log('INFO', '数据库连接失败，将在3分钟后重试');
 }
 
 module.exports = {
@@ -259,6 +262,7 @@ module.exports = {
     logHttpError,
     logBrowserDevToolsWarning,
     logDatabaseQuery,
+    logDatabaseRetry,
     log,
     LOG_LEVELS
 };

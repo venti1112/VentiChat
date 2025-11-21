@@ -8,7 +8,7 @@ const multer = require('multer');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const config = require('./config/config.json');
-const { log, logHttpError, logDatabaseQuery, logDatabaseRetry, logBrowserDevToolsWarning } = require('./utils/logger');
+const { log, logHttpError, logDatabaseQuery, logDatabaseRetry, logBrowserDevToolsWarning, LOG_LEVELS } = require('./utils/logger');
 
 // 创建Express应用
 const app = express();
@@ -43,7 +43,8 @@ const models = {
     Room: require('./models/room')(sequelize),
     RoomMember: require('./models/roomMember')(sequelize),
     Message: require('./models/message')(sequelize),
-    JoinRequest: require('./models/joinRequest')(sequelize)
+    JoinRequest: require('./models/joinRequest')(sequelize),
+    Token: require('./models/token')(sequelize)
 };
 
 // 手动设置模型关联，避免循环依赖
@@ -63,6 +64,8 @@ models.Message.belongsTo(models.Room, { foreignKey: 'roomId', as: 'MessageRoom' 
 
 models.JoinRequest.belongsTo(models.User, { foreignKey: 'userId' });
 models.JoinRequest.belongsTo(models.Room, { foreignKey: 'roomId' });
+
+models.Token.belongsTo(models.User, { foreignKey: 'userId' });
 
 // 将models对象挂载到app上，以便在其他地方使用
 app.set('models', models);
@@ -133,8 +136,6 @@ const apiRouter = require('./routes/index');
 apiRouter.models = models;
 app.use('/api', apiRouter);
 
-// 调试日志
-console.log('Models passed to routes:', Object.keys(models).filter(k => k !== 'sequelize' && k !== 'Sequelize'));
 
 // 404错误处理中间件
 app.use(async (req, res, next) => {
@@ -202,9 +203,9 @@ async function connectToDatabase() {
         await sequelize.authenticate();
         log('INFO', '数据库连接成功');
         
-        log('INFO', '正在同步数据库...');
-        await sequelize.sync({ alter: true });
-        log('INFO', '数据库同步完成');
+        // log('INFO', '正在同步数据库...');
+        // await sequelize.sync({ alter: true });
+        // log('INFO', '数据库同步完成');
         
         isDatabaseConnected = true;
         return true;

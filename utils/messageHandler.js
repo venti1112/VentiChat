@@ -1,5 +1,6 @@
 const { Message, Room, User } = require('../app');
 const { getFileUrl } = require('./fileUpload');
+const { log } = require('./logger'); // 引入日志方法
 
 // 发送消息
 const sendMessage = async (data) => {
@@ -48,7 +49,7 @@ const sendMessage = async (data) => {
             isDeleted: message.isDeleted
         };
     } catch (error) {
-        console.error('发送消息失败:', error);
+        log('ERROR', `发送消息失败: ${error.message}`);
         throw error;
     }
 };
@@ -79,7 +80,7 @@ const retractMessage = async (messageId, userId) => {
         
         return { success: true };
     } catch (error) {
-        console.error('撤回消息失败:', error);
+        log('ERROR', `撤回消息失败: ${error.message}`);
         throw error;
     }
 };
@@ -117,7 +118,7 @@ const getHistoryMessages = async (roomId, limit = 50, offset = 0) => {
             hasMore: offset + limit < messages.count
         };
     } catch (error) {
-        console.error('获取历史消息失败:', error);
+        log('ERROR', `获取历史消息失败: ${error.message}`);
         throw error;
     }
 };
@@ -148,7 +149,7 @@ const getUnreadCount = async (userId, roomId = null) => {
         
         return 0;
     } catch (error) {
-        console.error('获取未读消息数失败:', error);
+        log('ERROR', `获取未读消息数失败: ${error.message}`);
         throw error;
     }
 };

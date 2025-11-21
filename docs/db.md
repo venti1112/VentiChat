@@ -64,7 +64,7 @@
 | status | ENUM('pending','approved','rejected') | DEFAULT 'pending' | 申请状态 |
 | message | VARCHAR(255) | | 申请附言 |
 | user_id | INT | NOT NULL, FOREIGN KEY | 申请人ID |
-| room_id | INT | NOT NULL, FOREIGN KEY | 申请房间ID |
+| room_id | INT | NOT NULL, FOREIGN KEY | 申请聊天室ID |
 | request_time | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 申请时间 |
 
 ## 6. tokens 表

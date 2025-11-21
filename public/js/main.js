@@ -1,15 +1,58 @@
 // 显示全局消息
 function showMessage(message, type = 'success') {
-    const globalMessage = document.getElementById('globalMessage');
-    if (globalMessage) {
-        globalMessage.textContent = message;
-        globalMessage.className = `alert alert-${type} fixed-top text-center`;
-        globalMessage.style.display = 'block';
+    const messageModal = document.getElementById('messageModal');
+    const messageOverlay = document.getElementById('messageOverlay');
+    const messageContent = document.getElementById('messageContent');
+    const messageOK = document.getElementById('messageOK');
+    const messageTitle = document.getElementById('messageTitle');
+    
+    if (messageModal && messageOverlay && messageContent) {
+        // 设置消息内容和标题
+        messageContent.textContent = message;
+        messageTitle.textContent = type === 'success' ? '成功' : type === 'danger' ? '错误' : '提示';
         
-        setTimeout(() => {
-            globalMessage.style.display = 'none';
-        }, 3000);
+        // 显示模态框和遮罩
+        messageOverlay.style.display = 'flex';
+        
+        // 绑定确定按钮事件
+        messageOK.onclick = function() {
+            messageOverlay.style.display = 'none';
+        };
     }
+}
+
+// 自定义确认框函数
+function showConfirm(message) {
+    return new Promise((resolve) => {
+        const confirmModal = document.getElementById('confirmModal');
+        const confirmOverlay = document.getElementById('confirmOverlay');
+        const confirmMessage = document.getElementById('confirmMessage');
+        const confirmOK = document.getElementById('confirmOK');
+        const confirmCancel = document.getElementById('confirmCancel');
+        
+        if (confirmModal && confirmOverlay && confirmMessage) {
+            // 设置确认消息
+            confirmMessage.textContent = message;
+            
+            // 显示模态框和遮罩
+            confirmOverlay.style.display = 'flex';
+            
+            // 确定按钮事件
+            confirmOK.onclick = function() {
+                confirmOverlay.style.display = 'none';
+                resolve(true);
+            };
+            
+            // 取消按钮事件
+            confirmCancel.onclick = function() {
+                confirmOverlay.style.display = 'none';
+                resolve(false);
+            };
+        } else {
+            // 如果模态框不存在，使用默认的confirm
+            resolve(confirm(message));
+        }
+    });
 }
 
 // 切换到注册表单
@@ -62,21 +105,29 @@ function closeProfilePopup() {
     if (overlay) overlay.style.display = 'none';
 }
 
+// 引入前端日志工具
+// 使用统一的前端日志工具
+const logger = window.logger || {
+    logInfo: () => {},
+    logWarn: () => {},
+    logError: () => {}
+};
+
 // 页面加载时检查登录状态
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('页面加载完成，检查登录状态');
+    logger.logInfo('页面加载完成，检查登录状态');
     const token = localStorage.getItem('token');
     const authSection = document.getElementById('authSection');
     const chatSection = document.getElementById('chatSection');
     const savedUser = localStorage.getItem('user');
     
-    console.log('Token存在:', !!token);
-    console.log('authSection元素存在:', !!authSection);
-    console.log('chatSection元素存在:', !!chatSection);
-    console.log('保存的用户信息:', savedUser);
+    logger.logInfo('Token存在:', !!token);
+    logger.logInfo('authSection元素存在:', !!authSection);
+    logger.logInfo('chatSection元素存在:', !!chatSection);
+    logger.logInfo('保存的用户信息:', savedUser);
     
     if (token && authSection && chatSection) {
-        console.log('检测到已登录状态，切换到聊天界面');
+        logger.logInfo('检测到已登录状态，切换到聊天界面');
         // 显示聊天界面
         authSection.style.display = 'none';
         chatSection.style.display = 'block';
@@ -97,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (userAvatar) userAvatar.src = user.avatarUrl || '/default-avatar.png';
                 if (userId) userId.textContent = 'UID: ' + (user.id || user.userId);
             } catch (e) {
-                console.error('解析保存的用户信息失败:', e);
+                logger.logError('解析保存的用户信息失败:', e);
             }
         }
         
@@ -108,14 +159,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .then(response => {
-            console.log('验证Token响应状态:', response.status);
+            logger.logInfo('验证Token响应状态:', response.status);
             if (!response.ok) {
                 throw new Error('网络响应错误');
             }
             return response.json();
         })
         .then(data => {
-            console.log('获取用户信息响应:', data);
+            logger.logInfo('获取用户信息响应:', data);
             if (data.valid && data.user) {
                 const userNickname = document.getElementById('userNickname');
                 const userUsername = document.getElementById('userUsername');
@@ -140,7 +191,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-            console.error('获取用户信息失败:', error);
+            logger.logError('获取用户信息失败:', error);
             // 出错时清除本地存储并显示登录界面
             localStorage.removeItem('token');
             localStorage.removeItem('userId');
@@ -149,7 +200,7 @@ document.addEventListener('DOMContentLoaded', function() {
             chatSection.style.display = 'none';
         });
     } else {
-        console.log('未登录或元素缺失，保持登录界面');
+        logger.logInfo('未登录或元素缺失，保持登录界面');
         // 确保显示登录界面
         if (authSection) authSection.style.display = 'flex';
         if (chatSection) chatSection.style.display = 'none';
@@ -161,21 +212,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 绑定表单提交事件
 function bindFormEvents() {
-    console.log('绑定表单事件');
+    logger.logInfo('绑定表单事件');
     
     // 登录表单提交
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
-        console.log('找到登录表单，绑定提交事件');
+        logger.logInfo('找到登录表单，绑定提交事件');
         loginForm.addEventListener('submit', function(e) {
-            console.log('登录表单提交事件触发');
+            logger.logInfo('登录表单提交事件触发');
             e.preventDefault();
             
             const usernameInput = document.getElementById('loginUsername');
             const passwordInput = document.getElementById('loginPassword');
             
             if (!usernameInput || !passwordInput) {
-                console.error('缺少表单元素');
+                logger.logError('缺少表单元素');
                 showMessage('表单元素缺失', 'danger');
                 return;
             }
@@ -184,7 +235,7 @@ function bindFormEvents() {
             const password = passwordInput.value;
             const rememberMe = document.getElementById('rememberMe')?.checked || false;
             
-            console.log('发送登录请求', { username, rememberMe });
+            logger.logInfo('发送登录请求', { username, rememberMe });
             
             fetch('/api/auth/login', {
                 method: 'POST',
@@ -194,7 +245,7 @@ function bindFormEvents() {
                 body: JSON.stringify({ username, password, rememberMe })
             })
             .then(response => {
-                console.log('收到登录响应，状态码:', response.status);
+                logger.logInfo('收到登录响应，状态码:', response.status);
                 // 不管响应是否成功，都继续处理
                 return response.json().then(data => {
                     // 将响应数据和状态码一起传递下去
@@ -202,11 +253,11 @@ function bindFormEvents() {
                 });
             })
             .then(({ data, status, ok }) => {
-                console.log('登录响应数据:', data);
+                logger.logInfo('登录响应数据:', data);
                 
                 // 检查登录是否成功
                 if (ok && data.token && data.user) {
-                    console.log('登录成功');
+                    logger.logInfo('登录成功');
                     // 保存token和用户信息到localStorage
                     localStorage.setItem('token', data.token);
                     localStorage.setItem('userId', data.user.id);
@@ -227,40 +278,40 @@ function bindFormEvents() {
                     const authSection = document.getElementById('authSection');
                     const chatSection = document.getElementById('chatSection');
                     
-                    console.log('切换界面元素存在:', { 
+                    logger.logInfo('切换界面元素存在:', { 
                         authSection: !!authSection, 
                         chatSection: !!chatSection 
                     });
                     
                     if (authSection) {
                         authSection.style.display = 'none';
-                        console.log('隐藏登录区域');
+                        logger.logInfo('隐藏登录区域');
                     }
                     if (chatSection) {
                         chatSection.style.display = 'block';
-                        console.log('显示聊天区域');
+                        logger.logInfo('显示聊天区域');
                     }
                 } else {
                     // 登录失败，显示服务器返回的错误信息
-                    console.log('登录失败:', data.message);
+                    logger.logInfo('登录失败:', data.message);
                     showMessage(data.message || '登录失败，请检查用户名和密码', 'danger');
                 }
             })
             .catch(error => {
-                console.error('登录错误:', error);
+                logger.logError('登录错误:', error);
                 showMessage('网络错误，请稍后再试', 'danger');
             });
         });
     } else {
-        console.log('未找到登录表单');
+        logger.logInfo('未找到登录表单');
     }
     
     // 注册表单提交
     const registerForm = document.getElementById('registerForm');
     if (registerForm) {
-        console.log('找到注册表单，绑定提交事件');
+        logger.logInfo('找到注册表单，绑定提交事件');
         registerForm.addEventListener('submit', function(e) {
-            console.log('注册表单提交事件触发');
+            logger.logInfo('注册表单提交事件触发');
             e.preventDefault();
             
             const formData = new FormData(this);
@@ -270,14 +321,14 @@ function bindFormEvents() {
                 body: formData
             })
             .then(response => {
-                console.log('收到注册响应，状态码:', response.status);
+                logger.logInfo('收到注册响应，状态码:', response.status);
                 if (!response.ok) {
                     throw new Error('网络响应错误');
                 }
                 return response.json();
             })
             .then(data => {
-                console.log('注册响应数据:', data);
+                logger.logInfo('注册响应数据:', data);
                 if (data.success) {
                     showMessage('注册成功，请登录', 'success');
                     showLoginForm();
@@ -286,75 +337,85 @@ function bindFormEvents() {
                 }
             })
             .catch(error => {
-                console.error('注册错误:', error);
+                logger.logError('注册错误:', error);
                 showMessage('网络错误，请稍后再试', 'danger');
             });
         });
     } else {
-        console.log('未找到注册表单');
+        logger.logInfo('未找到注册表单');
     }
     
     // 退出登录
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
-        console.log('找到退出按钮，绑定点击事件');
+        logger.logInfo('找到退出按钮，绑定点击事件');
         logoutBtn.addEventListener('click', function() {
-            console.log('退出按钮点击事件触发');
-            
-            // 获取token用于请求退出登录接口
-            const token = localStorage.getItem('token');
-            
-            // 调用后端退出登录接口
-            if (token) {
-                fetch('/api/auth/logout', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        console.warn('退出登录接口调用失败:', response.status);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('退出登录接口响应:', data);
-                })
-                .catch(error => {
-                    console.error('退出登录接口调用错误:', error);
-                });
-            }
-            
-            // 清除本地存储
-            localStorage.removeItem('token');
-            localStorage.removeItem('userId');
-            localStorage.removeItem('user');
-            
-            // 切换到登录界面
-            const chatSection = document.getElementById('chatSection');
-            const authSection = document.getElementById('authSection');
-            
-            if (chatSection) chatSection.style.display = 'none';
-            if (authSection) authSection.style.display = 'flex';
-            
-            // 清空表单
-            const loginForm = document.getElementById('loginForm');
-            const registerForm = document.getElementById('registerForm');
-            
-            if (loginForm) loginForm.reset();
-            if (registerForm) registerForm.reset();
+            // 使用自定义确认框
+            showConfirm('确定要退出登录吗？').then(result => {
+                if (!result) {
+                    return; // 用户取消退出
+                }
+                
+                logger.logInfo('退出按钮点击事件触发');
+                
+                // 获取token用于请求退出登录接口
+                const token = localStorage.getItem('token');
+                
+                // 调用后端退出登录接口
+                if (token) {
+                    fetch('/api/auth/logout', {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            logger.logWarn('退出登录接口调用失败:', response.status);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        logger.logInfo('退出登录接口响应:', data);
+                    })
+                    .catch(error => {
+                        logger.logError('退出登录接口调用错误:', error);
+                    });
+                }
+                
+                // 清除本地存储
+                localStorage.removeItem('token');
+                localStorage.removeItem('userId');
+                localStorage.removeItem('user');
+                
+                // 切换到登录界面
+                const chatSection = document.getElementById('chatSection');
+                const authSection = document.getElementById('authSection');
+                
+                if (chatSection) chatSection.style.display = 'none';
+                if (authSection) authSection.style.display = 'flex';
+                
+                // 清空表单
+                const loginForm = document.getElementById('loginForm');
+                const registerForm = document.getElementById('registerForm');
+                
+                if (loginForm) loginForm.reset();
+                if (registerForm) registerForm.reset();
+                
+                // 显示退出成功消息
+                showMessage('您已成功退出登录');
+            });
         });
     } else {
-        console.log('未找到退出按钮');
+        logger.logInfo('未找到退出按钮');
     }
     
     // 创建聊天室按钮
     const createRoomBtn = document.getElementById('createRoomBtn');
     if (createRoomBtn) {
-        console.log('找到创建聊天室按钮，绑定点击事件');
+        logger.logInfo('找到创建聊天室按钮，绑定点击事件');
         createRoomBtn.addEventListener('click', function() {
-            console.log('创建聊天室按钮点击事件触发');
+            logger.logInfo('创建聊天室按钮点击事件触发');
             // 显示创建聊天室模态框
             const createRoomModal = new bootstrap.Modal(document.getElementById('createRoomModal'));
             if (createRoomModal) {
@@ -362,7 +423,7 @@ function bindFormEvents() {
             }
         });
     } else {
-        console.log('未找到创建聊天室按钮');
+        logger.logInfo('未找到创建聊天室按钮');
     }
     
     // 创建聊天室表单提交事件
@@ -419,13 +480,13 @@ function bindFormEvents() {
                 showMessage('聊天室创建成功', 'success');
             })
             .catch(error => {
-                console.error('创建聊天室失败:', error);
+                logger.logError('创建聊天室失败:', error);
                 showMessage(error.message || '创建聊天室失败', 'danger');
             });
         });
     }
     
-    // 搜索房间按钮
+    // 搜索聊天室按钮
     const searchRoomBtn = document.getElementById('searchRoomBtn');
     if (searchRoomBtn) {
         searchRoomBtn.addEventListener('click', function() {
@@ -436,7 +497,7 @@ function bindFormEvents() {
         });
     }
     
-    // 搜索房间按钮事件
+    // 搜索聊天室按钮事件
     const searchRoomButton = document.getElementById('searchRoomButton');
     if (searchRoomButton) {
         searchRoomButton.addEventListener('click', function() {
@@ -469,7 +530,7 @@ function bindFormEvents() {
         });
     }
     
-    // 搜索房间功能
+    // 搜索聊天室功能
     function searchRooms(query) {
         if (!query) {
             showMessage('请输入搜索关键词', 'warning');
@@ -497,7 +558,7 @@ function bindFormEvents() {
             displaySearchResults(data.rooms);
         })
         .catch(error => {
-            console.error('搜索房间失败:', error);
+            logger.logError('搜索聊天室失败:', error);
             showMessage('搜索失败，请稍后再试', 'danger');
         });
     }
@@ -527,24 +588,30 @@ function bindFormEvents() {
         `).join('');
     }
     
-    // 加入房间
+    // 加入聊天室
     function joinRoom(roomId) {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            showMessage('未登录，请先登录', 'danger');
-            return;
-        }
-        
-        // 这里应该调用加入房间的API，暂时显示提示信息
-        showMessage('加入房间功能将在后续版本中实现', 'info');
+        showConfirm('确定要加入这个聊天室吗？').then(result => {
+            if (!result) {
+                return; // 用户取消
+            }
+            
+            const token = localStorage.getItem('token');
+            if (!token) {
+                showMessage('未登录，请先登录', 'danger');
+                return;
+            }
+            
+            // 这里应该调用加入聊天室的API，暂时显示提示信息
+            showMessage('加入聊天室功能将在后续版本中实现', 'info');
+        });
     }
     
     // 个人中心表单提交
     const profileForm = document.getElementById('profileForm');
     if (profileForm) {
-        console.log('找到个人中心表单，绑定提交事件');
+        logger.logInfo('找到个人中心表单，绑定提交事件');
         profileForm.addEventListener('submit', function(e) {
-            console.log('个人中心表单提交事件触发');
+            logger.logInfo('个人中心表单提交事件触发');
             e.preventDefault();
             
             const formData = new FormData(this);
@@ -563,14 +630,14 @@ function bindFormEvents() {
                 body: formData
             })
             .then(response => {
-                console.log('收到个人中心更新响应，状态码:', response.status);
+                logger.logInfo('收到个人中心更新响应，状态码:', response.status);
                 if (!response.ok) {
                     throw new Error('网络响应错误');
                 }
                 return response.json();
             })
             .then(data => {
-                console.log('个人中心更新响应数据:', data);
+                logger.logInfo('个人中心更新响应数据:', data);
                 if (data.success) {
                     showMessage('个人信息更新成功', 'success');
                     
@@ -589,11 +656,11 @@ function bindFormEvents() {
                 }
             })
             .catch(error => {
-                console.error('更新个人信息错误:', error);
+                logger.logError('更新个人信息错误:', error);
                 showMessage('网络错误，请稍后再试', 'danger');
             });
         });
     } else {
-        console.log('未找到个人中心表单');
+        logger.logInfo('未找到个人中心表单');
     }
 }

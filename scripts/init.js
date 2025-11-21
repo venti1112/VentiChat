@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { log } = require('../utils/logger');
 
 async function init() {
     try {
@@ -34,11 +35,11 @@ async function init() {
 
         // 检查并删除同名数据库（如果存在）
         await connection.query(`DROP DATABASE IF EXISTS \`${answers.dbName}\`;`);
-        console.log(`已删除现有数据库 ${answers.dbName}（如果存在）`);
+        log('INFO', `已删除现有数据库 ${answers.dbName}（如果存在）`);
 
         // 创建新数据库
         await connection.query(`CREATE DATABASE \`${answers.dbName}\`;`);
-        console.log(`已创建新数据库 ${answers.dbName}`);
+        log('INFO', `已创建新数据库 ${answers.dbName}`);
 
         await connection.changeUser({ database: answers.dbName });
 
@@ -173,11 +174,11 @@ async function init() {
             JSON.stringify(config, null, 2)
         );
 
-        console.log('\n初始化完成！配置文件已保存到 config/config.json');
-        console.log('请运行 `npm start` 启动服务');
+        log('INFO', '初始化完成！配置文件已保存到 config/config.json');
+        log('INFO', '请运行 `npm start` 启动服务');
         process.exit(0);
     } catch (error) {
-        console.error('初始化失败:', error.message);
+        log('ERROR', `初始化失败: ${error.message}`);
         process.exit(1);
     }
 }

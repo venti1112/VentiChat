@@ -21,7 +21,7 @@ module.exports = (sequelize) => {
     });
 
     Room.associate = function(models) {
-        // 定义房间与用户的多对多关系
+        // 定义聊天室与用户的多对多关系
         Room.belongsToMany(models.User, {
             through: models.RoomMember,
             foreignKey: 'room_id',
@@ -29,7 +29,7 @@ module.exports = (sequelize) => {
             as: 'Participants'
         });
         
-        // 定义房间创建者关系
+        // 定义聊天室创建者关系
         Room.belongsTo(models.User, {
             foreignKey: 'creator_id',
             as: 'Creator'

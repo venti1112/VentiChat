@@ -1,4 +1,5 @@
-const models = require('../models');
+const { models } = require('../models');
+const { log, LOG_LEVELS } = require('../utils/logger');
 
 // 获取所有用户（管理员）
 exports.getUsers = async (req, res) => {
@@ -136,13 +137,13 @@ exports.getRooms = async (req, res) => {
             attributes: ['id', 'name', 'created_at', 'retention_days', 'creatorId']
         });
         
-        // 获取所有房间的成员数量
+        // 获取所有聊天室的成员数量
         const roomMembers = await models.RoomMember.findAll({
             attributes: ['room_id'],
             raw: true
         });
         
-        // 统计每个房间的成员数量
+        // 统计每个聊天室的成员数量
         const memberCounts = {};
         roomMembers.forEach(member => {
             if (!memberCounts[member.room_id]) {
@@ -180,7 +181,7 @@ exports.getRooms = async (req, res) => {
         
         res.json(formattedRooms);
     } catch (error) {
-        console.error('获取房间列表失败:', error);
+        log(LOG_LEVELS.ERROR, `获取聊天室列表失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };
@@ -216,7 +217,7 @@ exports.getRoom = async (req, res) => {
             return res.status(404).json({ error: '聊天室不存在' });
         }
         
-        // 获取房间成员数量
+        // 获取聊天室成员数量
         const memberCount = await models.RoomMember.count({
             where: { room_id: id }
         });
@@ -247,23 +248,23 @@ exports.getRoom = async (req, res) => {
         
         res.json(formattedRoom);
     } catch (error) {
-        console.error('获取房间详情失败:', error);
+        log(LOG_LEVELS.ERROR, `获取聊天室详情失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };
 
-// 获取房间成员列表（管理员）
+// 获取聊天室成员列表（管理员）
 exports.getRoomMembers = async (req, res) => {
     try {
         const { id } = req.params;
         
-        // 验证房间是否存在
+        // 验证聊天室是否存在
         const room = await models.Room.findByPk(id);
         if (!room) {
             return res.status(404).json({ error: '聊天室不存在' });
         }
         
-        // 获取房间成员列表
+        // 获取聊天室成员列表
         const members = await models.RoomMember.findAll({
             where: { room_id: id },
             raw: true // 使用raw查询避免Sequelize添加额外字段
@@ -301,7 +302,7 @@ exports.getRoomMembers = async (req, res) => {
         
         res.json(formattedMembers);
     } catch (error) {
-        console.error('获取房间成员列表失败:', error);
+        log(LOG_LEVELS.ERROR, `获取聊天室成员列表失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };

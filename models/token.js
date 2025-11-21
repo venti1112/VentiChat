@@ -1,7 +1,7 @@
-// 移除重复的DataTypes导入
-// const { DataTypes } = require('sequelize');
-
-module.exports = (sequelize, DataTypes) => {
+module.exports = (sequelize) => {
+  // 直接使用sequelize.DataTypes而不是解构
+  const DataTypes = sequelize.constructor.DataTypes;
+  
   const Token = sequelize.define('Token', {
     token: {
       type: DataTypes.STRING,

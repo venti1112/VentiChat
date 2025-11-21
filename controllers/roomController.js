@@ -182,13 +182,13 @@ exports.getRooms = async (req, res) => {
 
         // 添加未读消息计数
         const enrichedRooms = await Promise.all(allRooms.map(async (room) => {
-            // 检查是否是默认房间且用户未加入
+            // 检查是否是默认聊天室且用户未加入
             const isDefaultRoomNotJoined = defaultRoom && 
                 room.id === defaultRoom.id && 
                 !isJoinedDefaultRoom;
             
             if (isDefaultRoomNotJoined) {
-                // 对于未加入的默认房间，设置默认值
+                // 对于未加入的默认聊天室，设置默认值
                 return { 
                     ...room.get({ plain: true }), 
                     unreadCount: 0,
@@ -196,7 +196,7 @@ exports.getRooms = async (req, res) => {
                 };
             }
 
-            // 对于已加入的房间，获取成员信息和未读消息数
+            // 对于已加入的聊天室，获取成员信息和未读消息数
             const roomMember = room.RoomMemberships && room.RoomMemberships.length > 0 ? 
                 room.RoomMemberships[0] : null;
             const lastReadMessageId = roomMember?.last_read_message_id || 0;
@@ -225,7 +225,7 @@ exports.getRooms = async (req, res) => {
 
         res.json(enrichedRooms);
     } catch (error) {
-        log('ERROR', 'Error in getRooms: ' + error);
+        log('ERROR', '获取聊天室时出错: ' + error);
         res.status(500).json({ error: error.message });
     }
 };
@@ -243,7 +243,7 @@ exports.getRoomMembers = async (req, res) => {
         });
         res.json(room?.Participants || []);
     } catch (error) {
-        log('ERROR', 'Error in getRoomMembers: ' + error);
+        log('ERROR', '获取聊天室成员时出错: ' + error);
         res.status(500).json({ error: error.message });
     }
 };
@@ -283,7 +283,7 @@ exports.addMember = async (req, res) => {
         
         res.status(201).json({ message: '成员添加成功' });
     } catch (error) {
-        log('ERROR', 'Error in addMember: ' + error);
+        log('ERROR', '添加成员时出错: ' + error);
         res.status(500).json({ error: error.message });
     }
 };
@@ -440,13 +440,13 @@ exports.searchRooms = async (req, res) => {
             return res.status(400).json({ error: '查询参数不能为空' });
         }
         
-        // 使用工具函数搜索房间
+        // 使用工具函数搜索聊天室
         const { searchRooms } = require('../utils/roomManager');
         const rooms = await searchRooms(query);
         
         res.json({ rooms });
     } catch (error) {
-        log('ERROR', 'Error in searchRooms: ' + error);
+        log('ERROR', '搜索聊天室时出错: ' + error);
         res.status(500).json({ error: error.message });
     }
 };

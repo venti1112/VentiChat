@@ -1,6 +1,7 @@
 // 导入Sequelize和模型
 const Sequelize = require('sequelize');
-const { models } = require('../models');
+const models = require('../models');
+const { log } = require('./logger');
 
 // 创建聊天室
 const createRoom = async (creatorId, roomData) => {
@@ -32,7 +33,7 @@ const createRoom = async (creatorId, roomData) => {
         
         return room;
     } catch (error) {
-        console.error('创建聊天室失败:', error);
+        log('ERROR', '创建聊天室失败: ' + error.message);
         throw error;
     }
 };
@@ -91,7 +92,7 @@ const joinRoom = async (userId, roomId, requireApproval = true) => {
             message: '成功加入聊天室' 
         };
     } catch (error) {
-        console.error('加入聊天室失败:', error);
+        log('ERROR', '加入聊天室失败: ' + error.message);
         throw error;
     }
 };
@@ -133,7 +134,7 @@ const leaveRoom = async (userId, roomId) => {
         
         return { success: true, message: '成功离开聊天室' };
     } catch (error) {
-        console.error('离开聊天室失败:', error);
+        log('ERROR', '离开聊天室失败: ' + error.message);
         throw error;
     }
 };
@@ -163,7 +164,7 @@ const deleteRoom = async (roomId, operatorId) => {
     } catch (error) {
         // 如果有事务，则回滚
         await transaction.rollback();
-        console.error('删除聊天室失败:', error);
+        log('ERROR', '删除聊天室失败: ' + error.message);
         throw error;
     }
 };
@@ -203,7 +204,7 @@ const getUserRooms = async (userId) => {
             };
         });
     } catch (error) {
-        console.error('获取用户聊天室列表失败:', error);
+        log('ERROR', '获取用户聊天室列表失败: ' + error.message);
         throw error;
     }
 };
@@ -234,7 +235,7 @@ const getRoomMembers = async (roomId) => {
             joinTime: member.createdAt
         }));
     } catch (error) {
-        console.error('获取聊天室成员列表失败:', error);
+        log('ERROR', '获取聊天室成员列表失败: ' + error.message);
         throw error;
     }
 };
@@ -292,7 +293,7 @@ const addMember = async (roomId, userId, operatorId) => {
         
         return { success: true, membership };
     } catch (error) {
-        console.error('添加成员失败:', error);
+        log('ERROR', '添加成员失败: ' + error.message);
         throw error;
     }
 };
@@ -356,7 +357,7 @@ const kickMember = async (roomId, userId, operatorId) => {
         
         return { success: true, message: '成功踢出成员' };
     } catch (error) {
-        console.error('踢出成员失败:', error);
+        log('ERROR', '踢出成员失败: ' + error.message);
         throw error;
     }
 };
@@ -399,7 +400,7 @@ const setModerator = async (roomId, targetUserId, isModerator, operatorId) => {
         
         return { success: true, message: isModerator ? '已设为管理员' : '已取消管理员' };
     } catch (error) {
-        console.error('设置管理员失败:', error);
+        log('ERROR', '设置管理员失败: ' + error);
         throw error;
     }
 };
@@ -414,46 +415,56 @@ const searchRooms = async (query) => {
                     { id: parseInt(query) || 0 }
                 ]
             },
-            include: [
-                {
-                    model: models.User,
-                    as: 'Creator',
-                    attributes: ['nickname']
-                }
-            ],
             limit: 20
         });
         
-        // 使用单独的查询获取每个房间的成员数量
+        // 获取聊天室创建者信息
+        const creatorIds = [...new Set(rooms.map(room => room.creator_id))];
+        const creators = await models.User.findAll({
+            where: {
+                id: {
+                    [Sequelize.Op.in]: creatorIds
+                }
+            },
+            attributes: ['id', 'nickname']
+        });
+        
+        // 创建创建者映射
+        const creatorMap = {};
+        creators.forEach(creator => {
+            creatorMap[creator.id] = creator.nickname;
+        });
+        
+        // 使用单独的查询获取每个聊天室的成员数量
         const roomIds = rooms.map(room => room.id);
         const memberCounts = await models.RoomMember.findAll({
             where: {
-                roomId: {
+                room_id: {
                     [Sequelize.Op.in]: roomIds
                 }
             },
             attributes: [
-                'roomId',
-                [Sequelize.fn('COUNT', Sequelize.col('userId')), 'memberCount']
+                'room_id',
+                [Sequelize.fn('COUNT', Sequelize.col('user_id')), 'memberCount']
             ],
-            group: ['roomId']
+            group: ['room_id']
         });
         
         // 创建成员数量映射
         const memberCountMap = {};
         memberCounts.forEach(count => {
-            memberCountMap[count.get('roomId')] = parseInt(count.get('memberCount'));
+            memberCountMap[count.get('room_id')] = parseInt(count.get('memberCount'));
         });
         
         return rooms.map(room => ({
             id: room.id,
             name: room.name,
-            creatorNickname: room.Creator ? room.Creator.nickname : '未知',
+            creatorNickname: creatorMap[room.creator_id] || '未知',
             memberCount: memberCountMap[room.id] || 0,
             isPrivate: room.isPrivate
         }));
     } catch (error) {
-        console.error('搜索聊天室失败:', error);
+        log('ERROR', '搜索聊天室失败: ' + error);
         throw error;
     }
 };
