@@ -22,7 +22,16 @@ module.exports = (sequelize) => {
     });
 
     RoomMember.associate = function(models) {
-        // 移除可能导致循环依赖的关联，在需要的地方使用原始查询
+        // 定义与User和Room的关联
+        RoomMember.belongsTo(models.User, { 
+            foreignKey: 'user_id', 
+            as: 'User' 
+        });
+        
+        RoomMember.belongsTo(models.Room, { 
+            foreignKey: 'room_id', 
+            as: 'Room' 
+        });
     };
 
     return RoomMember;

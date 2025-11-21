@@ -47,25 +47,12 @@ const models = {
     Token: require('./models/token')(sequelize)
 };
 
-// 手动设置模型关联，避免循环依赖
-models.User.hasMany(models.Room, { foreignKey: 'creatorId', as: 'CreatedRooms' });
-models.User.belongsToMany(models.Room, { through: models.RoomMember, as: 'JoinedRooms', foreignKey: 'user_id', otherKey: 'room_id' });
-models.User.hasMany(models.RoomMember, { foreignKey: 'user_id', as: 'RoomMemberships' });
-
-models.Room.belongsTo(models.User, { foreignKey: 'creatorId', as: 'Creator' });
-models.Room.belongsToMany(models.User, { through: models.RoomMember, as: 'Participants', foreignKey: 'room_id', otherKey: 'user_id' });
-models.Room.hasMany(models.RoomMember, { foreignKey: 'room_id', as: 'RoomMembers' });
-
-models.RoomMember.belongsTo(models.User, { foreignKey: 'user_id', as: 'User' });
-models.RoomMember.belongsTo(models.Room, { foreignKey: 'room_id', as: 'Room' });
-
-models.Message.belongsTo(models.User, { foreignKey: 'senderId', as: 'Sender' });
-models.Message.belongsTo(models.Room, { foreignKey: 'roomId', as: 'MessageRoom' });
-
-models.JoinRequest.belongsTo(models.User, { foreignKey: 'userId' });
-models.JoinRequest.belongsTo(models.Room, { foreignKey: 'roomId' });
-
-models.Token.belongsTo(models.User, { foreignKey: 'userId' });
+// 调用各模型的associate方法设置关联关系
+Object.keys(models).forEach(modelName => {
+    if (models[modelName].associate) {
+        models[modelName].associate(models);
+    }
+});
 
 // 将models对象挂载到app上，以便在其他地方使用
 app.set('models', models);

@@ -290,6 +290,8 @@ function bindFormEvents() {
                     if (chatSection) {
                         chatSection.style.display = 'block';
                         logger.logInfo('显示聊天区域');
+                        // 加载聊天室列表
+                        loadRooms();
                     }
                 } else {
                     // 登录失败，显示服务器返回的错误信息
@@ -486,6 +488,100 @@ function bindFormEvents() {
         });
     }
     
+    // 加载聊天室列表
+    function loadRooms() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            logger.logWarn('未登录，无法加载聊天室列表');
+            return;
+        }
+        
+        fetch('/api/rooms', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('加载聊天室列表失败');
+            }
+            return response.json();
+        })
+        .then(rooms => {
+            displayRooms(rooms);
+        })
+        .catch(error => {
+            logger.logError('加载聊天室列表错误:', error);
+            showMessage('加载聊天室列表失败: ' + error.message, 'danger');
+        });
+    }
+    
+    // 显示聊天室列表
+    function displayRooms(rooms) {
+        const roomList = document.getElementById('roomList');
+        if (!roomList) {
+            logger.logWarn('未找到聊天室列表容器');
+            return;
+        }
+        
+        if (!rooms || rooms.length === 0) {
+            roomList.innerHTML = '<li class="list-group-item text-center text-muted">暂无聊天室</li>';
+            return;
+        }
+        
+        roomList.innerHTML = '';
+        rooms.forEach(room => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item list-group-item-action';
+            li.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold">${room.name}</div>
+                        ${room.note ? `<small class="text-muted">${room.note}</small>` : ''}
+                    </div>
+                    ${room.unreadCount > 0 ? 
+                        `<span class="badge bg-primary rounded-pill">${room.unreadCount}</span>` : ''}
+                </div>
+            `;
+            li.addEventListener('click', () => {
+                // 添加进入聊天室的逻辑
+                enterRoom(room);
+            });
+            roomList.appendChild(li);
+        });
+    }
+    
+    // 进入聊天室
+    function enterRoom(room) {
+        logger.logInfo('进入聊天室:', room.id);
+        
+        // 更新当前聊天室名称显示
+        const currentRoomName = document.getElementById('currentRoomName');
+        if (currentRoomName) {
+            currentRoomName.textContent = room.name;
+        }
+        
+        // 清空消息区域并显示提示
+        const chatMessages = document.getElementById('chatMessages');
+        if (chatMessages) {
+            chatMessages.innerHTML = '<div class="text-center text-muted my-3"><p>开始聊天吧!</p></div>';
+        }
+        
+        // 保存当前聊天室信息到本地存储或其他变量中
+        localStorage.setItem('currentRoomId', room.id);
+        localStorage.setItem('currentRoomName', room.name);
+        
+        // 可以在这里添加更多进入聊天室的逻辑，比如建立WebSocket连接等
+        showMessage(`已进入聊天室: ${room.name}`, 'success');
+    }
+    
+    // 页面加载完成后加载聊天室列表
+    const chatSection = document.getElementById('chatSection');
+    if (chatSection && chatSection.style.display !== 'none') {
+        // 如果聊天界面已显示，则加载聊天室列表
+        loadRooms();
+    }
+    
     // 搜索聊天室按钮
     const searchRoomBtn = document.getElementById('searchRoomBtn');
     if (searchRoomBtn) {
@@ -512,11 +608,79 @@ function bindFormEvents() {
     const membersBtn = document.getElementById('membersBtn');
     if (membersBtn) {
         membersBtn.addEventListener('click', function() {
+            // 获取当前聊天室的成员列表
+            loadRoomMembers();
+            
             const membersModal = new bootstrap.Modal(document.getElementById('membersModal'));
             if (membersModal) {
                 membersModal.show();
             }
         });
+    }
+    
+    // 加载聊天室成员列表
+    function loadRoomMembers() {
+        // 获取当前聊天室ID
+        const currentRoomId = localStorage.getItem('currentRoomId');
+        if (!currentRoomId) {
+            showMessage('请先选择一个聊天室', 'warning');
+            return;
+        }
+        
+        const token = localStorage.getItem('token');
+        if (!token) {
+            showMessage('未登录，请先登录', 'danger');
+            return;
+        }
+        
+        fetch(`/api/rooms/${currentRoomId}/members`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('获取成员列表失败');
+            }
+            return response.json();
+        })
+        .then(members => {
+            displayRoomMembers(members);
+        })
+        .catch(error => {
+            logger.logError('获取聊天室成员列表错误:', error);
+            showMessage('获取成员列表失败: ' + error.message, 'danger');
+        });
+    }
+    
+    // 显示聊天室成员列表
+    function displayRoomMembers(members) {
+        const membersList = document.getElementById('membersList');
+        if (!membersList) {
+            logger.logWarn('未找到成员列表容器');
+            return;
+        }
+        
+        if (!members || members.length === 0) {
+            membersList.innerHTML = '<li class="list-group-item text-center text-muted">暂无成员</li>';
+            return;
+        }
+        
+        membersList.innerHTML = members.map(member => `
+            <li class="list-group-item d-flex align-items-center">
+                <img src="${member.avatarUrl || '/default-avatar.png'}" 
+                     alt="头像" 
+                     class="rounded-circle me-3" 
+                     width="40" 
+                     height="40"
+                     onerror="this.src='/default-avatar.png'">
+                <div class="flex-grow-1">
+                    <div class="fw-bold">${member.nickname || member.username}</div>
+                    <div class="text-muted small">@${member.username}</div>
+                </div>
+                ${member.isModerator ? '<span class="badge bg-warning">管理员</span>' : ''}
+            </li>
+        `).join('');
     }
     
     // 设置按钮

@@ -56,8 +56,8 @@ const joinRoom = async (userId, roomId, requireApproval = true) => {
         // 检查是否已经是成员
         const existingMembership = await models.RoomMember.findOne({
             where: {
-                userId: userId,
-                roomId: roomId
+                user_id: userId,
+                room_id: roomId
             }
         });
         
@@ -66,11 +66,11 @@ const joinRoom = async (userId, roomId, requireApproval = true) => {
         }
         
         // 检查聊天室是否需要审批
-        if (room.requireApproval && requireApproval) {
+        if (room.require_approval && requireApproval) {
             // 创建加入请求
             const joinRequest = await models.JoinRequest.create({
-                userId: userId,
-                roomId: roomId,
+                user_id: userId,
+                room_id: roomId,
                 status: 'pending'
             });
             
@@ -82,9 +82,9 @@ const joinRoom = async (userId, roomId, requireApproval = true) => {
 
         // 直接加入聊天室
         const roomMember = await models.RoomMember.create({
-            userId: userId,
-            roomId: roomId,
-            isModerator: false
+            user_id: userId,
+            room_id: roomId,
+            is_moderator: false
         });
         
         return { 

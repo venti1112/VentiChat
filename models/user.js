@@ -20,12 +20,10 @@ module.exports = (sequelize) => {
     });
 
     User.associate = function(models) {
-        // 定义用户与聊天室的多对多关系
-        User.belongsToMany(models.Room, {
-            through: models.RoomMember,
-            foreignKey: 'user_id',
-            otherKey: 'room_id',
-            as: 'JoinedRooms'
+        // 定义用户创建的聊天室关系
+        User.hasMany(models.Room, {
+            foreignKey: 'creator_id',
+            as: 'CreatedRooms'
         });
     };
 

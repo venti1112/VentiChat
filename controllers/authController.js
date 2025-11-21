@@ -132,7 +132,23 @@ exports.register = async (req, res) => {
             passwordHash: hashedPassword,
             avatarUrl: avatarUrl
         });
-        
+
+        // 获取大厅房间（VentiChat大厅）
+        const hallRoom = await require('../models').Room.findOne({
+            where: {
+                name: 'VentiChat大厅'
+            }
+        });
+
+        // 如果大厅房间存在，将新用户加入其中
+        if (hallRoom) {
+            await require('../models').RoomMember.create({
+                user_id: newUser.id,
+                room_id: hallRoom.id,
+                is_moderator: false
+            });
+        }
+
         // 生成JWT token
         const token = jwt.sign(
             { 

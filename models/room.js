@@ -13,7 +13,8 @@ module.exports = (sequelize) => {
         allowImages: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'allow_images' },
         allowVideos: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'allow_videos' },
         allowFiles: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'allow_files' },
-        retentionDays: { type: DataTypes.INTEGER, defaultValue: 180, field: 'retention_days' }
+        retentionDays: { type: DataTypes.INTEGER, defaultValue: 180, field: 'retention_days' },
+        creatorId: { type: DataTypes.INTEGER, field: 'creator_id' }
     }, {
         tableName: 'Rooms',
         createdAt: 'created_at',
@@ -21,14 +22,6 @@ module.exports = (sequelize) => {
     });
 
     Room.associate = function(models) {
-        // 定义聊天室与用户的多对多关系
-        Room.belongsToMany(models.User, {
-            through: models.RoomMember,
-            foreignKey: 'room_id',
-            otherKey: 'user_id',
-            as: 'Participants'
-        });
-        
         // 定义聊天室创建者关系
         Room.belongsTo(models.User, {
             foreignKey: 'creator_id',
