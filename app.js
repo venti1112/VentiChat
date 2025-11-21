@@ -6,8 +6,9 @@ const path = require('path');
 const { Sequelize } = require('sequelize'); // 只导入Sequelize类
 const multer = require('multer');
 const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
 const config = require('./config/config.json');
-const { log, logHttpError, logDatabaseQuery } = require('./utils/logger');
+const { log, logHttpError, logDatabaseQuery, logDatabaseRetry, logBrowserDevToolsWarning } = require('./utils/logger');
 
 // 创建Express应用
 const app = express();
@@ -63,6 +64,9 @@ models.Message.belongsTo(models.Room, { foreignKey: 'roomId', as: 'MessageRoom' 
 models.JoinRequest.belongsTo(models.User, { foreignKey: 'userId' });
 models.JoinRequest.belongsTo(models.Room, { foreignKey: 'roomId' });
 
+// 将models对象挂载到app上，以便在其他地方使用
+app.set('models', models);
+
 // 中间件
 app.use(express.json());
 app.use(cookieParser()); // 添加 cookie-parser 中间件
@@ -70,24 +74,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // 对于根路径，提供index.html文件
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// 添加对常见页面的路由支持
-app.get('/login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'login.html'));
-});
-
-app.get('/register', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'register.html'));
-});
-
-app.get('/profile', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'profile.html'));
-});
-
-app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+    res.sendFile(path.join(__dirname, 'public', 'main.html'));
 });
 
 // 文件上传配置
@@ -112,15 +99,26 @@ const userSocketMap = new Map();
 let isDatabaseConnected = false;
 
 // 中间件：检查数据库连接状态
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
     if (!isDatabaseConnected) {
         // 记录500错误访问日志
         const clientIP = req.ip || req.connection.remoteAddress || 
-                        (req.headers['x-forwarded-for'] || '').split(',')[0] || 'unknown';
+                        (req.headers['x-forwarded-for'] || '').split(',')[0] || '未知用户';
         const method = req.method;
         const url = req.url;
+        // 获取用户名
+        let username = '未知用户';
+        const token = req.cookies.token;
+        if (token) {
+            try {
+                const decoded = jwt.verify(token, config.encryptionKey);
+                username = decoded.username || '未知用户';
+            } catch (error) {
+                // token无效，保持"未知用户"状态
+            }
+        }
         
-        logHttpError(clientIP, method, url, 500, '数据库连接失败');
+        logHttpError(clientIP, username, method, url, 500, '数据库连接失败');
         
         return res.status(500).json({ 
             error: '数据库连接失败，请稍后再试' 
@@ -130,17 +128,40 @@ app.use((req, res, next) => {
 });
 
 // 路由
-app.use('/api', require('./routes/index'));
+const apiRouter = require('./routes/index');
+// 将models对象传递给路由
+apiRouter.models = models;
+app.use('/api', apiRouter);
+
+// 调试日志
+console.log('Models passed to routes:', Object.keys(models).filter(k => k !== 'sequelize' && k !== 'Sequelize'));
 
 // 404错误处理中间件
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
     // 记录404错误访问日志
     const clientIP = req.ip || req.connection.remoteAddress || 
-                    (req.headers['x-forwarded-for'] || '').split(',')[0] || 'unknown';
+                    (req.headers['x-forwarded-for'] || '').split(',')[0] || '未知用户';
     const method = req.method;
     const url = req.url;
     
-    logHttpError(clientIP, '未登录', method, url, 404, '页面未找到');
+    // 获取用户名
+    let username = '未知用户';
+    const token = req.cookies.token;
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, config.encryptionKey);
+            username = decoded.username || '未知用户';
+        } catch (error) {
+            // token无效，保持"未知用户"状态
+        }
+    }
+    
+    // 特殊处理浏览器开发者工具的请求
+    if (url === '/.well-known/appspecific/com.chrome.devtools.json') {
+        logBrowserDevToolsWarning(clientIP, username);
+    } else {
+        logHttpError(clientIP, username, method, url, 404, '页面未找到');
+    }
     
     res.status(404).json({ 
         error: '页面未找到' 
@@ -148,14 +169,26 @@ app.use((req, res, next) => {
 });
 
 // 500错误处理中间件
-app.use((err, req, res, next) => {
+app.use(async (err, req, res, next) => {
     // 记录500错误访问日志
     const clientIP = req.ip || req.connection.remoteAddress || 
-                    (req.headers['x-forwarded-for'] || '').split(',')[0] || 'unknown';
+                    (req.headers['x-forwarded-for'] || '').split(',')[0] || '未知用户';
     const method = req.method;
     const url = req.url;
     
-    logHttpError(clientIP, '未登录', method, url, 500, err.message || '内部服务器错误');
+    // 获取用户名
+    let username = '未知用户';
+    const token = req.cookies.token;
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, config.encryptionKey);
+            username = decoded.username || '未知用户';
+        } catch (error) {
+            // token无效，保持"未知用户"状态
+        }
+    }
+    
+    logHttpError(clientIP, username, method, url, 500, err.message || '内部服务器错误');
     
     res.status(500).json({ 
         error: '内部服务器错误' 
@@ -169,6 +202,7 @@ async function connectToDatabase() {
         await sequelize.authenticate();
         log('INFO', '数据库连接成功');
         
+        log('INFO', '正在同步数据库...');
         await sequelize.sync({ alter: true });
         log('INFO', '数据库同步完成');
         
@@ -186,7 +220,7 @@ async function retryDatabaseConnection() {
     const retryInterval = 3 * 60 * 1000; // 3分钟
     
     while (!isDatabaseConnected) {
-        console.log('尝试重新连接数据库...');
+        log('INFO', '尝试重新连接数据库...');
         const connected = await connectToDatabase();
         
         if (!connected) {
@@ -198,7 +232,7 @@ async function retryDatabaseConnection() {
 
 // 错误处理
 process.on('unhandledRejection', (err) => {
-    console.error('未处理的Promise拒绝:', err);
+    log('ERROR', '未处理的Promise拒绝: ' + err);
     // 不直接退出进程，而是继续运行并尝试重新连接数据库
 });
 
@@ -225,7 +259,7 @@ async function startServer() {
         });
     } else {
         // 如果初始连接失败，启动重试机制
-        console.log('数据库初始连接失败，启动重试机制...');
+        log('INFO', '数据库初始连接失败，系统将在三分钟后重试');
         retryDatabaseConnection();
         
         // 即使数据库未连接也启动服务器，但会返回500错误
@@ -244,31 +278,47 @@ module.exports = {
 };
 
 // Socket.IO 事件处理
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
     // 获取客户端IP地址
     const clientIP = socket.handshake.address || 
                    (socket.request.headers['x-forwarded-for'] || 
                     socket.request.connection.remoteAddress || 
-                    'unknown');
+                    '未知用户');
     
-    // 获取用户ID
-    const userId = socket.handshake.query.userId || 'unknown';
+    // 从查询参数中获取token
+    const token = socket.handshake.query.token;
+    let userId = '未知用户';
+    let username = '未知用户';
+    
+    // 验证token并获取用户信息
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, config.encryptionKey);
+            const user = await models.User.findByPk(decoded.id);
+            if (user) {
+                userId = user.id;
+                username = user.username;
+            }
+        } catch (error) {
+            log('WARN', `Socket.IO连接token验证失败 - IP: ${clientIP}, 错误: ${error.message}`);
+        }
+    }
     
     // 记录连接日志
-    log('INFO', `用户连接Socket.IO - IP: ${clientIP}, 用户名: ${userId}, 结果: 成功`);
+    log('INFO', `用户连接Socket.IO - IP: ${clientIP}, 用户名: ${username}, 结果: 成功`);
     
     // 获取用户ID并建立映射
-    if (userId && userId !== 'unknown') {
+    if (userId && userId !== '未知用户') {
         userSocketMap.set(userId, socket.id);
         
         // 断开连接时清除映射
         socket.on('disconnect', () => {
             userSocketMap.delete(userId);
-            log('INFO', `用户断开Socket.IO - IP: ${clientIP}, 用户名: ${userId}, 结果: 成功`);
+            log('INFO', `用户断开Socket.IO - IP: ${clientIP}, 用户名: ${username}, 结果: 成功`);
         });
     } else {
         socket.on('disconnect', () => {
-            log('INFO', `用户断开Socket.IO - IP: ${clientIP}, 用户名: 未登录用户, 结果: 成功`);
+            log('INFO', `用户断开Socket.IO - IP: ${clientIP}, 用户名: 未知用户用户, 结果: 成功`);
         });
     }
 

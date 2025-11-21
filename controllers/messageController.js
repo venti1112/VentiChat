@@ -1,9 +1,13 @@
-const { models } = require('../app');
+const Message = require('../models/message');
+const RoomMember = require('../models/roomMember');
+const User = require('../models/user');
+const Room = require('../models/room');
+const { Sequelize } = require('sequelize');
 
 // 计算用户的总未读消息数（私有方法）
 const calculateTotalUnreadCount = async (userId) => {
     // 获取用户加入的所有聊天室及其最后阅读的消息ID
-    const roomMembers = await models.RoomMember.findAll({
+    const roomMembers = await RoomMember.findAll({
         where: { userId },
         attributes: ['roomId', 'lastReadMessageId']
     });
@@ -12,7 +16,7 @@ const calculateTotalUnreadCount = async (userId) => {
 
     // 构建查询条件：每个聊天室的最后一条消息ID > 用户最后阅读的ID
     const promises = roomMembers.map(async (member) => {
-        const lastMessage = await models.Message.findOne({
+        const lastMessage = await Message.findOne({
             where: { roomId: member.roomId },
             order: [['id', 'DESC']],
             attributes: ['id']
@@ -254,6 +258,8 @@ exports.markAsRead = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+
 
 
 

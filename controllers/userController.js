@@ -1,13 +1,17 @@
-const { models } = require('../app');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const User = require('../models/user');
+const Room = require('../models/room');
+const RoomMember = require('../models/roomMember');
+const { Sequelize } = require('sequelize');
+const { getAvatarUrl } = require('../utils/fileUpload');
 
 // 用户登录
 exports.login = async (req, res) => {
     try {
         const { username, password } = req.body;
         
-        const user = await models.User.findOne({ where: { username } });
+        const user = await User.findOne({ where: { username } });
         if (!user) {
             return res.status(401).json({ error: '用户名或密码错误' });
         }
@@ -20,7 +24,7 @@ exports.login = async (req, res) => {
         // 生成JWT令牌
         const token = jwt.sign(
             { id: user.id, username: user.username },
-            config.encryptionKey,
+            process.env.JWT_SECRET || 'your-secret-key',
             { expiresIn: '24h' }
         );
         
@@ -38,13 +42,35 @@ exports.login = async (req, res) => {
     }
 };
 
+// 获取用户个人资料
+exports.getProfile = async (req, res) => {
+    try {
+        const user = await User.findByPk(req.user.id, {
+            attributes: ['id', 'username', 'nickname', 'avatarUrl']
+        });
+        
+        if (!user) {
+            return res.status(404).json({ error: '用户不存在' });
+        }
+        
+        res.json({
+            id: user.id,
+            username: user.username,
+            nickname: user.nickname,
+            avatarUrl: user.avatarUrl || '/default-avatar.png'
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 // 用户注册
 exports.register = async (req, res) => {
     try {
         const { username, password, nickname } = req.body;
         
         // 检查用户名是否已存在
-        const existingUser = await models.User.findOne({ where: { username } });
+        const existingUser = await User.findOne({ where: { username } });
         if (existingUser) {
             return res.status(409).json({ error: '用户名已存在' });
         }
@@ -53,17 +79,21 @@ exports.register = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
         
+        // 设置默认头像
+        const defaultAvatarUrl = '/userdata/avatar/default-avatar.png';
+        
         // 创建用户
         const user = await User.create({
             username,
             passwordHash,
-            nickname: nickname || username
+            nickname: nickname || username,
+            avatarUrl: defaultAvatarUrl
         });
         
         // 加入默认大聊天室
-        const defaultRoom = await models.Room.findOne({ where: { name: '默认大聊天室' } });
+        const defaultRoom = await Room.findOne({ where: { name: 'VentiChat大厅' } });
         if (defaultRoom) {
-            await models.RoomMember.create({
+            await RoomMember.create({
                 userId: user.id,
                 roomId: defaultRoom.id
             });
@@ -78,19 +108,32 @@ exports.register = async (req, res) => {
 // 更新用户资料
 exports.updateProfile = async (req, res) => {
     try {
-        const { nickname, avatarUrl } = req.body;
+        const { nickname } = req.body;
         
-        await models.User.update(
-            {
-                nickname: nickname || req.user.nickname,
-                avatarUrl: avatarUrl || req.user.avatarUrl
-            },
+        // 准备更新数据
+        const updateData = {
+            nickname: nickname || req.user.nickname
+        };
+        
+        // 如果有上传头像文件，则更新头像URL
+        if (req.file) {
+            updateData.avatarUrl = getAvatarUrl(req.file.filename);
+        }
+        
+        await User.update(
+            updateData,
             {
                 where: { id: req.user.id }
             }
         );
         
-        res.json({ message: '资料更新成功' });
+        // 获取更新后的用户信息
+        const updatedUser = await User.findByPk(req.user.id);
+        
+        res.json({ 
+            message: '资料更新成功',
+            user: updatedUser
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -104,17 +147,41 @@ exports.searchUsers = async (req, res) => {
             return res.json([]);
         }
         
-        const users = await models.User.findAll({
+        const users = await User.findAll({
             where: {
-                [models.Sequelize.Op.or]: [
-                    { username: { [models.Sequelize.Op.like]: `%${query}%` } },
-                    { nickname: { [models.Sequelize.Op.like]: `%${query}%` } }
+                [Sequelize.Op.or]: [
+                    { username: { [Sequelize.Op.like]: `%${query}%` } },
+                    { nickname: { [Sequelize.Op.like]: `%${query}%` } }
                 ]
             },
             attributes: ['id', 'username', 'nickname', 'avatarUrl']
         });
         
         res.json(users);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 获取用户头像URL
+exports.getAvatarUrl = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        
+        // 如果没有提供userId，则返回当前用户的头像URL
+        const targetUserId = userId || req.user.id;
+        
+        const user = await User.findByPk(targetUserId, {
+            attributes: ['avatarUrl']
+        });
+        
+        if (!user) {
+            return res.status(404).json({ error: '用户不存在' });
+        }
+        
+        res.json({
+            avatarUrl: user.avatarUrl || '/default-avatar.png'
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

@@ -3,6 +3,11 @@ module.exports = (sequelize) => {
     const DataTypes = sequelize.constructor.DataTypes;
     
     const JoinRequest = sequelize.define('JoinRequest', {
+        id: { 
+            type: DataTypes.INTEGER, 
+            primaryKey: true, 
+            autoIncrement: true 
+        },
         status: {
             type: DataTypes.ENUM('pending', 'approved', 'rejected'),
             defaultValue: 'pending'

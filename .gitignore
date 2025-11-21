@@ -18,5 +18,5 @@ build/
 coverage/
 .vscode/
 *.local
-uploads/
+public/userdata/
 config/

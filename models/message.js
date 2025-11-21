@@ -2,6 +2,11 @@ module.exports = (sequelize) => {
     const DataTypes = sequelize.constructor.DataTypes;
     
     const Message = sequelize.define('Message', {
+        id: { 
+            type: DataTypes.INTEGER, 
+            primaryKey: true, 
+            autoIncrement: true 
+        },
         content: { type: DataTypes.TEXT },
         type: { type: DataTypes.ENUM('text', 'image', 'video', 'file'), defaultValue: 'text' },
         fileUrl: { type: DataTypes.STRING(255), field: 'file_url' },
@@ -18,12 +23,4 @@ module.exports = (sequelize) => {
 
     return Message;
 };
-
-
-
-
-
-
-
-
 

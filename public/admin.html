@@ -5,11 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>管理后台 - VentiChat</title>
     <link rel="stylesheet" href="/css/bootstrap.min.css">
-    <link rel="stylesheet" href="/css/common.css">
     <link rel="stylesheet" href="/css/admin.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <script src="/js/bootstrap.min.js" defer></script>
-    <script src="/js/common.js" defer></script>
     <script src="/js/admin.js" defer></script>
 </head>
 <body>
@@ -341,6 +339,76 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-danger" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 房间详情模态框 -->
+    <div class="modal fade" id="roomDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-door-open me-2"></i>聊天室详情</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>基本信息</h6>
+                            <table class="table table-borderless table-sm">
+                                <tbody>
+                                    <tr>
+                                        <td><strong>房间名称:</strong></td>
+                                        <td class="room-name"></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>房间ID:</strong></td>
+                                        <td class="room-id"></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>创建者:</strong></td>
+                                        <td class="room-creator"></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>成员数量:</strong></td>
+                                        <td><span class="member-count"></span> 人</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>消息数量:</strong></td>
+                                        <td><span class="message-count"></span> 条</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>设置信息</h6>
+                            <table class="table table-borderless table-sm">
+                                <tbody>
+                                    <tr>
+                                        <td><strong>创建时间:</strong></td>
+                                        <td class="created-at"></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>消息保留:</strong></td>
+                                        <td><span class="retention-days"></span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>加入政策:</strong></td>
+                                        <td class="join-policy"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <h6>成员列表</h6>
+                    <ul class="list-group" id="roomMembersList">
+                        <li class="list-group-item text-center text-muted">加载中...</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
                 </div>
             </div>
         </div>

@@ -2,6 +2,11 @@ module.exports = (sequelize) => {
     const DataTypes = sequelize.constructor.DataTypes;
     
     const Room = sequelize.define('Room', {
+        id: { 
+            type: DataTypes.INTEGER, 
+            primaryKey: true, 
+            autoIncrement: true 
+        },
         name: { type: DataTypes.STRING(100), allowNull: false },
         isPrivate: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_private' },
         requireApproval: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'require_approval' },
@@ -16,7 +21,19 @@ module.exports = (sequelize) => {
     });
 
     Room.associate = function(models) {
-        // 移除可能导致循环依赖的关联，在需要的地方使用原始查询
+        // 定义房间与用户的多对多关系
+        Room.belongsToMany(models.User, {
+            through: models.RoomMember,
+            foreignKey: 'room_id',
+            otherKey: 'user_id',
+            as: 'Participants'
+        });
+        
+        // 定义房间创建者关系
+        Room.belongsTo(models.User, {
+            foreignKey: 'creator_id',
+            as: 'Creator'
+        });
     };
 
     return Room;

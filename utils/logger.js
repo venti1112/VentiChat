@@ -79,6 +79,12 @@ function getFormattedTimestamp() {
 function colorizeConsoleMessage(message) {
     return message
         .replace(/(IP: )([\d\.]+)/g, `$1${colors.fg.blue}$2${colors.reset}`)
+        .replace(/(IP地址: )([\d\.]+)/g, `$1${colors.fg.blue}$2${colors.reset}`)
+        .replace(/(\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b)/g, `${colors.fg.blue}$1${colors.reset}`)
+        .replace(/(\b(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\b)/g, `${colors.fg.blue}$1${colors.reset}`)
+        .replace(/(\b(?:[0-9a-fA-F]{1,4}:)*::(?:[0-9a-fA-F]{1,4}:)*[0-9a-fA-F]{1,4}\b)/g, `${colors.fg.blue}$1${colors.reset}`)
+        .replace(/(\b(?:[0-9a-fA-F]{1,4}:)+:(?:[0-9a-fA-F]{1,4})?\b)/g, `${colors.fg.blue}$1${colors.reset}`)
+        .replace(/(\b::1\b)/g, `${colors.fg.blue}$1${colors.reset}`)
         .replace(/(用户名: )([^,\n]+)/g, `$1${colors.fg.green}$2${colors.reset}`)
         .replace(/(结果: 成功)/g, `${colors.fg.green}$1${colors.reset}`)
         .replace(/(结果: 失败)/g, `${colors.fg.red}$1${colors.reset}`)
@@ -87,6 +93,7 @@ function colorizeConsoleMessage(message) {
         .replace(/(状态码: [45]\d\d)/g, `${colors.fg.red}$1${colors.reset}`)
         .replace(/(状态码: [23]\d\d)/g, `${colors.fg.green}$1${colors.reset}`)
         .replace(/(信息: [^,\n]+)/g, `${colors.fg.yellow}$1${colors.reset}`)
+        .replace(/(警告：使用浏览器开发者工具)/g, `${colors.fg.yellow}$1${colors.reset}`)
         .replace(/(\b401\b)/g, `${colors.fg.red}$1${colors.reset}`)
         .replace(/(\b403\b)/g, `${colors.fg.red}$1${colors.reset}`);
 }
@@ -131,7 +138,7 @@ function log(level, message) {
 
 /**
  * 记录用户登录信息
- * @param {string} ip 用户IP地址
+ * 用户IP地址
  * @param {string} username 用户名
  * @param {boolean} success 是否登录成功
  * @param {string} errorMessage 错误信息（如果登录失败）
@@ -192,12 +199,14 @@ function logSocketDisconnect(ip, username, success, errorMessage = null) {
 /**
  * 记录异常访问日志
  * @param {string} ip 用户IP地址
- * @param {string} username 用户名（如未登录则为"未登录"）
- * @param {string} errorCode 异常代码
- * @param {string} errorMessage 中文错误原因
+ * @param {string} username 用户名（如未知用户则为"未知用户"）
+ * @param {string} method HTTP方法（GET、POST等）
+ * @param {string} path 请求路径
+ * @param {number} statusCode HTTP状态码
+ * @param {string} errorMessage 错误信息
  */
-function logUnauthorizedAccess(ip, username, errorCode, errorMessage) {
-    log('WARN', `异常访问 - IP: ${ip}, 用户名: ${username}, 代码: ${errorCode}, 原因: ${errorMessage}`);
+function logUnauthorizedAccess(ip, username, method, path, statusCode, errorMessage) {
+    log('WARN', `异常访问 - IP: ${ip}, 用户名: ${username}, 方法: ${method}, 路径: ${path}, 状态码: ${statusCode}, 原因: ${errorMessage}`);
 }
 
 /**
@@ -210,7 +219,16 @@ function logUnauthorizedAccess(ip, username, errorCode, errorMessage) {
  * @param {string} message 错误信息
  */
 function logHttpError(ip, username, method, url, statusCode, message) {
-    log('ERROR', `HTTP错误 - IP: ${ip}, 用户名: ${username || '未登录'}, 方法: ${method}, URL: ${url}, 状态码: ${statusCode}, 信息: ${message}`);
+    log('ERROR', `HTTP错误 - IP: ${ip}, 用户名: ${username || '未知用户'}, 方法: ${method}, URL: ${url}, 状态码: ${statusCode}, 信息: ${message}`);
+}
+
+/**
+ * 记录浏览器开发者工具相关警告
+ * @param {string} ip 用户IP地址
+ * @param {string} username 用户名
+ */
+function logBrowserDevToolsWarning(ip, username) {
+    log('WARN', `浏览器开发者工具，IP: ${ip}, 用户名: ${username} , 警告：使用浏览器开发者工具`);
 }
 
 /**
@@ -218,7 +236,18 @@ function logHttpError(ip, username, method, url, statusCode, message) {
  * @param {string} query SQL查询语句
  */
 function logDatabaseQuery(query) {
-    log(LOG_LEVELS.INFO, `数据库查询: ${query}`);
+    const timestamp = getFormattedTimestamp();
+    const logMessage = `[${timestamp}] [${LOG_LEVELS.INFO}] 数据库操作: ${query}\n`;
+    
+    // 只写入文件，不在控制台输出
+    const logFileName = `${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}.log`;
+    const logFilePath = path.join(logDir, logFileName);
+    
+    fs.appendFile(logFilePath, logMessage, { encoding: 'utf8' }, (err) => {
+        if (err) {
+            console.error('日志写入文件失败:', err);
+        }
+    });
 }
 
 module.exports = {
@@ -228,6 +257,7 @@ module.exports = {
     logSocketDisconnect,
     logUnauthorizedAccess,
     logHttpError,
+    logBrowserDevToolsWarning,
     logDatabaseQuery,
     log,
     LOG_LEVELS

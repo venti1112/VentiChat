@@ -1,6 +1,8 @@
-const { User, Room, RoomMember } = require('../app');
-const bcrypt = require('bcryptjs');
+const { User } = require('../models');
+const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const config = require('../config/config.json');
+const { log } = require('./logger');
 
 // 用户注册
 const register = async (userData) => {
@@ -44,22 +46,22 @@ const register = async (userData) => {
 // 用户登录
 const login = async (username, password) => {
     try {
-        console.log('开始登录流程，用户名:', username);
+        log('INFO', `开始登录流程，用户名: ${username}`);
         
         const user = await User.findOne({ where: { username } });
         
         if (!user) {
-            console.log('用户不存在:', username);
+            log('INFO', `用户不存在: ${username}`);
             throw new Error('用户名或密码错误');
         }
         
-        console.log('找到用户，检查状态:', user.status);
+        log('INFO', `找到用户，检查状态: ${user.status}`);
         if (user.status === 'banned') {
             throw new Error('该账户已被封禁');
         }
         
         const isMatch = await bcrypt.compare(password, user.passwordHash);
-        console.log('密码验证结果:', isMatch);
+        log('INFO', `密码验证结果: ${isMatch}`);
         
         if (!isMatch) {
             throw new Error('用户名或密码错误');
@@ -67,7 +69,7 @@ const login = async (username, password) => {
         
         // 检查配置
         if (!config.encryptionKey) {
-            console.error('JWT密钥未配置');
+            log('ERROR', 'JWT密钥未配置');
             throw new Error('系统配置错误');
         }
         
@@ -77,7 +79,7 @@ const login = async (username, password) => {
             { expiresIn: '7d' }
         );
         
-        console.log('Token生成成功，长度:', token.length);
+        log('INFO', `Token生成成功，长度: ${token.length}`);
         
         return {
             token: token,
@@ -90,7 +92,7 @@ const login = async (username, password) => {
             }
         };
     } catch (error) {
-        console.error('用户登录失败:', error.message);
+        log('ERROR', `用户登录失败: ${error.message}`);
         throw error;
     }
 };
@@ -108,7 +110,7 @@ const getUserInfo = async (userId) => {
         
         return user;
     } catch (error) {
-        console.error('获取用户信息失败:', error);
+        log('ERROR', `获取用户信息失败: ${error}`);
         throw error;
     }
 };

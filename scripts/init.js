@@ -1,6 +1,6 @@
 const inquirer = require('inquirer').default;
 const mysql = require('mysql2/promise');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -160,7 +160,8 @@ async function init() {
             },
             encryptionKey,
             baseUrl: answers.baseUrl,
-            port: answers.port
+            port: answers.port,
+            adminUsername: answers.adminUsername
         };
 
         const configDir = path.join(__dirname, '../config');

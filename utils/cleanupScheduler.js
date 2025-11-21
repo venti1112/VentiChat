@@ -2,6 +2,7 @@
 const cron = require('node-cron');
 const path = require('path');
 const fs = require('fs');
+const { log } = require('./logger');
 
 // 默认保存期限（天）
 const DEFAULT_RETENTION_DAYS = 180;
@@ -9,7 +10,7 @@ const DEFAULT_RETENTION_DAYS = 180;
 // 清理过期消息和文件
 const cleanupExpiredData = async (models, app) => {
     try {
-        console.log('开始清理过期数据...');
+        log('INFO', '开始清理过期数据...');
         
         // 获取保存期限配置（可从数据库或环境变量获取）
         const retentionDays = process.env.MESSAGE_RETENTION_DAYS ? parseInt(process.env.MESSAGE_RETENTION_DAYS) : DEFAULT_RETENTION_DAYS;
@@ -25,7 +26,7 @@ const cleanupExpiredData = async (models, app) => {
         });
         
         if (expiredMessages.length === 0) {
-            console.log('没有过期数据需要清理');
+            log('INFO', '没有过期数据需要清理');
             return;
         }
         
@@ -51,7 +52,7 @@ const cleanupExpiredData = async (models, app) => {
                     filesDeleted++;
                 }
             } catch (error) {
-                console.error(`删除文件失败 ${file.filePath}:`, error.message);
+                log('ERROR', `删除文件失败 ${file.filePath}: ${error.message}`);
             }
         }
         
@@ -69,7 +70,7 @@ const cleanupExpiredData = async (models, app) => {
           }
         });
         
-        console.log(`清理完成：删除了 ${messagesDeleted} 条消息，${filesDeleted} 个文件`);
+        log('INFO', `清理完成：删除了 ${messagesDeleted} 条消息，${filesDeleted} 个文件`);
         
         // 可选：通过Socket.IO通知管理员
         const io = app.get('io');
@@ -82,7 +83,7 @@ const cleanupExpiredData = async (models, app) => {
         }
         
     } catch (error) {
-        console.error('清理过期数据时出错:', error);
+        log('ERROR', '清理过期数据时出错: ' + error);
     }
 };
 
@@ -97,7 +98,7 @@ const startCleanupScheduler = (models, app) => {
         timezone: 'Asia/Shanghai' // 设置时区
     });
     
-    console.log('定时清理任务已启动，每天凌晨4点执行');
+    log('INFO', '定时清理任务已启动，每天凌晨4点执行');
     
     // 立即执行一次用于测试（可注释掉）
     // cleanupExpiredData(models, app);
