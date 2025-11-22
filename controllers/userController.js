@@ -80,7 +80,7 @@ exports.register = async (req, res) => {
         const passwordHash = await bcrypt.hash(password, salt);
         
         // 设置默认头像
-        const defaultAvatarUrl = '/userdata/avatar/default-avatar.png';
+        const defaultAvatarUrl = '/default-avatar.png';
         
         // 创建用户
         const user = await User.create({
@@ -97,6 +97,13 @@ exports.register = async (req, res) => {
                 userId: user.id,
                 roomId: defaultRoom.id
             });
+            
+            // 更新房间的成员列表
+            const currentMembers = defaultRoom.members || [];
+            if (!currentMembers.includes(user.id)) {
+                currentMembers.push(user.id);
+                await defaultRoom.update({ members: currentMembers });
+            }
         }
         
         res.status(201).json({ message: '注册成功' });

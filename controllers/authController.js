@@ -259,12 +259,25 @@ exports.verifyToken = async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, config.encryptionKey);
+    
+    // 获取完整的用户信息
+    const user = await User.findByPk(decoded.id);
+    if (!user) {
+      return res.status(403).json({ 
+        valid: false,
+        message: '用户不存在',
+        redirect: '/login'
+      });
+    }
+    
     res.json({ 
       valid: true, 
       user: {
-        id: decoded.id,
-        username: decoded.username,
-        isAdmin: decoded.isAdmin
+        id: user.id,
+        username: user.username,
+        nickname: user.nickname,
+        avatarUrl: user.avatarUrl,
+        isAdmin: user.isAdmin
       }
     });
   } catch (err) {

@@ -25,6 +25,12 @@ module.exports = (sequelize) => {
             foreignKey: 'creator_id',
             as: 'CreatedRooms'
         });
+        
+        // 定义用户发送的消息关系
+        User.hasMany(models.Message, {
+            foreignKey: 'senderId',
+            as: 'Sender'
+        });
     };
 
     return User;

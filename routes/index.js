@@ -68,6 +68,9 @@ router.get('/rooms/search', authMiddleware, roomController.searchRooms);
 const messageController = require('../controllers/messageController');
 const fileController = require('../controllers/fileController');
 
+// 获取消息历史路由 - 使用路径参数
+router.get('/messages/history/:roomId', authMiddleware, messageController.getMessageHistory);
+
 // 修改文件上传路由，使用新的上传机制
 router.get('/messages/:roomId', authMiddleware, messageController.getRoomMessages);
 router.post('/messages', authMiddleware, messageController.sendMessage);

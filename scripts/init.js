@@ -68,6 +68,7 @@ async function init() {
                 allow_videos BOOLEAN DEFAULT true,
                 allow_files BOOLEAN DEFAULT true,
                 retention_days INT DEFAULT 180,
+                members JSON,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
             ) ENGINE=InnoDB;
@@ -139,9 +140,9 @@ async function init() {
         // 创建默认大聊天室
         const [admin] = await connection.query('SELECT id FROM users WHERE username = ?', [answers.adminUsername]);
         await connection.query(
-            `INSERT INTO rooms (name, creator_id, is_private, require_approval, retention_days) 
-             VALUES ('VentiChat大厅', ?, false, false, 180)`,
-            [admin[0].id]
+            `INSERT INTO rooms (name, creator_id, is_private, require_approval, retention_days, members) 
+             VALUES ('VentiChat大厅', ?, false, false, 180, ?)`,
+            [admin[0].id, JSON.stringify([admin[0].id])]
         );
 
         // 获取大厅房间的ID

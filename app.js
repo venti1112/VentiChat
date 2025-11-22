@@ -84,6 +84,8 @@ app.set('upload', upload);
 
 // 用户Socket映射
 const userSocketMap = new Map();
+// 将userSocketMap挂载到app上
+app.set('userSocketMap', userSocketMap);
 
 // 数据库连接状态
 let isDatabaseConnected = false;

@@ -390,12 +390,59 @@
                 </div>
                 <div class="modal-body">
                     <div class="input-group mb-3">
-                        <input type="text" class="form-control" placeholder="聊天室ID/聊天室名称" id="searchRoomInput">
+                        <input type="text" class="form-control" placeholder="聊天室RID/聊天室名称" id="searchRoomInput">
                         <button class="btn btn-primary" id="searchRoomButton">搜索</button>
                     </div>
                     <ul class="list-group" id="searchRoomResults">
                         <!-- 搜索结果将通过JavaScript动态生成 -->
                     </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 聊天室设置模态框 -->
+    <div class="modal fade" id="settingsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">聊天室设置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="roomSettingsForm">
+                        <div class="mb-3">
+                            <label class="form-label">聊天室名称</label>
+                            <input type="text" class="form-control" id="roomNameSetting" name="name" required>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="requireApprovalSetting" name="requireApproval">
+                            <label class="form-check-label" for="requireApprovalSetting">加入需要审核</label>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">媒体权限</label>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="allowImagesSetting" name="allowImages">
+                                <label class="form-check-label" for="allowImagesSetting">允许发送图片</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="allowVideosSetting" name="allowVideos">
+                                <label class="form-check-label" for="allowVideosSetting">允许发送视频</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="allowFilesSetting" name="allowFiles">
+                                <label class="form-check-label" for="allowFilesSetting">允许发送文件</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">消息保存天数</label>
+                            <input type="number" class="form-control" id="retentionDaysSetting" name="retentionDays" min="1" max="365">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary" form="roomSettingsForm">保存</button>
                 </div>
             </div>
         </div>

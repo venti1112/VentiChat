@@ -13,20 +13,21 @@ exports.createRoom = async (req, res) => {
         // 创建聊天室
         const room = await models.Room.create({
             name,
-            creator_id: req.user.id,  // 使用数据库字段名
-            is_private: isPrivate || false,
-            require_approval: requireApproval !== undefined ? requireApproval : true,
-            allow_images: allowImages !== undefined ? allowImages : true,
-            allow_videos: allowVideos !== undefined ? allowVideos : true,
-            allow_files: allowFiles !== undefined ? allowFiles : true,
-            retention_days: retentionDays || 180
+            creatorId: req.user.id,  // 使用模型属性名
+            isPrivate: isPrivate || false,
+            requireApproval: requireApproval !== undefined ? requireApproval : true,
+            allowImages: allowImages !== undefined ? allowImages : true,
+            allowVideos: allowVideos !== undefined ? allowVideos : true,
+            allowFiles: allowFiles !== undefined ? allowFiles : true,
+            retentionDays: retentionDays || 180,
+            members: [req.user.id]  // 将创建者添加到成员列表中
         });
 
         // 将创建者加入聊天室并设为室主
         await models.RoomMember.create({
-            user_id: req.user.id,  // 使用数据库字段名
-            room_id: room.id,      // 使用数据库字段名
-            is_moderator: true     // 使用数据库字段名
+            userId: req.user.id,  // 使用模型属性名
+            roomId: room.id,      // 使用模型属性名
+            isModerator: true     // 使用模型属性名
         });
 
         // 记录聊天室创建成功
@@ -55,7 +56,7 @@ exports.createPrivateRoom = async (req, res) => {
         // 检查是否已经存在只有这两个用户的私聊房间
         const existingRooms = await models.Room.findAll({
             where: { 
-                is_private: true 
+                isPrivate: true 
             },
             include: [{
                 model: models.User,
@@ -78,25 +79,26 @@ exports.createPrivateRoom = async (req, res) => {
         const roomName = `私聊-${currentUser.username}-${targetUser.username}`;
         const room = await models.Room.create({
             name: roomName,
-            creator_id: currentUser.id,  // 使用数据库字段名
-            is_private: true,
-            require_approval: false,
-            allow_images: true,
-            allow_videos: true,
-            allow_files: true,
-            retention_days: 180
+            creatorId: currentUser.id,
+            isPrivate: true,
+            requireApproval: false,
+            allowImages: true,
+            allowVideos: true,
+            allowFiles: true,
+            retentionDays: 180,
+            members: [currentUser.id, targetUser.id] // 初始化成员列表
         });
         
         // 将两个用户加入聊天室
         await models.RoomMember.create({
-            user_id: currentUser.id,  // 使用数据库字段名
-            room_id: room.id,         // 使用数据库字段名
-            is_moderator: true        // 使用数据库字段名
+            userId: currentUser.id,
+            roomId: room.id,
+            isModerator: true
         });
         await models.RoomMember.create({
-            user_id: targetUser.id,   // 使用数据库字段名
-            room_id: room.id,         // 使用数据库字段名
-            is_moderator: false       // 使用数据库字段名
+            userId: targetUser.id,
+            roomId: room.id,
+            isModerator: false
         });
         
         res.json(room);
@@ -151,7 +153,7 @@ exports.getUserRooms = async (req, res) => {
 // 获取用户所在聊天室列表
 exports.getRooms = async (req, res) => {
     try {
-        // 先获取用户加入的所有聊天室ID
+        // 先获取用户加入的所有聊天室RID
         const roomMembers = await models.RoomMember.findAll({
             where: {
                 user_id: req.user.id
@@ -171,6 +173,11 @@ exports.getRooms = async (req, res) => {
         // 如果存在默认聊天室且用户未加入，则添加到列表中
         if (defaultRoom && !roomIds.includes(defaultRoom.id)) {
             roomIds.push(defaultRoom.id);
+        }
+
+        // 如果用户没有加入任何聊天室，直接返回空数组
+        if (roomIds.length === 0) {
+            return res.json([]);
         }
 
         // 获取用户加入的聊天室详细信息（不使用include来避免关联错误）
@@ -272,100 +279,58 @@ exports.getRooms = async (req, res) => {
 // 获取聊天室成员列表
 exports.getRoomMembers = async (req, res) => {
     try {
-        // 记录完整请求信息用于调试
-        log('DEBUG', `获取聊天室成员请求: ${JSON.stringify({
-            params: req.params,
-            query: req.query,
-            url: req.originalUrl
-        })}`);
-
         const { roomId } = req.params;
         
-        // 严格验证房间ID
-        if (!roomId || !/^\d+$/.test(roomId)) {
-            const errorMsg = `无效的房间ID参数: ${roomId}`;
-            log('WARN', errorMsg, { params: req.params });
-            return res.status(400).json({ 
-                error: '无效的房间ID',
-                details: '请提供有效的数字类型房间ID'
-            });
+        // 获取房间信息，包括成员列表
+        const room = await models.Room.findByPk(roomId);
+        if (!room) return res.status(404).json({ error: '聊天室不存在' });
+
+        // 从房间的members字段获取成员ID列表
+        const memberIds = room.members || [];
+        
+        // 如果没有成员，直接返回空数组
+        if (memberIds.length === 0) {
+            return res.json([]);
         }
 
-        const id = parseInt(roomId);
-        
-        // 获取房间信息
-        const room = await models.Room.findByPk(id);
-        if (!room) {
-            const errorMsg = `未找到房间ID: ${id}`;
-            log('WARN', errorMsg, { params: req.params });
-            return res.status(404).json({ 
-                error: '聊天室不存在',
-                details: `找不到ID为 ${id} 的聊天室`
-            });
-        }
-
-        // 检查是否是默认聊天室
-        const isDefaultRoom = room.name === 'VentiChat大厅';
-        
-        // 验证当前用户是否是房间成员
-        const isMember = await models.RoomMember.findOne({
+        // 根据成员ID列表获取用户信息
+        const members = await models.User.findAll({
             where: {
-                user_id: req.user.id,
-                room_id: id
+                id: memberIds
+            },
+            attributes: ['id', 'username', 'nickname', 'avatarUrl']
+        });
+
+        // 获取成员的额外信息（如是否为管理员等）
+        const memberDetails = await models.RoomMember.findAll({
+            where: {
+                room_id: roomId,
+                user_id: memberIds
             }
         });
-        
-        if (!isMember) {
-            const errorMsg = `获取聊天室成员列表时出错: User is not associated to RoomMember!`;
-            log('ERROR', errorMsg);
-            return res.status(403).json({ 
-                error: '无权访问',
-                details: '您不是该聊天室的成员'
-            });
-        }
-        
-        // 查询成员 - 使用正确的关联方式
-        const members = await models.RoomMember.findAll({
-            where: { room_id: id },
-            include: [{
-                model: models.User,
-                attributes: ['id', 'username', 'nickname', 'avatar_url']
-            }],
-            attributes: ['is_moderator', 'note']
-        });
 
-        if (!members) {
-            throw new Error('查询成员失败');
-        }
+        // 创建一个映射来快速查找成员详细信息
+        const memberDetailsMap = {};
+        memberDetails.forEach(detail => {
+            memberDetailsMap[detail.user_id] = detail;
+        });
 
         // 格式化返回数据
-        const formattedMembers = members.map(member => ({
-            id: member.User.id,
-            username: member.User.username,
-            nickname: member.User.nickname,
-            avatarUrl: member.User.avatar_url,
-            isModerator: member.is_moderator,
-            note: member.note
-        }));
+        const formattedMembers = members.map(member => {
+            const detail = memberDetailsMap[member.id] || {};
+            return {
+                id: member.id,
+                uid: member.id,  // 添加UID字段
+                username: member.username,
+                nickname: member.nickname,
+                avatarUrl: member.avatarUrl || '/default-avatar.png',
+                isModerator: detail.is_moderator || false,
+                isCreator: member.id === room.creatorId, // 添加群主标识
+                note: detail.note || null
+            };
+        });
 
-        // 如果是默认聊天室且没有成员，检查管理员是否在系统中
-        if (isDefaultRoom && formattedMembers.length === 0) {
-            const admin = await models.User.findOne({ 
-                where: { username: process.env.ADMIN_USERNAME || 'admin' } 
-            });
-            if (admin) {
-                formattedMembers.push({
-                    id: admin.id,
-                    username: admin.username,
-                    nickname: admin.nickname,
-                    avatarUrl: admin.avatar_url,
-                    isModerator: true,
-                    note: '系统管理员'
-                });
-            }
-        }
-
-        log('INFO', `成功获取房间 ${room.name}(ID: ${id}) 的成员列表，共 ${formattedMembers.length} 人`);
+        log('INFO', `成功获取房间 ${room.name}(RID: ${roomId}) 的成员列表，共 ${formattedMembers.length} 人`);
         res.json(formattedMembers);
     } catch (error) {
         log('ERROR', `获取聊天室成员列表时出错: ${error.message}`, { 
@@ -411,6 +376,13 @@ exports.addMember = async (req, res) => {
             isModerator: false
         });
         
+        // 更新房间的成员列表
+        const currentMembers = room.members || [];
+        if (!currentMembers.includes(userId)) {
+            currentMembers.push(userId);
+            await room.update({ members: currentMembers });
+        }
+        
         res.status(201).json({ message: '成员添加成功' });
     } catch (error) {
         log('ERROR', '添加成员时出错: ' + error);
@@ -427,6 +399,14 @@ exports.kickMember = async (req, res) => {
         // 使用工具函数踢出成员
         const { kickMember } = require('../utils/roomManager');
         const result = await kickMember(roomId, userId, operatorId);
+        
+        // 更新房间的成员列表
+        const room = await models.Room.findByPk(roomId);
+        if (room) {
+            const currentMembers = room.members || [];
+            const updatedMembers = currentMembers.filter(id => id !== parseInt(userId));
+            await room.update({ members: updatedMembers });
+        }
         
         res.json(result);
     } catch (error) {
@@ -475,7 +455,7 @@ exports.updateRoomSettings = async (req, res) => {
 // 发送聊天室加入请求
 exports.sendJoinRequest = async (req, res) => {
     try {
-        const { id } = req.params; // 聊天室ID
+        const { id } = req.params; // 聊天室RID
         const { message } = req.body;
         
         // 检查聊天室是否存在
@@ -521,7 +501,7 @@ exports.sendJoinRequest = async (req, res) => {
 // 审批聊天室加入请求
 exports.approveJoinRequest = async (req, res) => {
     try {
-        const { id } = req.params; // 聊天室ID
+        const { id } = req.params; // 聊天室RID
         const { userId, action } = req.body; // action: 'approve' or 'reject'
         
         // 检查聊天室是否存在且当前用户是创建者
@@ -542,10 +522,19 @@ exports.approveJoinRequest = async (req, res) => {
         if (action === 'approve') {
             // 批准：将用户加入聊天室
             await models.RoomMember.create({
-                user_id: userId,
-                room_id: id,
-                is_moderator: false
+                userId,
+                roomId: id,
+                isModerator: false
             });
+            
+            // 更新房间的成员列表
+            const room = await models.Room.findByPk(id);
+            const currentMembers = room.members || [];
+            if (!currentMembers.includes(userId)) {
+                currentMembers.push(userId);
+                await room.update({ members: currentMembers });
+            }
+            
             await request.update({ status: 'approved' });
             
             // 通知用户请求被批准（可选）

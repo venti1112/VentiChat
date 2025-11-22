@@ -32,7 +32,7 @@ const register = async (userData) => {
         // 自动加入默认大聊天室
         await RoomMember.create({
             userId: user.id,
-            roomId: 1, // 默认大聊天室ID
+            roomId: 1, // 默认大聊天室RID
             isModerator: false
         });
         

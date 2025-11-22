@@ -15,8 +15,18 @@ exports.authMiddleware = async (req, res, next) => {
         const clientIP = req.ip || req.connection.remoteAddress || 
                         (req.headers['x-forwarded-for'] || '').split(',')[0] || '未知用户';
         
-        // 从cookie获取token
-        const token = req.cookies.token;
+        // 从cookie或Authorization header获取token
+        let token = req.cookies.token;
+        
+        // 如果cookie中没有token，尝试从Authorization header获取
+        if (!token && req.headers.authorization) {
+            const authHeader = req.headers.authorization;
+            const authParts = authHeader.split(' ');
+            if (authParts.length === 2 && authParts[0] === 'Bearer') {
+                token = authParts[1];
+            }
+        }
+        
         if (!token) {
             logUnauthorizedAccess(clientIP, '未知用户', req.method, req.path, 403, '未提供认证令牌');
             return res.status(403).json({ 

@@ -21,10 +21,11 @@ const createRoom = async (creatorId, roomData) => {
             allowImages: roomData.allowImages !== undefined ? roomData.allowImages : true,
             allowVideos: roomData.allowVideos !== undefined ? roomData.allowVideos : true,
             allowFiles: roomData.allowFiles !== undefined ? roomData.allowFiles : true,
-            retentionDays: roomData.retentionDays || 180
+            retentionDays: roomData.retentionDays || 180,
+            members: [creatorId] // 初始化成员列表，包含创建者
         });
-        
-        // 将创建者加入聊天室并设为管理员
+
+        // 将创建者加入聊天室并设为室主
         await models.RoomMember.create({
             userId: creatorId,
             roomId: room.id,
@@ -78,19 +79,28 @@ const joinRoom = async (userId, roomId, requireApproval = true) => {
                 request: joinRequest,
                 message: '加入请求已提交，等待管理员审批' 
             };
+        } else {
+            // 直接加入聊天室
+            await models.RoomMember.create({
+                userId: userId,
+                roomId: roomId,
+                isModerator: false
+            });
+            
+            // 更新房间的成员列表
+            const room = await models.Room.findByPk(roomId);
+            const currentMembers = room.members || [];
+            if (!currentMembers.includes(userId)) {
+                currentMembers.push(userId);
+                await room.update({ members: currentMembers });
+            }
+            
+            return { 
+                success: true, 
+                requiresApproval: false, 
+                message: '成功加入聊天室' 
+            };
         }
-
-        // 直接加入聊天室
-        const roomMember = await models.RoomMember.create({
-            user_id: userId,
-            room_id: roomId,
-            is_moderator: false
-        });
-        
-        return { 
-            member: roomMember,
-            message: '成功加入聊天室' 
-        };
     } catch (error) {
         log('ERROR', '加入聊天室失败: ' + error.message);
         throw error;

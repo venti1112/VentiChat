@@ -14,9 +14,10 @@ module.exports = (sequelize) => {
         allowVideos: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'allow_videos' },
         allowFiles: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'allow_files' },
         retentionDays: { type: DataTypes.INTEGER, defaultValue: 180, field: 'retention_days' },
-        creatorId: { type: DataTypes.INTEGER, field: 'creator_id' }
+        creatorId: { type: DataTypes.INTEGER, allowNull: false, field: 'creator_id' },
+        members: { type: DataTypes.JSON, allowNull: true, defaultValue: [] }
     }, {
-        tableName: 'Rooms',
+        tableName: 'rooms',
         createdAt: 'created_at',
         updatedAt: false
     });

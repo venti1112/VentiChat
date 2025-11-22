@@ -561,18 +561,162 @@ function bindFormEvents() {
             currentRoomName.textContent = room.name;
         }
         
-        // 清空消息区域并显示提示
-        const chatMessages = document.getElementById('chatMessages');
-        if (chatMessages) {
-            chatMessages.innerHTML = '<div class="text-center text-muted my-3"><p>开始聊天吧!</p></div>';
-        }
-        
         // 保存当前聊天室信息到本地存储或其他变量中
         localStorage.setItem('currentRoomId', room.id);
         localStorage.setItem('currentRoomName', room.name);
         
+        // 通过WebSocket加入聊天室
+        if (socket && socket.connected) {
+            socket.emit('joinRoom', room.id);
+        }
+        
+        // 加载消息历史
+        loadMessageHistory(room.id);
+        
         // 可以在这里添加更多进入聊天室的逻辑，比如建立WebSocket连接等
         showMessage(`已进入聊天室: ${room.name}`, 'success');
+    }
+    
+    // 加载消息历史
+    function loadMessageHistory(roomId) {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            showMessage('未登录，请先登录', 'danger');
+            return;
+        }
+        
+        // 确保roomId是数字类型
+        const roomIdInt = parseInt(roomId);
+        if (isNaN(roomIdInt)) {
+            logger.logError('无效的聊天室ID:', roomId);
+            showMessage('无效的聊天室ID', 'danger');
+            return;
+        }
+        
+        const chatMessages = document.getElementById('chatMessages');
+        if (!chatMessages) {
+            logger.logWarn('未找到消息显示区域');
+            return;
+        }
+        
+        // 显示加载中提示
+        chatMessages.innerHTML = '<div class="text-center text-muted my-3"><p>加载消息中...</p></div>';
+        
+        fetch(`/api/messages/history/${roomIdInt}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.error || '加载消息历史失败');
+                });
+            }
+            return response.json();
+        })
+        .then(messages => {
+            displayMessages(messages);
+        })
+        .catch(error => {
+            logger.logError('加载消息历史错误:', error);
+            chatMessages.innerHTML = `<div class="text-center text-muted my-3"><p>加载消息失败: ${error.message}</p></div>`;
+            showMessage('加载消息历史失败: ' + error.message, 'danger');
+        });
+    }
+    
+    // 显示消息
+    function displayMessages(messages) {
+        const chatMessages = document.getElementById('chatMessages');
+        if (!chatMessages) {
+            logger.logWarn('未找到消息显示区域');
+            return;
+        }
+        
+        // 如果只有一条消息，将其添加到现有消息列表中
+        if (messages.length === 1) {
+            const message = messages[0];
+            // 检查消息是否已存在
+            const existingMessage = chatMessages.querySelector(`.message-item[data-message-id="${message.id}"]`);
+            if (existingMessage) {
+                // 如果消息已存在，更新内容（可能是撤回的消息）
+                existingMessage.innerHTML = renderMessage(message);
+                return;
+            }
+            
+            // 添加新消息
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message-item mb-3';
+            messageElement.setAttribute('data-message-id', message.id);
+            messageElement.innerHTML = renderMessage(message);
+            chatMessages.appendChild(messageElement);
+        } else {
+            // 如果是多条消息（历史消息），替换整个消息列表
+            if (!messages || messages.length === 0) {
+                chatMessages.innerHTML = '<div class="text-center text-muted my-3"><p>暂无消息</p></div>';
+                return;
+            }
+            
+            chatMessages.innerHTML = messages.map(message => `
+                <div class="message-item mb-3" data-message-id="${message.id}">
+                    ${renderMessage(message)}
+                </div>
+            `).join('');
+        }
+        
+        // 滚动到底部
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    
+    // 渲染单条消息
+    function renderMessage(message) {
+        // 格式化时间
+        const messageTime = new Date(message.sentAt || message.createdAt).toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        // 根据消息类型显示不同内容
+        let content = '';
+        switch (message.type) {
+            case 'text':
+                content = message.content;
+                break;
+            case 'image':
+                content = `<img src="${message.fileUrl}" alt="图片" style="max-width: 200px; max-height: 200px;">`;
+                break;
+            case 'video':
+                content = `<video src="${message.fileUrl}" controls style="max-width: 200px; max-height: 200px;"></video>`;
+                break;
+            case 'file':
+                content = `<a href="${message.fileUrl}" target="_blank">文件: ${message.content}</a>`;
+                break;
+            case 'recall':
+                content = '<em>消息已被撤回</em>';
+                break;
+            default:
+                content = message.content;
+        }
+        
+        return `
+            <div class="d-flex">
+                <img src="${message.Sender?.avatarUrl || '/default-avatar.png'}" 
+                     alt="头像" 
+                     class="rounded-circle me-2" 
+                     width="32" 
+                     height="32"
+                     onerror="this.src='/default-avatar.png'">
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center mb-1">
+                        <strong class="me-2">${message.Sender?.nickname || message.Sender?.username || '未知用户'}</strong>
+                        <small class="text-muted">${messageTime}</small>
+                    </div>
+                    <div class="message-content">
+                        ${content}
+                    </div>
+                </div>
+            </div>
+        `;
     }
     
     // 页面加载完成后加载聊天室列表
@@ -620,7 +764,7 @@ function bindFormEvents() {
     
     // 加载聊天室成员列表
     function loadRoomMembers() {
-        // 获取当前聊天室ID
+        // 获取当前聊天室RID
         const currentRoomId = localStorage.getItem('currentRoomId');
         if (!currentRoomId) {
             showMessage('请先选择一个聊天室', 'warning');
@@ -677,7 +821,9 @@ function bindFormEvents() {
                 <div class="flex-grow-1">
                     <div class="fw-bold">${member.nickname || member.username}</div>
                     <div class="text-muted small">@${member.username}</div>
+                    <div class="text-muted small">UID: ${member.uid}</div>
                 </div>
+                ${member.isCreator ? '<span class="badge bg-success me-1">群主</span>' : ''}
                 ${member.isModerator ? '<span class="badge bg-warning">管理员</span>' : ''}
             </li>
         `).join('');
@@ -827,4 +973,150 @@ function bindFormEvents() {
     } else {
         logger.logInfo('未找到个人中心表单');
     }
+    
+    // 绑定发送消息相关事件
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    
+    // 发送按钮点击事件
+    if (sendBtn) {
+        sendBtn.addEventListener('click', sendMessage);
+    }
+    
+    // 消息输入框回车事件
+    if (messageInput) {
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    }
+    
+    // 初始化WebSocket连接
+    function initWebSocket() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            logger.logWarn('未登录，无法建立WebSocket连接');
+            return;
+        }
+        
+        // 创建WebSocket连接
+        const socket = io({
+            query: { token }
+        });
+        
+        // 监听连接成功事件
+        socket.on('connect', () => {
+            logger.logInfo('WebSocket连接成功');
+            
+            // 如果有当前聊天室，加入该聊天室
+            const currentRoomId = localStorage.getItem('currentRoomId');
+            if (currentRoomId) {
+                socket.emit('joinRoom', currentRoomId);
+            }
+        });
+        
+        // 监听新消息事件
+        socket.on('newMessage', (message) => {
+            // 检查是否是当前聊天室的消息
+            const currentRoomId = localStorage.getItem('currentRoomId');
+            if (currentRoomId && currentRoomId == message.roomId) {
+                // 显示新消息
+                displayMessages([message]);
+            }
+        });
+        
+        // 监听消息撤回事件
+        socket.on('messageRecalled', (data) => {
+            const messageElements = document.querySelectorAll(`.message-item[data-message-id="${data.messageId}"]`);
+            messageElements.forEach(element => {
+                element.innerHTML = renderMessage({
+                    id: data.messageId,
+                    type: 'recall',
+                    content: '[已撤回]'
+                });
+            });
+        });
+        
+        // 监听未读计数更新事件
+        socket.on('unreadCountUpdate', (data) => {
+            // 更新未读计数显示
+            updateUnreadCount(data.count);
+        });
+        
+        // 监听连接错误事件
+        socket.on('connect_error', (error) => {
+            logger.logError('WebSocket连接错误:', error);
+        });
+        
+        // 监听断开连接事件
+        socket.on('disconnect', () => {
+            logger.logInfo('WebSocket连接断开');
+        });
+        
+        return socket;
+    }
+    
+    // 更新未读计数显示
+    function updateUnreadCount(count) {
+        // 这里可以更新UI上的未读计数显示
+        logger.logInfo('未读消息数更新:', count);
+    }
+    
+    // 发送消息函数
+    function sendMessage() {
+        const messageInput = document.getElementById('messageInput');
+        const currentRoomId = localStorage.getItem('currentRoomId');
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+            showMessage('未登录，请先登录', 'danger');
+            return;
+        }
+        
+        if (!currentRoomId) {
+            showMessage('请先选择一个聊天室', 'warning');
+            return;
+        }
+        
+        const content = messageInput.value.trim();
+        if (!content) {
+            showMessage('消息内容不能为空', 'warning');
+            return;
+        }
+        
+        // 发送消息到服务器
+        fetch('/api/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                roomId: currentRoomId,
+                content: content,
+                type: 'text'
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.error || '发送失败');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            // 清空输入框
+            if (messageInput) messageInput.value = '';
+        })
+        .catch(error => {
+            logger.logError('发送消息失败:', error);
+            showMessage(error.message || '发送消息失败', 'danger');
+        });
+    }
+    
+    // 初始化WebSocket连接
+    const socket = initWebSocket();
 }

@@ -24,12 +24,12 @@ module.exports = (sequelize) => {
     RoomMember.associate = function(models) {
         // 定义与User和Room的关联
         RoomMember.belongsTo(models.User, { 
-            foreignKey: 'user_id', 
+            foreignKey: 'userId', 
             as: 'User' 
         });
         
         RoomMember.belongsTo(models.Room, { 
-            foreignKey: 'room_id', 
+            foreignKey: 'roomId', 
             as: 'Room' 
         });
     };
