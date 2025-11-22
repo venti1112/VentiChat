@@ -105,6 +105,9 @@ router.get('/rooms/:roomId/member-ids', authMiddleware, roomController.getRoomMe
 router.post('/users/by-ids', authMiddleware, roomController.getUsersByIds);
 router.get('/rooms/:id', authMiddleware, roomController.getRoom);
 router.delete('/rooms/:roomId/members/:userId', authMiddleware, roomController.kickMember);
+// 新增加入请求相关路由
+router.post('/rooms/:id/join-request', authMiddleware, roomController.sendJoinRequest);
+router.post('/rooms/:id/approve-join-request', authMiddleware, roomController.approveJoinRequest);
 
 // 消息相关路由
 const messageController = require('../controllers/messageController');

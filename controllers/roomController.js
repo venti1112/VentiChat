@@ -18,8 +18,7 @@ exports.createRoom = async (req, res) => {
             requireApproval: requireApproval !== undefined ? requireApproval : true,
             allowImages: allowImages !== undefined ? allowImages : true,
             allowVideos: allowVideos !== undefined ? allowVideos : true,
-            allowFiles: allowFiles !== undefined ? allowFiles : true,
-            members: [req.user.userId]  // 将创建者添加到成员列表中
+            allowFiles: allowFiles !== undefined ? allowFiles : true
         });
 
         // 将创建者加入聊天室并设为室主
@@ -30,12 +29,23 @@ exports.createRoom = async (req, res) => {
         });
 
         // 记录聊天室创建成功
-        log('INFO', `用户 ${req.user.username}(ID: ${req.user.userId}) 成功创建聊天室: ${name}(ID: ${room.id})`);
+        log('INFO', `用户 ${req.user.username}(ID: ${req.user.userId}) 成功创建聊天室: ${name}(ID: ${room.roomId})`);
 
-        res.json(room);
+        // 返回格式化的房间信息
+        res.json({
+            roomId: room.roomId,
+            name: room.name,
+            creatorId: room.creatorId,
+            isPrivate: room.isPrivate,
+            requireApproval: room.requireApproval,
+            allowImages: room.allowImages,
+            allowVideos: room.allowVideos,
+            allowFiles: room.allowFiles,
+            createdAt: room.createdAt
+        });
     } catch (error) {
         // 记录创建聊天室失败
-        log('ERROR', `用户 ${req.user.username}(ID: ${req.user.id}) 创建聊天室失败: ${error.message}`);
+        log('ERROR', `用户 ${req.user.username}(ID: ${req.user.userId}) 创建聊天室失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };
@@ -535,7 +545,29 @@ exports.sendJoinRequest = async (req, res) => {
         
         // 检查是否需要审批
         if (!room.requireApproval) {
-            return res.status(400).json({ error: '该聊天室不需要审批' });
+            // 如果不需要审批，直接加入聊天室
+            const existingMember = await models.RoomMember.findOne({
+                where: { userId: req.user.userId, roomId: id }
+            });
+            if (existingMember) {
+                return res.status(400).json({ error: '您已经是该聊天室的成员' });
+            }
+            
+            // 直接创建房间成员
+            await models.RoomMember.create({
+                userId: req.user.userId,
+                roomId: id,
+                isModerator: false
+            });
+
+            // 更新房间的成员列表
+            const currentMembers = room.members || [];
+            if (!currentMembers.includes(req.user.userId)) {
+                currentMembers.push(req.user.userId);
+                await room.update({ members: currentMembers });
+            }
+
+            return res.json({ success: true, message: '已成功加入聊天室' });
         }
         
         // 检查用户是否已在聊天室中
@@ -561,7 +593,7 @@ exports.sendJoinRequest = async (req, res) => {
             message: message || null
         });
         
-        res.json({ success: true });
+        res.json({ success: true, message: '加入请求已发送' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -642,10 +674,13 @@ exports.searchRooms = async (req, res) => {
         // 获取房间创建者信息
         const roomWithCreators = await Promise.all(rooms.map(async (room) => {
             const creator = await models.User.findByPk(room.creatorId, {
-                attributes: ['id', 'username', 'nickname']
+                attributes: ['userId', 'username', 'nickname']
             });
             
-            const memberCount = room.members ? room.members.length : 0;
+            // 计算成员数量
+            const memberCount = await models.RoomMember.count({
+                where: { roomId: room.roomId }
+            });
             
             return {
                 id: room.roomId,
