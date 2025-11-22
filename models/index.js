@@ -1,5 +1,30 @@
 const fs = require('fs');
 const path = require('path');
+
+module.exports = (sequelize) => {
+    // 自动加载所有模型文件（除了index.js本身）
+    const models = {};
+    
+    // 获取当前目录下所有.js文件（除了index.js）
+    const modelFiles = fs.readdirSync(__dirname)
+        .filter(file => file !== 'index.js' && file.endsWith('.js'));
+    
+    // 加载每个模型文件
+    modelFiles.forEach(file => {
+        const model = require(path.join(__dirname, file))(sequelize);
+        models[model.name] = model;
+    });
+    
+    // 设置模型关联
+    Object.keys(models).forEach(modelName => {
+        if (models[modelName].associate) {
+            models[modelName].associate(models);
+        }
+    });
+    
+    return models;
+};
+
 const Sequelize = require('sequelize');
 const basename = path.basename(__filename);
 const env = process.env.NODE_ENV || 'development';
@@ -28,7 +53,7 @@ fs.readdirSync(__dirname)
     );
   })
   .forEach(file => {
-    const model = require(path.join(__dirname, file))(sequelize, Sequelize.DataTypes);
+    const model = require(path.join(__dirname, file))(sequelize);
     db[model.name] = model;
   });
 

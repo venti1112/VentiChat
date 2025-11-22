@@ -1,26 +1,44 @@
-// models/joinRequest.js
 module.exports = (sequelize) => {
     const DataTypes = sequelize.constructor.DataTypes;
     
     const JoinRequest = sequelize.define('JoinRequest', {
-        id: { 
+        requestId: { 
             type: DataTypes.INTEGER, 
             primaryKey: true, 
-            autoIncrement: true 
+            autoIncrement: true,
+            field: 'request_id'
         },
         status: {
             type: DataTypes.ENUM('pending', 'approved', 'rejected'),
-            defaultValue: 'pending'
+            defaultValue: 'pending',
+            field: 'status'
         },
-        message: { type: DataTypes.STRING(255), field: 'message' }
+        requestMessage: { 
+            type: DataTypes.STRING(255), 
+            field: 'request_message' 
+        },
+        userId: { 
+            type: DataTypes.INTEGER, 
+            allowNull: false,
+            field: 'user_id'
+        },
+        roomId: { 
+            type: DataTypes.INTEGER, 
+            allowNull: false,
+            field: 'room_id'
+        },
+        requestTime: {
+            type: DataTypes.DATE,
+            defaultValue: DataTypes.NOW,
+            field: 'request_time'
+        }
     }, {
-        tableName: 'JoinRequests',
-        createdAt: 'request_time',
-        updatedAt: false
+        tableName: 'join_requests',
+        timestamps: false
     });
 
     JoinRequest.associate = function(models) {
-        // 移除可能导致循环依赖的关联，在需要的地方使用原始查询
+        // 根据新要求，移除所有外键关联
     };
 
     return JoinRequest;

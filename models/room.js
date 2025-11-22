@@ -2,32 +2,59 @@ module.exports = (sequelize) => {
     const DataTypes = sequelize.constructor.DataTypes;
     
     const Room = sequelize.define('Room', {
-        id: { 
+        roomId: { 
             type: DataTypes.INTEGER, 
             primaryKey: true, 
-            autoIncrement: true 
+            autoIncrement: true,
+            field: 'room_id'
         },
-        name: { type: DataTypes.STRING(100), allowNull: false },
-        isPrivate: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_private' },
-        requireApproval: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'require_approval' },
-        allowImages: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'allow_images' },
-        allowVideos: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'allow_videos' },
-        allowFiles: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'allow_files' },
-        retentionDays: { type: DataTypes.INTEGER, defaultValue: 180, field: 'retention_days' },
-        creatorId: { type: DataTypes.INTEGER, allowNull: false, field: 'creator_id' },
-        members: { type: DataTypes.JSON, allowNull: true, defaultValue: [] }
+        name: { 
+            type: DataTypes.STRING(100), 
+            allowNull: false,
+            field: 'name'
+        },
+        creatorId: { 
+            type: DataTypes.INTEGER, 
+            allowNull: false,
+            field: 'creator_id' 
+        },
+        isPrivate: { 
+            type: DataTypes.BOOLEAN, 
+            defaultValue: false, 
+            field: 'is_private' 
+        },
+        requireApproval: { 
+            type: DataTypes.BOOLEAN, 
+            defaultValue: true, 
+            field: 'require_approval' 
+        },
+        allowImages: { 
+            type: DataTypes.BOOLEAN, 
+            defaultValue: true, 
+            field: 'allow_images' 
+        },
+        allowVideos: { 
+            type: DataTypes.BOOLEAN, 
+            defaultValue: true, 
+            field: 'allow_videos' 
+        },
+        allowFiles: { 
+            type: DataTypes.BOOLEAN, 
+            defaultValue: true, 
+            field: 'allow_files' 
+        },
+        createdAt: {
+            type: DataTypes.DATE,
+            defaultValue: DataTypes.NOW,
+            field: 'created_at'
+        }
     }, {
         tableName: 'rooms',
-        createdAt: 'created_at',
-        updatedAt: false
+        timestamps: false
     });
 
     Room.associate = function(models) {
-        // 定义聊天室创建者关系
-        Room.belongsTo(models.User, {
-            foreignKey: 'creator_id',
-            as: 'Creator'
-        });
+        // 根据新要求，移除所有外键关联
     };
 
     return Room;

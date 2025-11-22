@@ -44,7 +44,9 @@ const models = {
     RoomMember: require('./models/roomMember')(sequelize),
     Message: require('./models/message')(sequelize),
     JoinRequest: require('./models/joinRequest')(sequelize),
-    Token: require('./models/token')(sequelize)
+    Token: require('./models/token')(sequelize),
+    SystemSetting: require('./models/systemSetting')(sequelize),
+    BanIp: require('./models/banIp')(sequelize)
 };
 
 // 调用各模型的associate方法设置关联关系
@@ -61,6 +63,10 @@ app.set('models', models);
 app.use(express.json());
 app.use(cookieParser()); // 添加 cookie-parser 中间件
 app.use(express.static(path.join(__dirname, 'public')));
+
+// IP封禁中间件
+const ipBanMiddleware = require('./middleware/ipBanMiddleware');
+app.use(ipBanMiddleware);
 
 // 对于根路径，提供index.html文件
 app.get('/', (req, res) => {
@@ -120,10 +126,7 @@ app.use(async (req, res, next) => {
 });
 
 // 路由
-const apiRouter = require('./routes/index');
-// 将models对象传递给路由
-apiRouter.models = models;
-app.use('/api', apiRouter);
+app.use('/api', require('./routes/index'));
 
 
 // 404错误处理中间件
@@ -275,8 +278,8 @@ io.on('connection', async (socket) => {
                     socket.request.connection.remoteAddress || 
                     '未知用户');
     
-    // 从查询参数中获取token
-    const token = socket.handshake.query.token;
+    // 从查询参数或auth中获取token
+    const token = socket.handshake.query.token || socket.handshake.auth?.token;
     let userId = '未知用户';
     let username = '未知用户';
     
@@ -284,9 +287,9 @@ io.on('connection', async (socket) => {
     if (token) {
         try {
             const decoded = jwt.verify(token, config.encryptionKey);
-            const user = await models.User.findByPk(decoded.id);
+            const user = await models.User.findByPk(decoded.id || decoded.userId);
             if (user) {
-                userId = user.id;
+                userId = user.userId;
                 username = user.username;
             }
         } catch (error) {
@@ -308,20 +311,30 @@ io.on('connection', async (socket) => {
         });
     } else {
         socket.on('disconnect', () => {
-            log('INFO', `用户断开Socket.IO - IP: ${clientIP}, 用户名: 未知用户用户, 结果: 成功`);
+            log('INFO', `用户断开Socket.IO - IP: ${clientIP}, 用户名: 未知用户, 结果: 成功`);
         });
     }
 
     // 加入聊天室
-    socket.on('joinRoom', (roomId) => {
-        socket.join(`room_${roomId}`);
+    socket.on('joinRoom', (data) => {
+        // 兼容两种数据格式：直接传roomId或传{roomId: ...}对象
+        const roomId = typeof data === 'object' ? data.rid || data.roomId : data;
+        if (roomId) {
+            socket.join(`room_${roomId}`);
+            log('INFO', `用户 ${username} 加入聊天室 ${roomId}`);
+        }
     });
     
     // 离开聊天室
-    socket.on('leaveRoom', (roomId) => {
-        socket.leave(`room_${roomId}`);
+    socket.on('leaveRoom', (data) => {
+        // 兼容两种数据格式：直接传roomId或传{roomId: ...}对象
+        const roomId = typeof data === 'object' ? data.rid || data.roomId : data;
+        if (roomId) {
+            socket.leave(`room_${roomId}`);
+            log('INFO', `用户 ${username} 离开聊天室 ${roomId}`);
+        }
     });
 });
 
-// 启动应用
+// 启动服务器
 startServer();

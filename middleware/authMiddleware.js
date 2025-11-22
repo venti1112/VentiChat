@@ -5,8 +5,16 @@ const { logUnauthorizedAccess, log, LOG_LEVELS } = require('../utils/logger');
 
 // 认证中间件
 exports.authMiddleware = async (req, res, next) => {
-    // 跳过所有认证相关的请求
-    if (req.path.startsWith('/auth/')) {
+    // 明确排除认证相关路由，确保这些路由无需认证即可访问
+    const excludedPaths = [
+        '/api/auth/login',
+        '/api/auth/register',
+        '/auth/login',
+        '/auth/register'
+    ];
+    
+    // 检查请求路径是否在排除列表中
+    if (excludedPaths.includes(req.path) || req.path.startsWith('/auth/')) {
         return next();
     }
     
@@ -40,7 +48,7 @@ exports.authMiddleware = async (req, res, next) => {
         
         // 检查token是否存在于数据库
         const dbToken = await models.Token.findOne({
-          where: { token: token }
+          where: { tokenStr: token }
         });
         
         if (!dbToken) {
@@ -99,69 +107,23 @@ exports.authMiddleware = async (req, res, next) => {
 };
 
 // 管理员中间件
-exports.adminMiddleware = async (req, res, next) => {
-    // 先进行常规认证
-    await new Promise((resolve, reject) => {
-        exports.authMiddleware(req, res, (err) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve();
-            }
-        });
-    }).catch(next);
+exports.adminMiddleware = (req, res, next) => {
+    // 检查用户是否已通过认证
+    if (!req.user) {
+        return res.status(403).json({ message: '需要管理员权限' });
+    }
     
-    try {
-        // 检查用户是否存在
-        if (!req.user) {
-            const clientIP = req.ip || req.connection.remoteAddress || 
-                           (req.headers['x-forwarded-for'] || '').split(',')[0] || '未知用户';
-            logUnauthorizedAccess(clientIP, '未知用户', req.method, req.path, 403, '用户未认证');
-            return res.status(403).json({ error: '需要管理员权限' });
-        }
-
-        // 首先检查配置文件中的管理员用户名
-        if (req.user.username !== config.adminUsername) {
-            // 如果不匹配，再查询数据库确认用户是否为管理员
-            const adminUser = await models.User.findOne({
-                where: {
-                    username: config.adminUsername
-                }
-            });
-
-            // 检查当前用户是否与数据库中的管理员用户一致
-            if (!adminUser || req.user.id !== adminUser.id) {
-                // 获取客户端IP
-                const clientIP = req.ip || req.connection.remoteAddress || 
-                                (req.headers['x-forwarded-for'] || '').split(',')[0] || '未知用户';
-                
-                logUnauthorizedAccess(clientIP, req.user.username, req.method, req.path, 403, '需要管理员权限');
-                return res.status(403).json({ error: '需要管理员权限' });
-            }
-        }
-        next();
-    } catch (dbError) {
-        log(LOG_LEVELS.ERROR, `管理员权限验证过程中发生数据库错误: ${dbError.message}`);
-        // 发生数据库错误时，默认拒绝访问
+    // 检查用户是否为管理员
+    if (!req.user.isAdmin) {
+        // 获取客户端IP
         const clientIP = req.ip || req.connection.remoteAddress || 
                         (req.headers['x-forwarded-for'] || '').split(',')[0] || '未知用户';
         
-        let username = '未知用户';
-        if (req.user) {
-            username = req.user.username;
-        } else {
-            try {
-                const token = req.cookies.token;
-                if (token) {
-                    const decoded = jwt.decode(token);
-                    username = decoded.username || '未知用户';
-                }
-            } catch (decodeError) {
-                // 解码失败则使用默认值
-            }
-        }
+        // 记录未授权的管理员访问尝试
+        logUnauthorizedAccess(clientIP, req.user.username, req.method, req.path, 403, '需要管理员权限');
         
-        logUnauthorizedAccess(clientIP, username, req.method, req.path, 500, '服务器内部错误');
-        return res.status(500).json({ error: '服务器内部错误' });
+        return res.status(403).json({ message: '需要管理员权限' });
     }
+    
+    next();
 };

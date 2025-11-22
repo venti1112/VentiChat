@@ -12,26 +12,32 @@ module.exports = (sequelize) => {
             primaryKey: true,
             field: 'room_id'
         },
-        isModerator: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_moderator' },
-        note: { type: DataTypes.STRING(100), field: 'note' },
-        lastReadMessageId: { type: DataTypes.INTEGER, defaultValue: 0, field: 'last_read_message_id' }
+        isModerator: { 
+            type: DataTypes.BOOLEAN, 
+            defaultValue: false, 
+            field: 'is_moderator' 
+        },
+        note: { 
+            type: DataTypes.STRING(100), 
+            field: 'note' 
+        },
+        lastReadMessageId: { 
+            type: DataTypes.INTEGER, 
+            defaultValue: 0, 
+            field: 'last_read_message_id' 
+        },
+        joinTime: {
+            type: DataTypes.DATE,
+            defaultValue: DataTypes.NOW,
+            field: 'join_time'
+        }
     }, {
         tableName: 'room_members',
-        createdAt: 'join_time',
-        updatedAt: false
+        timestamps: false
     });
 
     RoomMember.associate = function(models) {
-        // 定义与User和Room的关联
-        RoomMember.belongsTo(models.User, { 
-            foreignKey: 'userId', 
-            as: 'User' 
-        });
-        
-        RoomMember.belongsTo(models.Room, { 
-            foreignKey: 'roomId', 
-            as: 'Room' 
-        });
+        // 根据新要求，移除所有外键关联
     };
 
     return RoomMember;

@@ -105,6 +105,131 @@ function closeProfilePopup() {
     if (overlay) overlay.style.display = 'none';
 }
 
+// 更新个人资料
+async function updateProfile(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    try {
+        // 显示加载状态
+        const submitButton = form.querySelector('button[type="submit"]');
+        const originalText = submitButton.innerHTML;
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 保存中...';
+        
+        // 构建基本的用户资料更新数据
+        const profileData = {
+            nickname: formData.get('nickname')
+        };
+        
+        // 构建偏好设置更新数据
+        const preferencesData = {
+            themeColor: formData.get('themeColor')
+        };
+        
+        // 检查是否有新的头像文件
+        const avatarFile = document.getElementById('avatarInput').files[0];
+        if (avatarFile) {
+            formData.append('avatar', avatarFile);
+        }
+        
+        // 检查是否有新的背景图片文件
+        const bgFile = document.getElementById('backgroundImage').files[0];
+        if (bgFile) {
+            // 上传背景图片
+            const bgFormData = new FormData();
+            bgFormData.append('background', bgFile);
+            
+            const bgResponse = await fetch('/api/users/upload-background', {
+                method: 'POST',
+                body: bgFormData,
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            
+            if (!bgResponse.ok) {
+                throw new Error('背景图片上传失败');
+            }
+            
+            const bgResult = await bgResponse.json();
+            preferencesData.backgroundUrl = bgResult.backgroundUrl;
+        }
+        
+        // 更新用户资料（包括头像）
+        const profileResponse = await fetch('/api/users/profile', {
+            method: 'PUT',
+            body: avatarFile ? formData : JSON.stringify(profileData),
+            headers: avatarFile ? {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            } : {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        
+        if (!profileResponse.ok) {
+            throw new Error('用户资料更新失败');
+        }
+        
+        // 更新偏好设置
+        const preferencesResponse = await fetch('/api/users/preferences', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify(preferencesData)
+        });
+        
+        if (!preferencesResponse.ok) {
+            throw new Error('偏好设置更新失败');
+        }
+        
+        // 获取更新后的用户信息
+        const profileResult = await profileResponse.json();
+        const preferencesResult = await preferencesResponse.json();
+        
+        // 更新本地存储的用户信息
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const updatedUser = {
+            ...currentUser,
+            nickname: profileResult.user.nickname,
+            avatarUrl: profileResult.user.avatarUrl
+        };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        
+        // 更新页面上的用户信息显示
+        const userNickname = document.getElementById('userNickname');
+        const userAvatar = document.getElementById('userAvatar');
+        if (userNickname) userNickname.textContent = updatedUser.nickname;
+        if (userAvatar) userAvatar.src = updatedUser.avatarUrl;
+        
+        // 应用新的个性化设置
+        const newPreferences = {
+            backgroundUrl: preferencesResult.preferences.backgroundUrl,
+            themeColor: preferencesResult.preferences.themeColor
+        };
+        applyUserPreferences(newPreferences);
+        
+        // 显示成功消息
+        showMessage('个人资料更新成功！', 'success');
+        
+        // 关闭弹窗
+        closeProfilePopup();
+    } catch (error) {
+        console.error('更新个人资料失败:', error);
+        showMessage(`更新失败: ${error.message}`, 'danger');
+    } finally {
+        // 恢复按钮状态
+        const submitButton = form.querySelector('button[type="submit"]');
+        submitButton.disabled = false;
+        submitButton.innerHTML = originalText;
+    }
+}
+
 // 引入前端日志工具
 // 使用统一的前端日志工具
 const logger = window.logger || {
@@ -112,6 +237,142 @@ const logger = window.logger || {
     logWarn: () => {},
     logError: () => {}
 };
+
+// 获取用户个性化设置
+function getUserPreferences() {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        logger.logWarn('未登录，无法获取用户个性化设置');
+        return Promise.reject(new Error('未登录'));
+    }
+    
+    // 定义默认设置
+    const defaultPreferences = {
+        backgroundUrl: '/wp.jpg',
+        themeColor: '#4cd8b8'
+    };
+    
+    return fetch('/api/users/preferences', {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        // 添加请求超时处理
+        signal: AbortSignal.timeout(10000) // 10秒超时
+    })
+    .then(response => {
+        if (!response) {
+            throw new Error('网络连接失败，请检查网络连接');
+        }
+        
+        if (!response.ok) {
+            // 根据不同的HTTP状态码提供更具体的错误信息
+            switch (response.status) {
+                case 401:
+                    // Token无效或过期，清除本地存储
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('userId');
+                    localStorage.removeItem('user');
+                    throw new Error('登录已过期，请重新登录');
+                    
+                case 404:
+                    // 如果是404，可能是新用户没有个性化设置，返回默认设置
+                    logger.logInfo('用户个性化设置不存在，使用默认设置');
+                    applyUserPreferences(defaultPreferences);
+                    return defaultPreferences;
+                    
+                case 500:
+                    throw new Error('服务器内部错误，请稍后再试');
+                    
+                case 502:
+                case 503:
+                case 504:
+                    throw new Error('服务器暂时不可用，请稍后再试');
+                    
+                default:
+                    // 将响应转换为文本以查看详细错误信息
+                    return response.text().then(text => {
+                        let errorData;
+                        try {
+                            errorData = JSON.parse(text);
+                        } catch (e) {
+                            errorData = { message: text || `HTTP ${response.status}: ${response.statusText}` };
+                        }
+                        throw new Error(errorData.error || errorData.message || `请求失败: HTTP ${response.status}`);
+                    });
+            }
+        }
+        
+        // 成功响应，解析JSON数据
+        return response.json();
+    })
+    .then(data => {
+        // 验证返回的数据结构是否完整
+        if (!data || typeof data !== 'object') {
+            logger.logWarn('用户个性化设置数据格式不正确，使用默认设置');
+            applyUserPreferences(defaultPreferences);
+            return defaultPreferences;
+        }
+        
+        // 确保必要的属性存在，缺失时使用默认值
+        const safeData = {
+            backgroundUrl: data.backgroundUrl || defaultPreferences.backgroundUrl,
+            themeColor: data.themeColor || defaultPreferences.themeColor
+        };
+        
+        // 应用用户个性化设置
+        applyUserPreferences(safeData);
+        return safeData;
+    })
+    .catch(error => {
+        // 区分不同类型的错误
+        if (error.name === 'AbortError') {
+            logger.logError('获取用户个性化设置超时:', error);
+            // 超时时也应用默认设置
+            applyUserPreferences(defaultPreferences);
+            throw new Error('请求超时，请检查网络连接');
+        } else if (error.message.includes('登录已过期')) {
+            logger.logError('Token已过期，需要重新登录');
+            // 这种情况已经在上面的401处理中清除了token
+            throw error;
+        } else {
+            logger.logError('获取用户个性化设置失败:', error);
+            // 对于其他错误，应用默认设置但仍然抛出错误以便调用者处理
+            applyUserPreferences(defaultPreferences);
+            throw error;
+        }
+    });
+}
+
+// 应用用户个性化设置
+function applyUserPreferences(preferences) {
+    // 应用自定义背景
+    if (preferences.backgroundUrl) {
+        document.body.style.backgroundImage = `url('${preferences.backgroundUrl}')`;
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundAttachment = 'fixed';
+        document.body.style.backgroundRepeat = 'no-repeat';
+    }
+    
+    // 应用自定义主题色
+    if (preferences.themeColor) {
+        // 应用主题色到各种按钮元素
+        const buttons = document.querySelectorAll('.btn');
+        buttons.forEach(button => {
+            button.style.backgroundColor = preferences.themeColor;
+        });
+        
+        // 应用主题色到其他需要着色的元素
+        const themeColorElements = document.querySelectorAll('.theme-color-element');
+        themeColorElements.forEach(element => {
+            element.style.borderColor = preferences.themeColor;
+        });
+    }
+    
+    // 将个性化设置保存到localStorage中
+    localStorage.setItem('userPreferences', JSON.stringify(preferences));
+}
 
 // 页面加载时检查登录状态
 document.addEventListener('DOMContentLoaded', function() {
@@ -152,6 +413,20 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
+        // 获取并应用用户个性化设置
+        getUserPreferences()
+            .then(preferences => {
+                logger.logInfo('用户个性化设置加载成功:', preferences);
+            })
+            .catch(error => {
+                logger.logWarn('加载用户个性化设置失败:', error);
+                // 使用默认设置
+                applyUserPreferences({
+                    backgroundUrl: '/wp.jpg',
+                    themeColor: '#4cd8b8'
+                });
+            });
+        
         // 获取用户信息
         fetch('/api/auth/verify', {
             headers: {
@@ -173,14 +448,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 const userAvatar = document.getElementById('userAvatar');
                 const userId = document.getElementById('userId');
                 
-                if (userNickname) userNickname.textContent = data.user.username; // verify接口不返回nickname
+                if (userNickname) userNickname.textContent = data.user.nickname || data.user.username;
                 if (userUsername) userUsername.textContent = data.user.username;
-                if (userAvatar) userAvatar.src = '/default-avatar.png'; // verify接口不返回avatarUrl
-                if (userId) userId.textContent = 'UID: ' + data.user.id;
+                if (userAvatar) userAvatar.src = data.user.avatarUrl || '/default-avatar.png';
+                if (userId) userId.textContent = 'UID: ' + (data.user.id || data.user.userId);
                 
                 // 更新本地存储的用户信息
                 localStorage.setItem('user', JSON.stringify(data.user));
-                localStorage.setItem('userId', data.user.id);
+                localStorage.setItem('userId', data.user.id || data.user.userId);
             } else {
                 // Token无效，清除本地存储并显示登录界面
                 localStorage.removeItem('token');
@@ -283,15 +558,30 @@ function bindFormEvents() {
                         chatSection: !!chatSection 
                     });
                     
-                    if (authSection) {
+                    if (authSection && chatSection) {
                         authSection.style.display = 'none';
-                        logger.logInfo('隐藏登录区域');
-                    }
-                    if (chatSection) {
                         chatSection.style.display = 'block';
-                        logger.logInfo('显示聊天区域');
+                        logger.logInfo('切换到聊天界面');
+                        
+                        // 获取并应用用户个性化设置
+                        getUserPreferences()
+                            .then(preferences => {
+                                logger.logInfo('用户个性化设置加载成功:', preferences);
+                            })
+                            .catch(error => {
+                                logger.logWarn('加载用户个性化设置失败:', error);
+                                // 使用默认设置
+                                applyUserPreferences({
+                                    backgroundUrl: '/wp.jpg',
+                                    themeColor: '#4cd8b8'
+                                });
+                            });
+                            
                         // 加载聊天室列表
                         loadRooms();
+                        
+                        // 建立WebSocket连接
+                        initializeWebSocket(data.token);
                     }
                 } else {
                     // 登录失败，显示服务器返回的错误信息
@@ -389,6 +679,11 @@ function bindFormEvents() {
                 localStorage.removeItem('token');
                 localStorage.removeItem('userId');
                 localStorage.removeItem('user');
+                localStorage.removeItem('userPreferences');
+                
+                // 重置页面背景和主题
+                document.body.style.backgroundImage = '';
+                document.body.style.backgroundColor = '#f8f9fa';
                 
                 // 切换到登录界面
                 const chatSection = document.getElementById('chatSection');
@@ -553,15 +848,19 @@ function bindFormEvents() {
     
     // 进入聊天室
     function enterRoom(room) {
-        logger.logInfo('进入聊天室:', room.id);
-        
-        // 更新当前聊天室名称显示
-        const currentRoomName = document.getElementById('currentRoomName');
-        if (currentRoomName) {
-            currentRoomName.textContent = room.name;
+        // 检查房间对象和ID的有效性
+        if (!room || !room.id || room.id === 'undefined') {
+            showMessage('房间信息无效', 'danger');
+            return;
         }
         
-        // 保存当前聊天室信息到本地存储或其他变量中
+        // 更新当前聊天室显示
+        const currentRoomNameElement = document.getElementById('currentRoomName');
+        if (currentRoomNameElement) {
+            currentRoomNameElement.textContent = room.note || room.name;
+        }
+        
+        // 保存当前聊天室信息到本地存储
         localStorage.setItem('currentRoomId', room.id);
         localStorage.setItem('currentRoomName', room.name);
         
@@ -615,8 +914,8 @@ function bindFormEvents() {
             }
             return response.json();
         })
-        .then(messages => {
-            displayMessages(messages);
+        .then(async messages => {
+            await displayMessages(messages);
         })
         .catch(error => {
             logger.logError('加载消息历史错误:', error);
@@ -626,7 +925,7 @@ function bindFormEvents() {
     }
     
     // 显示消息
-    function displayMessages(messages) {
+    async function displayMessages(messages) {
         const chatMessages = document.getElementById('chatMessages');
         if (!chatMessages) {
             logger.logWarn('未找到消息显示区域');
@@ -640,7 +939,7 @@ function bindFormEvents() {
             const existingMessage = chatMessages.querySelector(`.message-item[data-message-id="${message.id}"]`);
             if (existingMessage) {
                 // 如果消息已存在，更新内容（可能是撤回的消息）
-                existingMessage.innerHTML = renderMessage(message);
+                existingMessage.innerHTML = await renderMessage(message);
                 return;
             }
             
@@ -648,7 +947,7 @@ function bindFormEvents() {
             const messageElement = document.createElement('div');
             messageElement.className = 'message-item mb-3';
             messageElement.setAttribute('data-message-id', message.id);
-            messageElement.innerHTML = renderMessage(message);
+            messageElement.innerHTML = await renderMessage(message);
             chatMessages.appendChild(messageElement);
         } else {
             // 如果是多条消息（历史消息），替换整个消息列表
@@ -657,64 +956,174 @@ function bindFormEvents() {
                 return;
             }
             
-            chatMessages.innerHTML = messages.map(message => `
-                <div class="message-item mb-3" data-message-id="${message.id}">
-                    ${renderMessage(message)}
-                </div>
-            `).join('');
+            // 使用 Promise.all 并行处理所有消息的渲染
+            const renderedMessages = await Promise.all(messages.map(async (message) => {
+                const rendered = await renderMessage(message);
+                return `
+                    <div class="message-item mb-3" data-message-id="${message.id}">
+                        ${rendered}
+                    </div>
+                `;
+            }));
+            
+            chatMessages.innerHTML = renderedMessages.join('');
         }
         
         // 滚动到底部
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
     
+    // 用户信息缓存
+    const userCache = new Map();
+    const userCacheExpiry = new Map();
+    const CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存
+
+    // 通过UID获取用户信息
+    async function getUserInfoById(userId) {
+        // 检查用户ID是否有效
+        if (!userId || userId === 'undefined' || userId === 'null' || String(userId).trim() === '' || String(userId).trim() === 'undefined') {
+            console.error('getUserInfoById: 无效的用户ID', userId);
+            throw new Error('无效的用户ID');
+        }
+        
+        // 转换为字符串并去除空格
+        const userIdStr = String(userId).trim();
+        
+        // 检查缓存
+        const now = Date.now();
+        if (userCache.has(userIdStr)) {
+            const expiry = userCacheExpiry.get(userIdStr);
+            if (expiry && now < expiry) {
+                return userCache.get(userIdStr);
+            } else {
+                // 缓存过期，清除
+                userCache.delete(userIdStr);
+                userCacheExpiry.delete(userIdStr);
+            }
+        }
+        
+        // 如果是当前用户，直接从localStorage获取
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        if (String(currentUser.id) === userIdStr) {
+            return {
+                id: currentUser.id,
+                username: currentUser.username,
+                nickname: currentUser.nickname || currentUser.username,
+                avatarUrl: currentUser.avatarUrl || '/default-avatar.png'
+            };
+        }
+        
+        // 从服务器获取用户信息
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                throw new Error('未登录');
+            }
+            
+            const response = await fetch(`/api/users/profile/${userIdStr}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+            
+            const userData = await response.json();
+            
+            // 缓存用户信息
+            userCache.set(userIdStr, userData);
+            userCacheExpiry.set(userIdStr, now + CACHE_DURATION);
+            
+            return userData;
+        } catch (error) {
+            console.error('获取用户信息错误:', error);
+            // 抛出错误让调用方处理
+            throw error;
+        }
+    }
+
     // 渲染单条消息
-    function renderMessage(message) {
+    async function renderMessage(message) {
         // 格式化时间
         const messageTime = new Date(message.sentAt || message.createdAt).toLocaleTimeString('zh-CN', {
             hour: '2-digit',
             minute: '2-digit'
         });
         
+        // 获取发送者信息
+        let senderInfo;
+        try {
+            // 正确解析用户ID，考虑不同来源的数据结构
+            let userId;
+            if (message.Sender && typeof message.Sender === 'object') {
+                // 从Sender对象中获取userId
+                userId = message.Sender.userId || message.Sender.id;
+            } else if (message.userId) {
+                // 直接从message.userId获取
+                userId = message.userId;
+            }
+            
+            // 验证userId是否有效
+            if (!userId || userId === 'undefined' || String(userId).trim() === '' || String(userId).trim() === 'undefined') {
+                throw new Error('无法获取有效的发送者ID');
+            }
+            
+            senderInfo = await getUserInfoById(userId);
+        } catch (error) {
+            console.error('获取发送者信息失败:', error);
+            // 使用消息对象中的信息作为备选
+            senderInfo = {
+                id: message.Sender?.userId || message.Sender?.id || message.userId || 'unknown',
+                username: message.Sender?.username || `用户${message.Sender?.userId || message.userId || '未知'}`,
+                nickname: message.Sender?.nickname || message.Sender?.username || `用户${message.Sender?.userId || message.userId || '未知'}`,
+                avatarUrl: message.Sender?.avatarUrl || '/default-avatar.png'
+            };
+        }
+        
+        // 判断是否为当前用户发送的消息
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const isCurrentUser = String(senderInfo.id) === String(currentUser.id);
+        
         // 根据消息类型显示不同内容
         let content = '';
         switch (message.type) {
             case 'text':
-                content = message.content;
+                content = message.content || '';
                 break;
             case 'image':
-                content = `<img src="${message.fileUrl}" alt="图片" style="max-width: 200px; max-height: 200px;">`;
+                content = `<img src="${message.fileUrl}" alt="图片" class="message-image" style="max-width: 200px; max-height: 200px;">`;
                 break;
             case 'video':
-                content = `<video src="${message.fileUrl}" controls style="max-width: 200px; max-height: 200px;"></video>`;
+                content = `<video src="${message.fileUrl}" controls class="message-video" style="max-width: 200px; max-height: 200px;"></video>`;
                 break;
             case 'file':
-                content = `<a href="${message.fileUrl}" target="_blank">文件: ${message.content}</a>`;
+                content = `<a href="${message.fileUrl}" target="_blank" class="message-file">文件: ${message.content || '文件'}</a>`;
                 break;
             case 'recall':
                 content = '<em>消息已被撤回</em>';
                 break;
             default:
-                content = message.content;
+                content = message.content || '';
         }
         
         return `
-            <div class="d-flex">
-                <img src="${message.Sender?.avatarUrl || '/default-avatar.png'}" 
-                     alt="头像" 
-                     class="rounded-circle me-2" 
-                     width="32" 
-                     height="32"
-                     onerror="this.src='/default-avatar.png'">
-                <div class="flex-grow-1">
-                    <div class="d-flex align-items-center mb-1">
-                        <strong class="me-2">${message.Sender?.nickname || message.Sender?.username || '未知用户'}</strong>
-                        <small class="text-muted">${messageTime}</small>
-                    </div>
+            <div class="message ${isCurrentUser ? 'message-right' : 'message-left'}">
+                <div class="message-bubble-container">
+                    <img src="${senderInfo.avatarUrl}" 
+                         alt="头像" 
+                         class="avatar" 
+                         onerror="this.src='/default-avatar.png'">
                     <div class="message-content">
-                        ${content}
+                        <div class="message-sender">${senderInfo.nickname || senderInfo.username}</div>
+                        <div class="message-bubble">
+                            ${content}
+                        </div>
                     </div>
                 </div>
+                <div class="message-time">${messageTime}</div>
             </div>
         `;
     }
@@ -766,7 +1175,8 @@ function bindFormEvents() {
     function loadRoomMembers() {
         // 获取当前聊天室RID
         const currentRoomId = localStorage.getItem('currentRoomId');
-        if (!currentRoomId) {
+        // 检查roomId的有效性
+        if (!currentRoomId || currentRoomId === 'undefined' || currentRoomId === 'null') {
             showMessage('请先选择一个聊天室', 'warning');
             return;
         }
@@ -840,6 +1250,66 @@ function bindFormEvents() {
         });
     }
     
+    // 设置表单提交事件
+    const settingsForm = document.getElementById('settingsForm');
+    if (settingsForm) {
+        settingsForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const settingsData = {
+                name: formData.get('name'),
+                requireApproval: formData.get('requireApproval') === 'on',
+                allowImages: formData.get('allowImages') === 'on',
+                allowVideos: formData.get('allowVideos') === 'on',
+                allowFiles: formData.get('allowFiles') === 'on'
+            };
+            
+            const token = localStorage.getItem('token');
+            if (!token) {
+                showMessage('未登录，请先登录', 'danger');
+                return;
+            }
+            
+            fetch('/api/rooms/settings', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(settingsData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.error || '设置更新失败');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                // 关闭模态框
+                const modal = bootstrap.Modal.getInstance(document.getElementById('settingsModal'));
+                if (modal) {
+                    modal.hide();
+                }
+                
+                // 重置表单
+                settingsForm.reset();
+                
+                // 重新加载聊天室列表
+                loadRooms();
+                
+                // 显示成功消息
+                showMessage('设置更新成功', 'success');
+            })
+            .catch(error => {
+                logger.logError('更新设置失败:', error);
+                showMessage(error.message || '更新设置失败', 'danger');
+            });
+        });
+    }
+    
     // 搜索聊天室功能
     function searchRooms(query) {
         if (!query) {
@@ -898,22 +1368,87 @@ function bindFormEvents() {
         `).join('');
     }
     
-    // 加入聊天室
-    function joinRoom(roomId) {
-        showConfirm('确定要加入这个聊天室吗？').then(result => {
-            if (!result) {
-                return; // 用户取消
+    // 加入房间函数
+    async function joinRoom(roomId) {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            showMessage('请先登录', 'danger');
+            showLoginModal();
+            return;
+        }
+
+        try {
+            // 更新当前房间ID
+            localStorage.setItem('currentRoomId', roomId);
+            
+            // 通知服务器加入房间
+            if (socket && socket.connected) {
+                socket.emit('joinRoom', { roomId });
             }
             
-            const token = localStorage.getItem('token');
-            if (!token) {
-                showMessage('未登录，请先登录', 'danger');
-                return;
+            // 显示房间标题
+            const roomTitleElement = document.getElementById('roomTitle');
+            if (roomTitleElement) {
+                // 获取房间详细信息
+                const response = await fetch(`/api/rooms/${roomId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const room = await response.json();
+                    roomTitleElement.textContent = room.note || room.name || `房间 ${roomId}`;
+                } else {
+                    roomTitleElement.textContent = `房间 ${roomId}`;
+                }
             }
             
-            // 这里应该调用加入聊天室的API，暂时显示提示信息
-            showMessage('加入聊天室功能将在后续版本中实现', 'info');
-        });
+            // 清空消息区域并显示加载状态
+            const chatMessages = document.getElementById('chatMessages');
+            if (chatMessages) {
+                chatMessages.innerHTML = '<div class="text-center text-muted my-3"><p>加载中...</p></div>';
+            }
+            
+            // 加载房间消息历史
+            await loadRoomMessages(roomId);
+            
+            // 切换显示区域
+            document.getElementById('welcome-screen').style.display = 'none';
+            document.getElementById('chat-container').style.display = 'block';
+            
+            // 启动自动刷新
+            startAutoRefresh();
+            
+        } catch (error) {
+            logger.logError('加入房间失败:', error);
+            showMessage('加入房间失败: ' + error.message, 'danger');
+        }
+    }
+    
+    // 退出房间函数
+    function leaveRoom() {
+        // 通知服务器离开房间
+        const currentRoomId = localStorage.getItem('currentRoomId');
+        if (socket && socket.connected && currentRoomId) {
+            socket.emit('leaveRoom', { roomId: currentRoomId });
+        }
+        
+        // 清除当前房间ID
+        localStorage.removeItem('currentRoomId');
+        
+        // 停止自动刷新
+        stopAutoRefresh();
+        
+        // 切换显示区域
+        document.getElementById('chat-container').style.display = 'none';
+        document.getElementById('welcome-screen').style.display = 'block';
+        
+        // 清空房间标题
+        const roomTitleElement = document.getElementById('roomTitle');
+        if (roomTitleElement) {
+            roomTitleElement.textContent = '';
+        }
     }
     
     // 个人中心表单提交
@@ -932,7 +1467,7 @@ function bindFormEvents() {
                 return;
             }
             
-            fetch('/api/user/profile', {
+            fetch('/api/users/profile', {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -957,7 +1492,7 @@ function bindFormEvents() {
                     const popupNickname = document.getElementById('popupNickname');
                     
                     if (userNickname) userNickname.textContent = data.user.nickname;
-                    if (userAvatar) userAvatar.src = data.user.avatar || '/default-avatar.png';
+                    if (userAvatar) userAvatar.src = data.user.avatarUrl || '/default-avatar.png';
                     if (popupNickname) popupNickname.value = data.user.nickname;
                     
                     closeProfilePopup();
@@ -994,36 +1529,124 @@ function bindFormEvents() {
     }
     
     // 初始化WebSocket连接
-    function initWebSocket() {
-        const token = localStorage.getItem('token');
+    function initializeWebSocket(token) {
         if (!token) {
-            logger.logWarn('未登录，无法建立WebSocket连接');
+            logger.logWarn('未提供token，无法建立WebSocket连接');
             return;
         }
         
         // 创建WebSocket连接
         const socket = io({
-            query: { token }
+            auth: {
+                token: token
+            }
         });
         
-        // 监听连接成功事件
+        // 监听连接事件
         socket.on('connect', () => {
             logger.logInfo('WebSocket连接成功');
             
             // 如果有当前聊天室，加入该聊天室
             const currentRoomId = localStorage.getItem('currentRoomId');
             if (currentRoomId) {
-                socket.emit('joinRoom', currentRoomId);
+                socket.emit('joinRoom', {roomId: currentRoomId});
+            }
+        });
+
+        // 添加自动刷新机制
+        let refreshInterval = null;
+        
+        // 开始自动刷新
+        function startAutoRefresh() {
+            // 清除现有的定时器（如果有的话）
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+            
+            // 每5秒检查一次新消息
+            refreshInterval = setInterval(async () => {
+                const currentRoomId = localStorage.getItem('currentRoomId');
+                if (currentRoomId && token) {
+                    try {
+                        const response = await fetch(`/api/messages/${currentRoomId}/history?limit=10`, {
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            const messages = data.messages || data;
+                            
+                            // 检查是否有新消息
+                            const chatMessages = document.getElementById('chatMessages');
+                            if (chatMessages && messages.length > 0) {
+                                // 获取当前显示的消息ID列表
+                                const displayedMessageIds = Array.from(
+                                    chatMessages.querySelectorAll('.message-item')
+                                ).map(el => el.dataset.messageId);
+                                
+                                // 找出新消息
+                                const newMessages = messages.filter(msg => 
+                                    !displayedMessageIds.includes(String(msg.messageId || msg.id))
+                                );
+                                
+                                // 如果有新消息，添加到聊天界面
+                                if (newMessages.length > 0) {
+                                    await displayMessages(newMessages);
+                                    
+                                    // 滚动到底部
+                                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        logger.logError('自动刷新消息失败:', error);
+                    }
+                }
+            }, 5000); // 每5秒刷新一次
+        }
+        
+        // 停止自动刷新
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+        }
+        
+        // 当加入房间时启动自动刷新
+        socket.on('joinRoom', () => {
+            startAutoRefresh();
+        });
+        
+        // 页面隐藏时停止刷新，显示时恢复刷新
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopAutoRefresh();
+            } else {
+                startAutoRefresh();
             }
         });
         
         // 监听新消息事件
-        socket.on('newMessage', (message) => {
+        socket.on('newMessage', async (message) => {
+            logger.logInfo('收到新消息:', message);
             // 检查是否是当前聊天室的消息
             const currentRoomId = localStorage.getItem('currentRoomId');
             if (currentRoomId && currentRoomId == message.roomId) {
-                // 显示新消息
-                displayMessages([message]);
+                // 显示新消息（等待异步渲染完成）
+                await displayMessages([message]);
+                
+                // 滚动到底部
+                const chatMessages = document.getElementById('chatMessages');
+                if (chatMessages) {
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+            } else {
+                // 不是当前聊天室的消息，更新房间列表中的未读数
+                logger.logInfo('收到其他房间消息，当前房间ID:', currentRoomId);
+                updateRoomUnreadCount(message.roomId);
             }
         });
         
@@ -1031,10 +1654,12 @@ function bindFormEvents() {
         socket.on('messageRecalled', (data) => {
             const messageElements = document.querySelectorAll(`.message-item[data-message-id="${data.messageId}"]`);
             messageElements.forEach(element => {
-                element.innerHTML = renderMessage({
+                renderMessage({
                     id: data.messageId,
                     type: 'recall',
                     content: '[已撤回]'
+                }).then(renderedMessage => {
+                    element.innerHTML = renderedMessage;
                 });
             });
         });
@@ -1064,6 +1689,31 @@ function bindFormEvents() {
         logger.logInfo('未读消息数更新:', count);
     }
     
+    // 更新房间未读数显示
+    function updateRoomUnreadCount(roomId) {
+        // 获取房间列表中对应的房间项
+        const roomItem = document.querySelector(`#room-${roomId}`);
+        if (roomItem) {
+            // 查找未读数标记元素
+            let unreadBadge = roomItem.querySelector('.unread-badge');
+            if (!unreadBadge) {
+                // 如果不存在未读数标记，则创建一个
+                unreadBadge = document.createElement('span');
+                unreadBadge.className = 'unread-badge badge bg-danger ms-2';
+                unreadBadge.textContent = '1';
+                // 将未读数标记添加到房间项中
+                const roomNameSpan = roomItem.querySelector('.room-name');
+                if (roomNameSpan) {
+                    roomNameSpan.appendChild(unreadBadge);
+                }
+            } else {
+                // 如果存在未读数标记，则增加计数
+                const currentCount = parseInt(unreadBadge.textContent) || 0;
+                unreadBadge.textContent = currentCount + 1;
+            }
+        }
+    }
+    
     // 发送消息函数
     function sendMessage() {
         const messageInput = document.getElementById('messageInput');
@@ -1086,6 +1736,25 @@ function bindFormEvents() {
             return;
         }
         
+        // 获取当前用户信息
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        
+        // 创建临时消息对象用于立即显示
+        const tempMessage = {
+            id: Date.now(), // 临时ID
+            content: content,
+            type: 'text',
+            sentAt: new Date().toISOString(),
+            Sender: {
+                nickname: currentUser.nickname || currentUser.username,
+                username: currentUser.username,
+                avatarUrl: currentUser.avatar || '/default-avatar.png'
+            }
+        };
+        
+        // 立即显示消息
+        displayMessages([tempMessage]);
+        
         // 发送消息到服务器
         fetch('/api/messages', {
             method: 'POST',
@@ -1094,7 +1763,7 @@ function bindFormEvents() {
                 'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
-                roomId: currentRoomId,
+                roomId: parseInt(currentRoomId), // 确保roomId是数字类型
                 content: content,
                 type: 'text'
             })
@@ -1110,13 +1779,230 @@ function bindFormEvents() {
         .then(data => {
             // 清空输入框
             if (messageInput) messageInput.value = '';
+            
+            // 用服务器返回的真实消息替换临时消息
+            const chatMessages = document.getElementById('chatMessages');
+            if (chatMessages) {
+                const tempMessageElement = chatMessages.querySelector(`.message-item[data-message-id="${tempMessage.id}"]`);
+                if (tempMessageElement) {
+                    renderMessage(data).then(renderedMessage => {
+                        tempMessageElement.outerHTML = renderedMessage;
+                    });
+                }
+            }
         })
         .catch(error => {
             logger.logError('发送消息失败:', error);
             showMessage(error.message || '发送消息失败', 'danger');
+            
+            // 移除临时消息
+            const chatMessages = document.getElementById('chatMessages');
+            if (chatMessages) {
+                const tempMessageElement = chatMessages.querySelector(`.message-item[data-message-id="${tempMessage.id}"]`);
+                if (tempMessageElement) {
+                    tempMessageElement.remove();
+                }
+            }
         });
     }
     
-    // 初始化WebSocket连接
-    const socket = initWebSocket();
+    // 初始化WebSocket连接（已在登录时初始化）
+    let socket = null;
+    const token = localStorage.getItem('token');
+    if (token) {
+        // 使用查询参数传递token
+        socket = io({
+            query: {
+                token: token
+            }
+        });
+    } else {
+        socket = io();
+    }
+    
+    // 加载聊天室设置
+    const roomSettingsBtn = document.getElementById('settingsBtn');
+    if (roomSettingsBtn) {
+        roomSettingsBtn.addEventListener('click', function() {
+            const currentRoomId = localStorage.getItem('currentRoomId');
+            if (!currentRoomId) {
+                showMessage('请先选择一个聊天室', 'warning');
+                return;
+            }
+            
+            const token = localStorage.getItem('token');
+            if (!token) {
+                showMessage('未登录，请先登录', 'danger');
+                return;
+            }
+            
+            fetch(`/api/rooms/${currentRoomId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('获取聊天室信息失败');
+                }
+                return response.json();
+            })
+            .then(room => {
+                // 填充表单数据
+                document.getElementById('roomNameSetting').value = room.name;
+                document.getElementById('requireApprovalSetting').checked = room.requireApproval;
+                document.getElementById('allowImagesSetting').checked = room.allowImages;
+                document.getElementById('allowVideosSetting').checked = room.allowVideos;
+                document.getElementById('allowFilesSetting').checked = room.allowFiles;
+                
+                // 显示设置模态框
+                const settingsModal = new bootstrap.Modal(document.getElementById('settingsModal'));
+                if (settingsModal) {
+                    settingsModal.show();
+                }
+            })
+            .catch(error => {
+                logger.logError('获取聊天室设置错误:', error);
+                showMessage('获取聊天室设置失败: ' + error.message, 'danger');
+            });
+        });
+    }
+    
+    // 保存聊天室设置
+    const roomSettingsForm = document.getElementById('roomSettingsForm');
+    if (roomSettingsForm) {
+        roomSettingsForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const currentRoomId = localStorage.getItem('currentRoomId');
+            if (!currentRoomId) {
+                showMessage('请先选择一个聊天室', 'warning');
+                return;
+            }
+            
+            const token = localStorage.getItem('token');
+            if (!token) {
+                showMessage('未登录，请先登录', 'danger');
+                return;
+            }
+            
+            const formData = new FormData(this);
+            const settingsData = {
+                name: formData.get('name'),
+                requireApproval: formData.get('requireApproval') === 'on',
+                allowImages: formData.get('allowImages') === 'on',
+                allowVideos: formData.get('allowVideos') === 'on',
+                allowFiles: formData.get('allowFiles') === 'on'
+            };
+            
+            fetch(`/api/rooms/${currentRoomId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(settingsData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.error || '保存失败');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                // 关闭模态框
+                const modal = bootstrap.Modal.getInstance(document.getElementById('settingsModal'));
+                if (modal) {
+                    modal.hide();
+                }
+                
+                // 重置表单
+                roomSettingsForm.reset();
+                
+                // 重新加载聊天室列表
+                loadRooms();
+                
+                // 显示成功消息
+                showMessage('设置保存成功', 'success');
+            })
+            .catch(error => {
+                logger.logError('保存设置失败:', error);
+                showMessage(error.message || '保存设置失败', 'danger');
+            });
+        });
+    }
+    
+    // 手动刷新消息
+    async function refreshMessages() {
+        const currentRoomId = localStorage.getItem('currentRoomId');
+        const token = localStorage.getItem('token');
+        
+        if (!currentRoomId || !token) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/messages/${currentRoomId}/history?limit=50`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                const messages = data.messages || data;
+                
+                // 清空当前消息并重新显示
+                const chatMessages = document.getElementById('chatMessages');
+                if (chatMessages) {
+                    chatMessages.innerHTML = '';
+                    await displayMessages(messages.reverse()); // 反转消息顺序以正确显示
+                    
+                    // 滚动到底部
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+                
+                showMessage('消息已刷新', 'success');
+            } else {
+                showMessage('刷新消息失败', 'danger');
+            }
+        } catch (error) {
+            logger.logError('刷新消息失败:', error);
+            showMessage('刷新消息失败: ' + error.message, 'danger');
+        }
+    }
+    
+    // 初始化聊天功能
+    async function initChat() {
+        logger.logInfo('初始化聊天功能');
+        
+        // 初始化WebSocket连接
+        initWebSocket();
+        
+        // 检查是否有保存的房间ID，如果有则加入该房间
+        const savedRoomId = localStorage.getItem('currentRoomId');
+        if (savedRoomId) {
+            await joinRoom(savedRoomId);
+        }
+        
+        // 绑定发送消息事件
+        const messageForm = document.getElementById('messageForm');
+        if (messageForm) {
+            messageForm.addEventListener('submit', handleSendMessage);
+        }
+        
+        // 绑定退出房间事件
+        const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+        if (leaveRoomBtn) {
+            leaveRoomBtn.addEventListener('click', leaveRoom);
+        }
+        
+        // 绑定刷新消息事件
+        const refreshMessagesBtn = document.getElementById('refreshMessagesBtn');
+        if (refreshMessagesBtn) {
+            refreshMessagesBtn.addEventListener('click', refreshMessages);
+        }
+    }
 }

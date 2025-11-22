@@ -33,7 +33,6 @@
 | allow_images | BOOLEAN | DEFAULT true | 是否允许在聊天室发送图片 |
 | allow_videos | BOOLEAN | DEFAULT true | 是否允许在聊天室发送视频 |
 | allow_files | BOOLEAN | DEFAULT true | 是否允许在聊天室发送文件 |
-| members | JSON | DEFAULT '[]' | 聊天室成员ID列表，JSON数组格式，用于快速查询 |
 | created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 聊天室的创建时间，系统自动记录 |
 
 ### 3. room_members 表 - 聊天室成员表
@@ -94,7 +93,8 @@
 | max_file_size | INT | DEFAULT 10485760 | 上传文件最大大小（字节），默认10MB |
 | site_name | VARCHAR(255) | DEFAULT VentiChat | 网站显示名称 |
 | allow_user_registration | BOOLEAN | DEFAULT true | 是否允许新用户注册：true-允许，false-禁止 |
-| max_login_attempts | INT | DEFAULT 5 | 最大登录尝试次数，超过次数会暂时锁定账户 |
+| max_login_attempts | INT | DEFAULT 5 | 最大登录尝试次数，超过次数会暂时封禁IP |
+| login_lock_time | INT | DEFAULT 120 | IP登录失败锁定时间（分钟），超过时间后自动解锁 |
 | max_room_members | INT | DEFAULT 1000 | 单个聊天室最大成员数量 |
 
 ## 权限层级说明
@@ -163,3 +163,16 @@
 ### 复合主键
 - **作用**：使用多个列的组合作为主键
 - **特点**：确保多个列的组合是唯一的
+
+## 设计特点总结
+
+1. **完全独立**：所有表无外键约束
+2. **权限分层**：清晰的权限层级
+3. **性能优化**：使用复合主键和适当索引提高查询效率
+4. **扩展性**：JSON字段支持灵活的数据结构
+5. **用户体验**：支持个性化设置（背景、主题色），并提供合理的默认值
+6. **数据安全**：密码加密存储，令牌管理支持即时失效，登录尝试次数限制
+7. **标准化**：统一使用下划线命名规范，字段名清晰明确
+8. **友好默认**：为新用户提供完整的默认个性化设置，提升初次使用体验
+9. **集中配置**：使用system_settings表统一管理系统全局设置，便于维护和扩展
+10. **安全控制**：通过登录尝试次数限制和文件大小限制，提升系统安全性

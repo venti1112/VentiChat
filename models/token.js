@@ -1,21 +1,16 @@
 module.exports = (sequelize) => {
-  // 直接使用sequelize.DataTypes而不是解构
   const DataTypes = sequelize.constructor.DataTypes;
   
   const Token = sequelize.define('Token', {
-    token: {
-      type: DataTypes.STRING,
+    tokenStr: {
+      type: DataTypes.STRING(255),
       primaryKey: true,
       field: 'token_str'
     },
     userId: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      field: 'user_id',
-      references: {
-        model: 'User',
-        key: 'id'
-      }
+      field: 'user_id'
     },
     expiresAt: {
       type: DataTypes.DATE,
@@ -28,10 +23,7 @@ module.exports = (sequelize) => {
   });
 
   Token.associate = function(models) {
-    Token.belongsTo(models.User, {
-      foreignKey: 'userId',
-      as: 'user'
-    });
+    // 根据新要求，移除所有外键关联
   };
 
   return Token;

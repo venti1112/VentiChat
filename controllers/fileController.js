@@ -14,38 +14,30 @@ exports.handleUpload = async (req, res) => {
         
         // 验证用户在聊天室中
         const roomMember = await RoomMember.findOne({
-            where: { userId: req.user.id, roomId }
+            where: { userId: req.user.userId, roomId }
         });
         
         if (!roomMember) {
             // 删除已上传的文件
-            const filePath = path.join(__dirname, '..', 'public', 'userdata', req.file.destination.split('/').pop(), req.file.filename);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-            }
+            fs.unlinkSync(req.file.path);
             return res.status(403).json({ error: '您不是该聊天室的成员' });
         }
         
-        // 确定文件类型
-        const mimeType = req.file.mimetype;
-        const type = getFileType(mimeType);
+        // 获取文件类型
+        const fileType = getFileType(req.file);
         
         // 构建文件URL
-        // req.file.destination 示例: public/userdata/picture
-        const dirParts = req.file.destination.split(path.sep);
-        const dirType = dirParts[dirParts.length - 1]; // 获取目录类型 (picture, video, flie等)
-        const fileUrl = getFileUrl(req.file.filename, dirType === 'picture' ? 'image' : dirType === 'video' ? 'video' : 'file');
+        const fileUrl = getFileUrl(req.file, fileType);
         
-        // 返回文件信息，由前端决定是否发送消息
+        // 返回文件信息
         res.json({
-            success: true,
-            fileUrl,
-            type,
-            filename: req.file.originalname,
-            size: req.file.size
+            fileUrl: fileUrl,
+            fileName: req.file.originalname,
+            fileSize: req.file.size
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('文件上传错误:', error);
+        res.status(500).json({ error: '文件上传失败' });
     }
 };
 
@@ -56,35 +48,33 @@ exports.initiateChunkedUpload = async (req, res) => {
         
         // 验证用户在聊天室中
         const roomMember = await RoomMember.findOne({
-            where: { userId: req.user.id, roomId }
+            where: { userId: req.user.userId, roomId }
         });
         
         if (!roomMember) {
             return res.status(403).json({ error: '您不是该聊天室的成员' });
         }
         
-        // 创建临时文件夹来存储分片
-        const tempDir = path.join(__dirname, '..', 'public', 'userdata', 'temp', `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+        // 生成唯一上传ID
+        const uploadId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        // 创建临时目录
+        const tempDir = path.join('public', 'temp', uploadId);
         if (!fs.existsSync(tempDir)) {
             fs.mkdirSync(tempDir, { recursive: true });
         }
         
-        // 计算总分片数 (每片25MB)
-        const chunkSize = 25 * 1024 * 1024; // 25MB
-        const totalChunks = Math.ceil(fileSize / chunkSize);
-        
         res.json({
-            success: true,
-            uploadId: path.basename(tempDir),
-            totalChunks,
-            chunkSize
+            uploadId: uploadId,
+            message: '分片上传初始化成功'
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('初始化分片上传错误:', error);
+        res.status(500).json({ error: '初始化分片上传失败' });
     }
 };
 
-// 上传单个分片
+// 上传分片
 exports.uploadChunk = async (req, res) => {
     try {
         if (!req.file) {
@@ -93,130 +83,83 @@ exports.uploadChunk = async (req, res) => {
         
         const { uploadId, chunkIndex } = req.body;
         
-        // 移动分片文件到正确位置
-        const tempDir = path.join(__dirname, '..', 'public', 'userdata', 'temp', uploadId);
+        // 移动分片到临时目录
+        const tempDir = path.join('public', 'temp', uploadId);
         if (!fs.existsSync(tempDir)) {
             return res.status(400).json({ error: '无效的上传ID' });
         }
         
-        const chunkFileName = `chunk-${chunkIndex}`;
-        const finalPath = path.join(tempDir, chunkFileName);
-        
-        // 将文件从multer的临时位置移动到最终位置
-        const tempPath = req.file.path;
-        fs.renameSync(tempPath, finalPath);
+        const chunkPath = path.join(tempDir, `chunk-${chunkIndex}`);
+        fs.renameSync(req.file.path, chunkPath);
         
         res.json({
-            success: true,
             message: `分片 ${chunkIndex} 上传成功`
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('上传分片错误:', error);
+        res.status(500).json({ error: '上传分片失败' });
     }
 };
 
-// 完成分片上传并合并文件
+// 完成分片上传
 exports.completeChunkedUpload = async (req, res) => {
     try {
-        const { uploadId, fileName, fileType, roomId } = req.body;
+        const { uploadId, fileName, fileSize, roomId, totalChunks } = req.body;
         
         // 验证用户在聊天室中
         const roomMember = await RoomMember.findOne({
-            where: { userId: req.user.id, roomId }
+            where: { userId: req.user.userId, roomId }
         });
         
         if (!roomMember) {
             // 清理临时文件
-            const tempDir = path.join(__dirname, '..', 'public', 'userdata', 'temp', uploadId);
+            const tempDir = path.join('public', 'temp', uploadId);
             if (fs.existsSync(tempDir)) {
                 fs.rmSync(tempDir, { recursive: true });
             }
             return res.status(403).json({ error: '您不是该聊天室的成员' });
         }
         
-        const tempDir = path.join(__dirname, '..', 'public', 'userdata', 'temp', uploadId);
-        if (!fs.existsSync(tempDir)) {
-            return res.status(400).json({ error: '无效的上传ID' });
-        }
+        // 组装分片
+        const tempDir = path.join('public', 'temp', uploadId);
+        const finalPath = path.join('public', 'userdata', 'files', fileName);
         
-        // 确定目标目录
-        const targetDir = path.join(__dirname, '..', 'public', 'userdata', getFileTypeDirectory(fileType));
+        // 确保目标目录存在
+        const targetDir = path.dirname(finalPath);
         if (!fs.existsSync(targetDir)) {
             fs.mkdirSync(targetDir, { recursive: true });
         }
         
-        // 生成唯一文件名
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const ext = path.extname(fileName);
-        const finalFileName = `${fileType}-${uniqueSuffix}${ext}`;
-        const finalFilePath = path.join(targetDir, finalFileName);
-        
-        // 合并所有分片
-        const chunks = fs.readdirSync(tempDir)
-            .filter(file => file.startsWith('chunk-'))
-            .sort((a, b) => {
-                const aIndex = parseInt(a.split('-')[1]);
-                const bIndex = parseInt(b.split('-')[1]);
-                return aIndex - bIndex;
-            });
-        
         // 创建写入流
-        const writeStream = fs.createWriteStream(finalFilePath);
+        const writeStream = fs.createWriteStream(finalPath);
         
-        // 依次写入所有分片
-        for (const chunk of chunks) {
-            const chunkPath = path.join(tempDir, chunk);
+        // 按顺序合并分片
+        for (let i = 0; i < totalChunks; i++) {
+            const chunkPath = path.join(tempDir, `chunk-${i}`);
             const chunkData = fs.readFileSync(chunkPath);
             writeStream.write(chunkData);
+            fs.unlinkSync(chunkPath); // 删除已合并的分片
         }
         
         writeStream.end();
         
-        // 等待写入完成
-        writeStream.on('finish', () => {
-            // 删除临时目录
-            fs.rmSync(tempDir, { recursive: true });
-            
-            // 构建文件URL
-            const fileUrl = getFileUrl(finalFileName, fileType);
-            
-            // 返回文件信息
-            res.json({
-                success: true,
-                fileUrl,
-                type: fileType,
-                filename: fileName,
-                size: fs.statSync(finalFilePath).size
-            });
-        });
+        // 清理临时目录
+        fs.rmdirSync(tempDir);
         
-        writeStream.on('error', (err) => {
-            // 清理文件
-            if (fs.existsSync(finalFilePath)) {
-                fs.unlinkSync(finalFilePath);
-            }
-            // 清理临时目录
-            if (fs.existsSync(tempDir)) {
-                fs.rmSync(tempDir, { recursive: true });
-            }
-            throw err;
+        // 获取文件类型和URL
+        const fileType = path.extname(fileName).toLowerCase().substring(1);
+        const fileUrl = `/userdata/files/${fileName}`;
+        
+        res.json({
+            fileUrl: fileUrl,
+            fileName: fileName,
+            fileSize: fs.statSync(finalPath).size
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('完成分片上传错误:', error);
+        res.status(500).json({ error: '完成分片上传失败' });
     }
 };
-
-// 根据文件类型获取目录名
-function getFileTypeDirectory(fileType) {
-    switch (fileType) {
-        case 'image':
-            return 'picture';
-        case 'video':
-            return 'video';
-        default:
-            return 'flie';
-    }
-}
 
 // 文件下载（可选）
 exports.downloadFile = async (req, res) => {

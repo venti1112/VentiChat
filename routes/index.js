@@ -41,42 +41,80 @@ const upload = multer({
 // 用户相关路由
 const authController = require('../controllers/authController');
 router.post('/auth/login', authController.login);
-router.post('/auth/register', upload.single('avatar'), authController.register); // 添加文件上传中间件
+router.post('/auth/register', upload.single('avatar'), authController.register);
 router.get('/auth/logout', authController.logout);
-
-// 添加token验证路由
 router.get('/auth/verify', authController.verifyToken);
 
-// 修复：引入authMiddleware
+// 引入中间件
 const authMiddleware = require('../middleware/authMiddleware').authMiddleware;
+
+// 创建用于背景图上传的 multer 实例
+const backgroundStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'public/userdata/background/');
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'bg-' + req.user.userId + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const backgroundUpload = multer({ 
+  storage: backgroundStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 限制文件大小为10MB
+  },
+  fileFilter: function (req, file, cb) {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('只允许上传图片文件'));
+    }
+  }
+});
+
+// 确保背景图目录存在
+const backgroundDir = 'public/userdata/background';
+if (!fs.existsSync(backgroundDir)){
+  fs.mkdirSync(backgroundDir, { recursive: true });
+}
+
+// 用户相关路由
 const userController = require('../controllers/userController');
+router.get('/users/preferences', authMiddleware, userController.getUserPreferences);
+router.put('/users/preferences', authMiddleware, userController.updateUserPreferences);
+router.post('/users/upload-background', authMiddleware, backgroundUpload.single('background'), userController.uploadBackground);
+router.post('/users/reset-background', authMiddleware, userController.resetBackground);
 router.put('/users/profile', authMiddleware, userController.updateProfile);
+router.get('/users/profile/:userId', authMiddleware, userController.getUserById);
 router.get('/users/search', authMiddleware, userController.searchUsers);
-router.get('/users/:userId/avatar', authMiddleware, userController.getAvatarUrl); // 获取指定用户头像URL
-router.get('/users/avatar', authMiddleware, userController.getAvatarUrl); // 获取当前用户头像URL
+router.get('/users/:userId/avatar', authMiddleware, userController.getAvatarUrl);
+router.get('/users/avatar', authMiddleware, userController.getAvatarUrl);
+
+// 添加缺失的路由别名，以支持 /api/user/profile 路径
+router.put('/user/profile', authMiddleware, userController.updateProfile);
 
 // 聊天室相关路由
 const roomController = require('../controllers/roomController');
 router.get('/rooms', authMiddleware, roomController.getRooms);
 router.post('/rooms', authMiddleware, roomController.createRoom);
 router.post('/rooms/private', authMiddleware, roomController.createPrivateRoom);
-router.get('/rooms/:roomId/members', authMiddleware, roomController.getRoomMembers);
-router.delete('/rooms/:roomId/members/:userId', authMiddleware, roomController.kickMember);
 router.get('/rooms/search', authMiddleware, roomController.searchRooms);
+router.get('/rooms/:roomId/members', authMiddleware, roomController.getRoomMembers);
+router.get('/rooms/:roomId/member-ids', authMiddleware, roomController.getRoomMemberIds);
+router.post('/users/by-ids', authMiddleware, roomController.getUsersByIds);
+router.get('/rooms/:id', authMiddleware, roomController.getRoom);
+router.delete('/rooms/:roomId/members/:userId', authMiddleware, roomController.kickMember);
 
 // 消息相关路由
 const messageController = require('../controllers/messageController');
-const fileController = require('../controllers/fileController');
-
-// 获取消息历史路由 - 使用路径参数
 router.get('/messages/history/:roomId', authMiddleware, messageController.getMessageHistory);
-
-// 修改文件上传路由，使用新的上传机制
 router.get('/messages/:roomId', authMiddleware, messageController.getRoomMessages);
 router.post('/messages', authMiddleware, messageController.sendMessage);
 router.put('/messages/:messageId/retract', authMiddleware, messageController.recallMessage);
 
-// 为不同类型的文件上传提供专门的路由端点
+// 文件相关路由
+const fileController = require('../controllers/fileController');
 router.post('/messages/image', authMiddleware, uploadSingle('file', 'image'), fileController.handleUpload);
 router.post('/messages/video', authMiddleware, uploadSingle('file', 'video'), fileController.handleUpload);
 router.post('/messages/file', authMiddleware, uploadSingle('file', 'file'), fileController.handleUpload);
@@ -93,7 +131,6 @@ router.get('/admin/users', adminMiddleware, adminController.getUsers);
 router.post('/admin/users', adminMiddleware, adminController.createUser);
 router.put('/admin/users/:userId', adminMiddleware, adminController.updateUser);
 router.delete('/admin/users/:userId', adminMiddleware, adminController.deleteUser);
-// 修复路由，使用新的控制器函数处理用户状态更新
 router.put('/admin/users/:userId/status', adminMiddleware, adminController.updateUserStatus);
 router.get('/admin/rooms', adminMiddleware, adminController.getRooms);
 router.get('/admin/rooms/:id', adminMiddleware, adminController.getRoom);

@@ -5,16 +5,16 @@ const { log, LOG_LEVELS } = require('../utils/logger');
 exports.getUsers = async (req, res) => {
     try {
         const users = await models.User.findAll({
-            attributes: ['id', 'username', 'nickname', 'status', 'created_at']
+            attributes: ['userId', 'username', 'nickname', 'status', 'createdAt']
         });
         
         // 格式化返回数据，确保字段名与前端一致
         const formattedUsers = users.map(user => ({
-            id: user.id,
+            id: user.userId,
             username: user.username,
             nickname: user.nickname,
             status: user.status,
-            createdAt: user.created_at,
+            createdAt: user.createdAt,
             avatarUrl: user.avatarUrl || '/default-avatar.png'
         }));
         
@@ -47,26 +47,32 @@ exports.createUser = async (req, res) => {
             passwordHash
         });
         
-        res.json({ message: '用户创建成功', user: { id: user.id, username: user.username, nickname: user.nickname } });
+        res.json({ message: '用户创建成功', user: { id: user.userId, username: user.username, nickname: user.nickname } });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 };
 
-// 更新用户（管理员）
+// 更新用户信息（管理员）
 exports.updateUser = async (req, res) => {
     try {
         const { userId } = req.params;
-        const { nickname, status } = req.body;
+        const { username, nickname, status } = req.body;
         
+        // 查找用户
         const user = await models.User.findByPk(userId);
         if (!user) {
             return res.status(404).json({ error: '用户不存在' });
         }
         
-        await user.update({ nickname, status });
+        // 更新用户信息
+        await user.update({
+            username,
+            nickname,
+            status
+        });
         
-        res.json({ message: '用户信息已更新' });
+        res.json({ message: '用户信息更新成功' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -77,54 +83,39 @@ exports.deleteUser = async (req, res) => {
     try {
         const { userId } = req.params;
         
+        // 检查用户是否存在
         const user = await models.User.findByPk(userId);
         if (!user) {
             return res.status(404).json({ error: '用户不存在' });
         }
         
-        await user.destroy();
-        
-        res.json({ message: '用户已删除' });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-};
-
-// 封禁/解封用户（管理员）
-exports.toggleUserStatus = async (req, res) => {
-    try {
-        const { userId, action } = req.body; // action: 'ban' or 'unban'
-        
-        const user = await models.User.findByPk(userId);
-        if (!user) {
-            return res.status(404).json({ error: '用户不存在' });
-        }
-        
-        await user.update({
-            status: action === 'ban' ? 'banned' : 'active'
+        // 删除用户
+        await models.User.destroy({
+            where: { userId }
         });
         
-        res.json({ message: `用户已${action === 'ban' ? '封禁' : '解封'}` });
+        res.json({ message: '用户删除成功' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 };
 
-// 更新用户状态（管理员）- 用于处理前端PUT /api/admin/users/:userId/status请求
+// 更新用户状态（管理员）
 exports.updateUserStatus = async (req, res) => {
     try {
         const { userId } = req.params;
         const { status } = req.body;
         
+        // 检查用户是否存在
         const user = await models.User.findByPk(userId);
         if (!user) {
             return res.status(404).json({ error: '用户不存在' });
         }
         
+        // 更新用户状态
         await user.update({ status });
         
-        const action = status === 'banned' ? '封禁' : '解封';
-        res.json({ message: `用户已${action}` });
+        res.json({ message: '用户状态更新成功' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -133,55 +124,54 @@ exports.updateUserStatus = async (req, res) => {
 // 获取所有聊天室（管理员）
 exports.getRooms = async (req, res) => {
     try {
-        const rooms = await models.Room.findAll({
-            attributes: ['id', 'name', 'created_at', 'retention_days', 'creatorId']
-        });
+        const rooms = await models.Room.findAll();
+        res.json(rooms);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 获取聊天室详情（管理员）
+exports.getRoom = async (req, res) => {
+    try {
+        const { id } = req.params;
         
-        // 获取所有聊天室的成员数量
+        const room = await models.Room.findByPk(id);
+        if (!room) {
+            return res.status(404).json({ error: '聊天室不存在' });
+        }
+        
+        res.json(room);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 获取聊天室成员（管理员）
+exports.getRoomMembers = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // 获取房间成员
         const roomMembers = await models.RoomMember.findAll({
-            attributes: ['room_id'],
-            raw: true
+            where: { roomId: id },
+            include: [{
+                model: models.User,
+                attributes: ['userId', 'username', 'nickname', 'avatarUrl']
+            }]
         });
         
-        // 统计每个聊天室的成员数量
-        const memberCounts = {};
-        roomMembers.forEach(member => {
-            if (!memberCounts[member.room_id]) {
-                memberCounts[member.room_id] = 0;
-            }
-            memberCounts[member.room_id]++;
-        });
-        
-        // 获取所有创建者信息
-        const creatorIds = [...new Set(rooms.map(room => room.creatorId))];
-        const creators = await models.User.findAll({
-            attributes: ['id', 'nickname'],
-            where: {
-                id: creatorIds
-            },
-            raw: true
-        });
-        
-        const creatorMap = {};
-        creators.forEach(creator => {
-            creatorMap[creator.id] = creator;
-        });
-        
-        // 格式化返回数据
-        const formattedRooms = rooms.map(room => ({
-            id: room.id,
-            name: room.name,
-            creator: creatorMap[room.creatorId] || null,
-            memberCount: memberCounts[room.id] || 0,
-            createdAt: room.created_at,
-            retentionDays: room.retention_days || 180,
-            // 添加一个默认的messageCount字段，避免前端出错
-            messageCount: 0
+        // 格式化成员信息
+        const members = roomMembers.map(rm => ({
+            uid: rm.User.userId,
+            username: rm.User.username,
+            nickname: rm.User.nickname,
+            avatarUrl: rm.User.avatarUrl,
+            isModerator: rm.isModerator
         }));
         
-        res.json(formattedRooms);
+        res.json(members);
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `获取聊天室列表失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };
@@ -191,118 +181,19 @@ exports.deleteRoom = async (req, res) => {
     try {
         const { id } = req.params;
         
-        const room = await models.Room.findByPk(id);
-        if (!room) {
+        // 删除聊天室相关数据
+        await models.RoomMember.destroy({ where: { roomId: id } });
+        await models.Message.destroy({ where: { roomId: id } });
+        await models.JoinRequest.destroy({ where: { roomId: id } });
+        
+        // 删除聊天室
+        const result = await models.Room.destroy({ where: { roomId: id } });
+        if (result === 0) {
             return res.status(404).json({ error: '聊天室不存在' });
         }
         
-        await room.destroy();
-        
-        res.json({ message: '聊天室已删除' });
+        res.json({ message: '聊天室删除成功' });
     } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-};
-
-// 获取特定聊天室详情（管理员）
-exports.getRoom = async (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        const room = await models.Room.findByPk(id, {
-            attributes: ['id', 'name', 'created_at', 'retention_days', 'creatorId']
-        });
-        
-        if (!room) {
-            return res.status(404).json({ error: '聊天室不存在' });
-        }
-        
-        // 获取聊天室成员数量
-        const memberCount = await models.RoomMember.count({
-            where: { room_id: id }
-        });
-        
-        // 获取创建者信息
-        const creator = await models.User.findByPk(room.creatorId, {
-            attributes: ['id', 'nickname']
-        });
-        
-        // 获取消息数量
-        const messageCount = await models.Message.count({
-            where: { roomId: id }
-        });
-        
-        // 格式化返回数据
-        const formattedRoom = {
-            id: room.id,
-            name: room.name,
-            creator: creator ? {
-                id: creator.id,
-                nickname: creator.nickname
-            } : null,
-            memberCount: memberCount,
-            messageCount: messageCount,
-            createdAt: room.created_at,
-            retentionDays: room.retention_days || 180
-        };
-        
-        res.json(formattedRoom);
-    } catch (error) {
-        log(LOG_LEVELS.ERROR, `获取聊天室详情失败: ${error.message}`);
-        res.status(500).json({ error: error.message });
-    }
-};
-
-// 获取聊天室成员列表（管理员）
-exports.getRoomMembers = async (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        // 验证聊天室是否存在
-        const room = await models.Room.findByPk(id);
-        if (!room) {
-            return res.status(404).json({ error: '聊天室不存在' });
-        }
-        
-        // 获取聊天室成员列表
-        const members = await models.RoomMember.findAll({
-            where: { room_id: id },
-            raw: true // 使用raw查询避免Sequelize添加额外字段
-        });
-        
-        // 获取用户信息
-        const userIds = members.map(member => member.user_id);
-        const users = await models.User.findAll({
-            where: {
-                id: userIds
-            },
-            attributes: ['id', 'username', 'nickname', 'avatarUrl', 'status'],
-            raw: true
-        });
-        
-        const userMap = {};
-        users.forEach(user => {
-            userMap[user.id] = user;
-        });
-        
-        // 格式化返回数据
-        const formattedMembers = members.map(member => {
-            const user = userMap[member.user_id];
-            return {
-                id: user ? user.id : null,
-                username: user ? user.username : null,
-                nickname: user ? user.nickname : null,
-                avatarUrl: user ? (user.avatarUrl || '/default-avatar.png') : '/default-avatar.png',
-                status: user ? user.status : null,
-                isModerator: member.is_moderator,
-                note: member.note,
-                joinTime: member.join_time
-            };
-        });
-        
-        res.json(formattedMembers);
-    } catch (error) {
-        log(LOG_LEVELS.ERROR, `获取聊天室成员列表失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };

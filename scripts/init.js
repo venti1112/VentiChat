@@ -46,12 +46,17 @@ async function init() {
         // 创建用户表
         await connection.query(`
             CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT AUTO_INCREMENT PRIMARY KEY,
                 username VARCHAR(50) UNIQUE NOT NULL,
                 nickname VARCHAR(50) NOT NULL,
                 password_hash VARCHAR(255) NOT NULL,
-                avatar_url VARCHAR(255),
+                avatar_url VARCHAR(255) DEFAULT '/default-avatar.png',
+                background_url VARCHAR(255) DEFAULT '/wp.jpg',
+                theme_color VARCHAR(7) DEFAULT '#4cd8b8',
+                is_admin BOOLEAN DEFAULT false,
                 status ENUM('active', 'banned') DEFAULT 'active',
+                login_attempts INT DEFAULT 0,
+                last_login_attempt TIMESTAMP NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB;
         `);
@@ -59,7 +64,7 @@ async function init() {
         // 创建聊天室表
         await connection.query(`
             CREATE TABLE IF NOT EXISTS rooms (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+                room_id INT AUTO_INCREMENT PRIMARY KEY,
                 name VARCHAR(100) NOT NULL,
                 creator_id INT NOT NULL,
                 is_private BOOLEAN DEFAULT false,
@@ -67,10 +72,7 @@ async function init() {
                 allow_images BOOLEAN DEFAULT true,
                 allow_videos BOOLEAN DEFAULT true,
                 allow_files BOOLEAN DEFAULT true,
-                retention_days INT DEFAULT 180,
-                members JSON,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB;
         `);
 
@@ -80,42 +82,37 @@ async function init() {
                 user_id INT NOT NULL,
                 room_id INT NOT NULL,
                 is_moderator BOOLEAN DEFAULT false,
-                join_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 note VARCHAR(100),
                 last_read_message_id INT DEFAULT 0,
-                PRIMARY KEY (user_id, room_id),
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-                FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
+                join_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, room_id)
             ) ENGINE=InnoDB;
         `);
 
         // 创建消息表
         await connection.query(`
             CREATE TABLE IF NOT EXISTS messages (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+                message_id INT AUTO_INCREMENT PRIMARY KEY,
                 room_id INT NOT NULL,
-                sender_id INT NOT NULL,
+                user_id INT NOT NULL,
                 content TEXT,
                 type ENUM('text', 'image', 'video', 'file') DEFAULT 'text',
                 file_url VARCHAR(255),
-                sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                file_size INT DEFAULT 0,
                 is_deleted BOOLEAN DEFAULT false,
-                FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
-                FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
+                sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB;
         `);
 
         // 创建加入请求表
         await connection.query(`
-            CREATE TABLE IF NOT EXISTS JoinRequests (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS join_requests (
+                request_id INT AUTO_INCREMENT PRIMARY KEY,
                 status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
-                message VARCHAR(255),
+                request_message VARCHAR(255),
                 user_id INT NOT NULL,
                 room_id INT NOT NULL,
-                request_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-                FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
+                request_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB;
         `);
 
@@ -124,35 +121,77 @@ async function init() {
             CREATE TABLE IF NOT EXISTS tokens (
                 token_str VARCHAR(255) PRIMARY KEY,
                 user_id INT NOT NULL,
-                expires_at DATETIME NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                expires_at DATETIME NOT NULL
             ) ENGINE=InnoDB;
+        `);
+
+        // 创建系统设置表
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS system_settings (
+                setting_id INT AUTO_INCREMENT PRIMARY KEY,
+                message_retention_days INT DEFAULT 180,
+                max_file_size INT DEFAULT 10485760,
+                site_name VARCHAR(255) DEFAULT 'VentiChat',
+                allow_user_registration BOOLEAN DEFAULT true,
+                max_login_attempts INT DEFAULT 5,
+                max_room_members INT DEFAULT 1000,
+                login_lock_time INT DEFAULT 30
+            ) ENGINE=InnoDB;
+        `);
+
+        // 创建IP封禁表
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS ban_ip (
+                ip VARCHAR(45) PRIMARY KEY,
+                ban_time TIMESTAMP NOT NULL,
+                unban_time TIMESTAMP NOT NULL,
+                failed_attempts INT DEFAULT 0
+            ) ENGINE=InnoDB;
+        `);
+
+        // 插入默认系统设置
+        await connection.query(`
+            INSERT INTO system_settings (
+                setting_id, message_retention_days, max_file_size, site_name, 
+                allow_user_registration, max_login_attempts, max_room_members, login_lock_time
+            ) VALUES (1, 180, 10485760, 'VentiChat', true, 5, 1000, 30)
         `);
 
         // 创建默认管理员
         const hashedPassword = bcrypt.hashSync(answers.adminPassword, 10);
         await connection.query(
-            `INSERT INTO users (username, nickname, password_hash, status) 
-             VALUES (?, ?, ?, 'active')`,
+            `INSERT INTO users (
+                username, nickname, password_hash, is_admin, status
+            ) VALUES (?, ?, ?, true, 'active')`,
             [answers.adminUsername, answers.adminUsername, hashedPassword]
         );
 
+        // 获取管理员ID
+        const [adminRows] = await connection.query(
+            'SELECT user_id FROM users WHERE username = ?', 
+            [answers.adminUsername]
+        );
+        const adminId = adminRows[0].user_id;
+
         // 创建默认大聊天室
-        const [admin] = await connection.query('SELECT id FROM users WHERE username = ?', [answers.adminUsername]);
         await connection.query(
-            `INSERT INTO rooms (name, creator_id, is_private, require_approval, retention_days, members) 
-             VALUES ('VentiChat大厅', ?, false, false, 180, ?)`,
-            [admin[0].id, JSON.stringify([admin[0].id])]
+            `INSERT INTO rooms (
+                name, creator_id, is_private, require_approval
+            ) VALUES (?, ?, false, false)`,
+            ['VentiChat大厅', adminId]
         );
 
         // 获取大厅房间的ID
-        const [hall] = await connection.query('SELECT id FROM rooms WHERE name = ?', ['VentiChat大厅']);
-        
-        // 将管理员加入大厅房间（仅管理员）
+        const [hallRows] = await connection.query(
+            'SELECT room_id FROM rooms WHERE name = ?', 
+            ['VentiChat大厅']
+        );
+        const hallId = hallRows[0].room_id;
+
+        // 将管理员加入大厅房间（作为管理员）
         await connection.query(
-            `INSERT INTO room_members (user_id, room_id, is_moderator) 
-             VALUES (?, ?, true)`,
-            [admin[0].id, hall[0].id]
+            `INSERT INTO room_members (user_id, room_id, is_moderator) VALUES (?, ?, true)`,
+            [adminId, hallId]
         );
 
         // 保存配置
@@ -166,8 +205,7 @@ async function init() {
             },
             encryptionKey,
             baseUrl: answers.baseUrl,
-            port: answers.port,
-            adminUsername: answers.adminUsername
+            port: answers.port
         };
 
         const configDir = path.join(__dirname, '../config');
