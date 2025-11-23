@@ -17,6 +17,10 @@
   --sent-message-border: #0b93f6;
 }
 
+* {
+    border: none !important;
+}
+
 body {
     min-height: 100vh;
     background: url('/wp.jpg') no-repeat center center fixed;
@@ -71,7 +75,6 @@ body {
     padding: 20px;
     min-width: 300px;
     max-width: 500px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     position: relative;
 }
 
@@ -109,10 +112,17 @@ body {
     gap: 10px;
 }
 
-.btn {
-    border: none;
-}
 /* 按钮样式 */
+.btn {
+    background-color: var(--primary-color);
+    transition: filter 0.2s ease;
+}
+.btn:hover {
+    background-color: var(--primary-color);
+    filter: brightness(0.9);
+    transition: filter 0.2s ease;
+}
+
 .btn-modal {
     padding: 8px 16px;
     border-radius: 4px;
@@ -121,7 +131,7 @@ body {
 }
 
 .btn-modal-primary {
-    background-color: #007bff;
+    background-color: var(--primary-color);
     color: white;
 }
 
@@ -149,23 +159,21 @@ body {
 /* 聊天界面样式 */
 .chat-container { 
     height: calc(100vh - 180px); 
-    background: rgba(255, 255, 255, 0.4);
+    background: var(--card-bg-color);
     backdrop-filter: blur(var(--blur-amount));
     -webkit-backdrop-filter: blur(var(--blur-amount));
     border-radius: var(--border-radius);
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
     margin-top: 0; /* 移除顶部外边距，与用户信息卡片对齐 */
 }
 
 .room-list { 
     height: calc(100vh - 260px); /* 减少高度以腾出空间给用户信息栏 */
     overflow-y: auto; 
-    background: rgba(255, 255, 255, 0.4);
+    background: var(--card-bg-color);
     backdrop-filter: blur(var(--blur-amount));
     -webkit-backdrop-filter: blur(var(--blur-amount));
     border: none;
     border-radius: var(--border-radius);
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
     margin-top: 0; /* 确保顶部没有额外边距，与用户信息栏对齐 */
 }
 
@@ -193,10 +201,6 @@ body {
 #membersBtn:hover, #settingsBtn:hover {
     background-color: #0b5ed7; /* Slightly darker on hover */
     border-color: #0a58ca;
-}
-
-#membersBtn:focus, #settingsBtn:focus {
-    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
 }
 
 /* 消息气泡样式 */
@@ -247,7 +251,6 @@ body {
     margin: 5px 0;
     position: relative;
     word-wrap: break-word;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     max-width: 100%;
 }
 
@@ -293,12 +296,12 @@ body {
 }
 
 .message-left .message-sender {
-    color: #0b93f6;
+    color: var(--primary-color);
     align-self: flex-start;
 }
 
 .message-right .message-sender {
-    color: #0b93f6;
+    color: var(--primary-color);
     align-self: flex-end;
 }
 
@@ -331,7 +334,7 @@ body {
     border-bottom-right-radius: 0.25rem !important;
 }
 
-/* 移除聊天室列表头部的蓝色背景，改为透明背景，文字颜色改为黑色 */
+/* 聊天室列表 */
 .room-list .card-header {
     background-color: transparent !important;
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
@@ -344,14 +347,12 @@ body {
     -webkit-backdrop-filter: blur(var(--blur-amount));
     border: none;
     border-radius: 15px;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    transition: transform 0.3s ease;
     margin-bottom: 20px;
 }
 
 .room-list .card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
 }
 
 /* 移除聊天室列表头部的蓝色背景，改为透明背景，文字颜色改为黑色 */
@@ -367,7 +368,6 @@ body {
     -webkit-backdrop-filter: blur(var(--blur-amount));
     border: none;
     border-radius: 15px;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
 }
 
 .create-room-card .card-header {
@@ -403,15 +403,15 @@ body {
 .login-container {
     max-width: 500px;
     width: 100%;
-    background: rgba(255, 255, 255, 0.4);
+    background: var(--card-bg-color);
+    backdrop-filter: blur(var(--blur-amount));
     border-radius: var(--border-radius);
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
     overflow: hidden;
     margin: 0 auto;
 }
 
 .login-header {
-    background: #0b93f6;
+    background: var(--primary-color);
     color: white;
     padding: 30px 20px 20px;
     text-align: center;
@@ -440,15 +440,15 @@ body {
 .register-container {
     max-width: 600px;
     width: 100%;
-    background: rgba(255, 255, 255, 0.4);
+    background: var(--card-bg-color);
+    backdrop-filter: blur(var(--blur-amount));
     border-radius: var(--border-radius);
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
     overflow: hidden;
     margin: 0 auto;
 }
 
 .register-header {
-    background: #0b93f6;
+    background: var(--primary-color);
     color: white;
     padding: 30px 20px 20px;
     text-align: center;
@@ -486,7 +486,6 @@ body {
     -webkit-backdrop-filter: blur(var(--blur-amount));
     border: none;
     border-radius: 15px;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
     height: 100%; /* 使卡片填满容器 */
 }
 
@@ -517,7 +516,6 @@ body {
     border-radius: 50%;
     object-fit: cover;
     border: 3px solid #fff;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
 .change-avatar {
@@ -548,16 +546,15 @@ body {
 }
 
 .form-control {
-    background: rgba(255, 255, 255, 0.7);
+    background: var(--card-bg-color);
     border: 1px solid #ced4da;
     border-radius: 8px;
     padding: 10px 15px;
 }
 
 .form-control:focus {
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--card-bg-color);
     border-color: #86b7fe;
-    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
 }
 
 .card-header {
@@ -571,7 +568,6 @@ body {
     -webkit-backdrop-filter: blur(var(--blur-amount));
     border: none;
     border-radius: 15px;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
 }
 
 /* 修复卡片头部消失问题 */
@@ -629,11 +625,9 @@ body {
 }
 
 .user-info-bar {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--card-bg-color);
     backdrop-filter: blur(var(--blur-amount));
-    -webkit-backdrop-filter: blur(var(--blur-amount));
     border-radius: var(--border-radius);
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
     display: flex;
     align-items: center;
     padding: 10px 15px;
@@ -649,7 +643,6 @@ body {
     object-fit: cover;
     cursor: pointer;
     border: 2px solid #fff;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
 .user-details {
@@ -673,11 +666,10 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--card-bg-color);
     backdrop-filter: blur(var(--blur-amount));
     -webkit-backdrop-filter: blur(var(--blur-amount));
     border-radius: var(--border-radius);
-    box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
     z-index: 10000;
     width: 90%;
     max-width: 500px;
@@ -739,6 +731,5 @@ body {
     padding: 20px;
     min-width: 300px;
     max-width: 500px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     position: relative;
 }

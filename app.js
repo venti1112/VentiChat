@@ -270,7 +270,6 @@ module.exports = {
     models 
 };
 
-// Socket.IO 事件处理
 io.on('connection', async (socket) => {
     // 获取客户端IP地址
     const clientIP = socket.handshake.address || 
@@ -291,29 +290,38 @@ io.on('connection', async (socket) => {
             if (user) {
                 userId = user.userId;
                 username = user.username;
+            } else {
+                // Token有效但用户不存在
+                log('WARN', `Socket.IO连接被拒绝 - IP: ${clientIP}, 原因: 用户不存在`);
+                socket.emit('unauthorized', { message: '用户不存在' });
+                socket.disconnect(true);
+                return;
             }
         } catch (error) {
             log('WARN', `Socket.IO连接token验证失败 - IP: ${clientIP}, 错误: ${error.message}`);
+            socket.emit('unauthorized', { message: '令牌无效' });
+            socket.disconnect(true);
+            return;
         }
+    } else {
+        // 没有提供token
+        log('WARN', `Socket.IO连接被拒绝 - IP: ${clientIP}, 原因: 缺少访问令牌`);
+        socket.emit('unauthorized', { message: '缺少访问令牌' });
+        socket.disconnect(true);
+        return;
     }
     
     // 记录连接日志
     log('INFO', `用户连接Socket.IO - IP: ${clientIP}, 用户名: ${username}, 结果: 成功`);
     
     // 获取用户ID并建立映射
-    if (userId && userId !== '未知用户') {
-        userSocketMap.set(userId, socket.id);
-        
-        // 断开连接时清除映射
-        socket.on('disconnect', () => {
-            userSocketMap.delete(userId);
-            log('INFO', `用户断开Socket.IO - IP: ${clientIP}, 用户名: ${username}, 结果: 成功`);
-        });
-    } else {
-        socket.on('disconnect', () => {
-            log('INFO', `用户断开Socket.IO - IP: ${clientIP}, 用户名: 未知用户, 结果: 成功`);
-        });
-    }
+    userSocketMap.set(userId, socket.id);
+    
+    // 断开连接时清除映射
+    socket.on('disconnect', () => {
+        userSocketMap.delete(userId);
+        log('INFO', `用户断开Socket.IO - IP: ${clientIP}, 用户名: ${username}, 结果: 成功`);
+    });
 
     // 加入聊天室
     socket.on('joinRoom', (data) => {

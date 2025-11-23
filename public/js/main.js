@@ -1,5 +1,6 @@
 // 显示全局消息
-function showMessage(message, type = 'success') {
+// 修改showMessage函数，添加title参数以支持自定义标题
+function showMessage(message, type = 'success', title = null) {
     const messageModal = document.getElementById('messageModal');
     const messageOverlay = document.getElementById('messageOverlay');
     const messageContent = document.getElementById('messageContent');
@@ -7,9 +8,14 @@ function showMessage(message, type = 'success') {
     const messageTitle = document.getElementById('messageTitle');
     
     if (messageModal && messageOverlay && messageContent) {
-        // 设置消息内容和标题
+        // 设置消息内容
         messageContent.textContent = message;
-        messageTitle.textContent = type === 'success' ? '成功' : type === 'danger' ? '错误' : '提示';
+        // 如果提供了自定义标题，则使用自定义标题，否则使用默认标题
+        if (title) {
+            messageTitle.textContent = title;
+        } else {
+            messageTitle.textContent = type === 'success' ? '成功' : type === 'danger' ? '错误' : '提示';
+        }
         
         // 显示模态框和遮罩
         messageOverlay.style.display = 'flex';
@@ -599,43 +605,28 @@ function bindFormEvents() {
     }
     
     // 注册表单提交
-    const registerForm = document.getElementById('registerForm');
-    if (registerForm) {
-        logger.logInfo('找到注册表单，绑定提交事件');
-        registerForm.addEventListener('submit', function(e) {
-            logger.logInfo('注册表单提交事件触发');
-            e.preventDefault();
-            
-            const formData = new FormData(this);
-            
-            fetch('/api/auth/register', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                logger.logInfo('收到注册响应，状态码:', response.status);
-                if (!response.ok) {
-                    throw new Error('网络响应错误');
-                }
-                return response.json();
-            })
-            .then(data => {
-                logger.logInfo('注册响应数据:', data);
-                if (data.success) {
-                    showMessage('注册成功，请登录', 'success');
-                    showLoginForm();
-                } else {
-                    showMessage(data.message || '注册失败', 'danger');
-                }
-            })
-            .catch(error => {
-                logger.logError('注册错误:', error);
-                showMessage('网络错误，请稍后再试', 'danger');
-            });
+    document.getElementById('registerForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        
+        fetch('/api/auth/register', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showMessage('注册成功，请登录');
+                showLoginForm();
+            } else {
+                showMessage(data.message || '注册失败');
+            }
+        })
+        .catch(error => {
+            showMessage('网络错误，请稍后再试', 'danger', '注册失败');
         });
-    } else {
-        logger.logInfo('未找到注册表单');
-    }
+    });
     
     // 退出登录
     const logoutBtn = document.getElementById('logoutBtn');
@@ -871,9 +862,6 @@ function bindFormEvents() {
         
         // 加载消息历史
         loadMessageHistory(room.id);
-        
-        // 可以在这里添加更多进入聊天室的逻辑，比如建立WebSocket连接等
-        showMessage(`已进入聊天室: ${room.name}`, 'success');
     }
     
     // 加载消息历史
@@ -1381,7 +1369,7 @@ function bindFormEvents() {
     }
     
     // 申请加入房间函数
-    async function requestToJoinRoom(roomId) {
+    async function requestToJoinRoom(roomId, message = '') {
         console.log('申请加入房间:', roomId); // 添加调试日志
         const token = localStorage.getItem('token');
         if (!token) {
@@ -1392,12 +1380,18 @@ function bindFormEvents() {
 
         try {
             console.log('发送请求到: ', `/api/rooms/${roomId}/join-request`); // 添加调试日志
+            const requestData = {};
+            if (message) {
+                requestData.message = message;
+            }
+            
             const response = await fetch(`/api/rooms/${roomId}/join-request`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify(requestData)
             });
             
             console.log('收到响应:', response); // 添加调试日志
@@ -1405,7 +1399,14 @@ function bindFormEvents() {
             console.log('响应数据:', data); // 添加调试日志
             
             if (response.ok) {
-                showMessage('加入请求已发送，等待房主审批', 'success');
+                // 根据返回的消息判断是否需要等待审核
+                if (data.message === '已成功加入聊天室') {
+                    showMessage('已成功加入聊天室', 'success');
+                    // 刷新聊天室列表而不是切换房间
+                    loadRooms();
+                } else {
+                    showMessage('加入请求已发送，等待房主审批', 'success');
+                }
             } else {
                 showMessage(data.error || '发送加入请求失败', 'danger');
             }
@@ -1415,90 +1416,6 @@ function bindFormEvents() {
             showMessage('发送加入请求失败: ' + error.message, 'danger');
         }
     }
-    
-    // 加入房间函数
-    async function joinRoom(roomId) {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            showMessage('请先登录', 'danger');
-            showLoginModal();
-            return;
-        }
-
-        try {
-            // 更新当前房间ID
-            localStorage.setItem('currentRoomId', roomId);
-            
-            // 通知服务器加入房间
-            if (socket && socket.connected) {
-                socket.emit('joinRoom', { roomId });
-            }
-            
-            // 显示房间标题
-            const roomTitleElement = document.getElementById('roomTitle');
-            if (roomTitleElement) {
-                // 获取房间详细信息
-                const response = await fetch(`/api/rooms/${roomId}`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                
-                if (response.ok) {
-                    const room = await response.json();
-                    roomTitleElement.textContent = room.note || room.name || `房间 ${roomId}`;
-                } else {
-                    roomTitleElement.textContent = `房间 ${roomId}`;
-                }
-            }
-            
-            // 清空消息区域并显示加载状态
-            const chatMessages = document.getElementById('chatMessages');
-            if (chatMessages) {
-                chatMessages.innerHTML = '<div class="text-center text-muted my-3"><p>加载中...</p></div>';
-            }
-            
-            // 加载房间消息历史
-            await loadRoomMessages(roomId);
-            
-            // 切换显示区域
-            document.getElementById('welcome-screen').style.display = 'none';
-            document.getElementById('chat-container').style.display = 'block';
-            
-            // 启动自动刷新
-            startAutoRefresh();
-            
-        } catch (error) {
-            logger.logError('加入房间失败:', error);
-            showMessage('加入房间失败: ' + error.message, 'danger');
-        }
-    }
-    
-    // 退出房间函数
-    function leaveRoom() {
-        // 通知服务器离开房间
-        const currentRoomId = localStorage.getItem('currentRoomId');
-        if (socket && socket.connected && currentRoomId) {
-            socket.emit('leaveRoom', { roomId: currentRoomId });
-        }
-        
-        // 清除当前房间ID
-        localStorage.removeItem('currentRoomId');
-        
-        // 停止自动刷新
-        stopAutoRefresh();
-        
-        // 切换显示区域
-        document.getElementById('chat-container').style.display = 'none';
-        document.getElementById('welcome-screen').style.display = 'block';
-        
-        // 清空房间标题
-        const roomTitleElement = document.getElementById('roomTitle');
-        if (roomTitleElement) {
-            roomTitleElement.textContent = '';
-        }
-    }
-    
     // 个人中心表单提交
     const profileForm = document.getElementById('profileForm');
     if (profileForm) {
@@ -2103,19 +2020,19 @@ function bindFormEvents() {
     // 加载聊天室设置
     const roomSettingsBtn = document.getElementById('settingsBtn');
     if (roomSettingsBtn) {
-        roomSettingsBtn.addEventListener('click', function() {
+        roomSettingsBtn.addEventListener('click', async function() {
             const currentRoomId = localStorage.getItem('currentRoomId');
             if (!currentRoomId) {
                 showMessage('请先选择一个聊天室', 'warning');
                 return;
             }
-            
+
             const token = localStorage.getItem('token');
             if (!token) {
                 showMessage('未登录，请先登录', 'danger');
                 return;
             }
-            
+
             fetch(`/api/rooms/${currentRoomId}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -2135,10 +2052,28 @@ function bindFormEvents() {
                 document.getElementById('allowVideosSetting').checked = room.allowVideos;
                 document.getElementById('allowFilesSetting').checked = room.allowFiles;
                 
-                // 显示设置模态框
-                const settingsModal = new bootstrap.Modal(document.getElementById('settingsModal'));
-                if (settingsModal) {
-                    settingsModal.show();
+                // 使用Bootstrap内置方法显示设置模态框，而不是手动创建实例
+                const settingsModalElement = document.getElementById('settingsModal');
+                if (settingsModalElement) {
+                    // 添加hidden.bs.modal事件监听器确保清理工作
+                    const hideHandler = function() {
+                        // 确保背景遮罩完全清除
+                        document.body.classList.remove('modal-open');
+                        const backdrop = document.querySelector('.modal-backdrop');
+                        if (backdrop) {
+                            backdrop.remove();
+                        }
+                    };
+                    
+                    // 移除之前的事件监听器（如果有的话）
+                    settingsModalElement.removeEventListener('hidden.bs.modal', hideHandler);
+                    // 添加新的事件监听器
+                    settingsModalElement.addEventListener('hidden.bs.modal', hideHandler);
+                    
+                    // 使用Bootstrap jQuery方法显示模态框（如果有jQuery）
+                    // 或者使用原生Bootstrap JS方法
+                    const modal = bootstrap.Modal.getOrCreateInstance(settingsModalElement);
+                    modal.show();
                 }
             })
             .catch(error => {
@@ -2175,7 +2110,8 @@ function bindFormEvents() {
                 allowFiles: formData.get('allowFiles') === 'on'
             };
             
-            fetch(`/api/rooms/${currentRoomId}`, {
+            // 修复URL，使用正确的API端点
+            fetch(`/api/rooms/${currentRoomId}/settings`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

@@ -38,13 +38,6 @@ const upload = multer({
   }
 });
 
-// 用户相关路由
-const authController = require('../controllers/authController');
-router.post('/auth/login', authController.login);
-router.post('/auth/register', upload.single('avatar'), authController.register);
-router.get('/auth/logout', authController.logout);
-router.get('/auth/verify', authController.verifyToken);
-
 // 引入中间件
 const authMiddleware = require('../middleware/authMiddleware').authMiddleware;
 
@@ -80,6 +73,11 @@ if (!fs.existsSync(backgroundDir)){
 }
 
 // 用户相关路由
+const authController = require('../controllers/authController');
+router.post('/auth/login', authController.login);
+router.post('/auth/register', upload.single('avatar'), authController.register);
+router.get('/auth/logout', authController.logout);
+router.get('/auth/verify', authController.verifyToken);
 const userController = require('../controllers/userController');
 router.get('/users/preferences', authMiddleware, userController.getUserPreferences);
 router.put('/users/preferences', authMiddleware, userController.updateUserPreferences);
@@ -108,10 +106,13 @@ router.delete('/rooms/:roomId/members/:userId', authMiddleware, roomController.k
 // 新增加入请求相关路由
 router.post('/rooms/:id/join-request', authMiddleware, roomController.sendJoinRequest);
 router.post('/rooms/:id/approve-join-request', authMiddleware, roomController.approveJoinRequest);
+// 添加更新聊天室设置的路由
+router.put('/rooms/:id/settings', authMiddleware, roomController.updateRoomSettings);
 
 // 消息相关路由
 const messageController = require('../controllers/messageController');
 router.get('/messages/history/:roomId', authMiddleware, messageController.getMessageHistory);
+router.get('/messages/:roomId/history', authMiddleware, messageController.getMessageHistory);
 router.get('/messages/:roomId', authMiddleware, messageController.getRoomMessages);
 router.post('/messages', authMiddleware, messageController.sendMessage);
 router.put('/messages/:messageId/retract', authMiddleware, messageController.recallMessage);
