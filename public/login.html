@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VentiChat 登录</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-4 col-md-6 col-sm-8">
+                <div class="card mt-5">
+                    <div class="card-body">
+                        <h3 class="card-title text-center mb-4">
+                            <i class="fas fa-comments me-2 text-primary"></i>VentiChat
+                        </h3>
+                        <form @submit.prevent="login">
+                            <div class="mb-3">
+                                <label class="form-label">用户名</label>
+                                <input type="text" class="form-control" v-model="loginForm.username" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">密码</label>
+                                <input type="password" class="form-control" v-model="loginForm.password" required>
+                            </div>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary" :disabled="loading">
+                                    <span v-if="loading">
+                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        登录中...
+                                    </span>
+                                    <span v-else>
+                                        <i class="fas fa-sign-in-alt me-1"></i>登录
+                                    </span>
+                                </button>
+                            </div>
+                        </form>
+                        <div class="text-center mt-3">
+                            <a href="#" @click="showRegister">还没有账号？点击注册</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 注册模态框 -->
+    <div class="modal fade" id="registerModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">用户注册</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form @submit.prevent="register">
+                        <div class="mb-3">
+                            <label class="form-label">用户名</label>
+                            <input type="text" class="form-control" v-model="registerForm.username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">昵称</label>
+                            <input type="text" class="form-control" v-model="registerForm.nickname" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">密码</label>
+                            <input type="password" class="form-control" v-model="registerForm.password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">确认密码</label>
+                            <input type="password" class="form-control" v-model="registerForm.confirmPassword" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" @click="register" :disabled="loading">
+                        <span v-if="loading">
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            注册中...
+                        </span>
+                        <span v-else>注册</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script>
+        const { createApp, ref } = Vue;
+        
+        createApp({
+            setup() {
+                const loginForm = ref({
+                    username: '',
+                    password: ''
+                });
+                
+                const registerForm = ref({
+                    username: '',
+                    nickname: '',
+                    password: '',
+                    confirmPassword: ''
+                });
+                
+                const loading = ref(false);
+                
+                // 登录
+                const login = async () => {
+                    if (!loginForm.value.username || !loginForm.value.password) {
+                        alert('请填写用户名和密码');
+                        return;
+                    }
+                    
+                    loading.value = true;
+                    
+                    try {
+                        // 模拟API调用
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        
+                        // 模拟登录成功
+                        const user = {
+                            user_id: 1,
+                            username: loginForm.value.username,
+                            nickname: '用户昵称'
+                        };
+                        
+                        localStorage.setItem('user', JSON.stringify(user));
+                        localStorage.setItem('token', 'fake-jwt-token');
+                        
+                        window.location.href = '/public/chat.html';
+                    } catch (error) {
+                        alert('登录失败：' + error.message);
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+                
+                // 注册
+                const register = async () => {
+                    if (!registerForm.value.username || !registerForm.value.nickname || 
+                        !registerForm.value.password || !registerForm.value.confirmPassword) {
+                        alert('请填写所有字段');
+                        return;
+                    }
+                    
+                    if (registerForm.value.password !== registerForm.value.confirmPassword) {
+                        alert('两次输入的密码不一致');
+                        return;
+                    }
+                    
+                    loading.value = true;
+                    
+                    try {
+                        // 模拟API调用
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        
+                        alert('注册成功，请登录');
+                        
+                        // 关闭模态框
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('registerModal'));
+                        modal.hide();
+                        
+                        // 清空注册表单
+                        registerForm.value = {
+                            username: '',
+                            nickname: '',
+                            password: '',
+                            confirmPassword: ''
+                        };
+                    } catch (error) {
+                        alert('注册失败：' + error.message);
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+                
+                // 显示注册模态框
+                const showRegister = () => {
+                    const modal = new bootstrap.Modal(document.getElementById('registerModal'));
+                    modal.show();
+                };
+                
+                return {
+                    loginForm,
+                    registerForm,
+                    loading,
+                    login,
+                    register,
+                    showRegister
+                };
+            }
+        }).mount('body');
+    </script>
+</body>
+</html>

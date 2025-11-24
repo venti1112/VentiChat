@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VentiChat 聊天室</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .chat-container {
+            height: calc(100vh - 100px);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            background-color: #f8f9fa;
+        }
+        
+        .message-bubble {
+            max-width: 70%;
+            padding: 0.75rem 1rem;
+            margin-bottom: 1rem;
+            border-radius: 1rem;
+        }
+        
+        .message-sent {
+            background-color: #0d6efd;
+            color: white;
+            margin-left: auto;
+        }
+        
+        .message-received {
+            background-color: white;
+            border: 1px solid #dee2e6;
+        }
+        
+        .chat-input {
+            padding: 1rem;
+            background-color: white;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        .room-list {
+            height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- 导航栏 -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="#">
+                    <i class="fas fa-comments me-2"></i>VentiChat
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-circle me-1"></i><span id="user-nickname">用户</span>
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/public/index.html"><i class="fas fa-cog me-2"></i>管理后台</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" @click="logout"><i class="fas fa-sign-out-alt me-2"></i>退出登录</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container-fluid mt-3 chat-container">
+            <div class="row">
+                <!-- 聊天室列表 -->
+                <div class="col-md-3">
+                    <div class="card room-list">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span>聊天室</span>
+                            <button class="btn btn-sm btn-primary" @click="showCreateRoomModal">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        <div class="list-group list-group-flush">
+                            <a 
+                                v-for="room in rooms" 
+                                :key="room.room_id"
+                                href="#" 
+                                class="list-group-item list-group-item-action"
+                                :class="{active: currentRoom && currentRoom.room_id === room.room_id}"
+                                @click="joinRoom(room)"
+                            >
+                                <div class="d-flex justify-content-between">
+                                    <strong>{{ room.name }}</strong>
+                                    <span v-if="room.unread_count" class="badge bg-danger">{{ room.unread_count }}</span>
+                                </div>
+                                <small class="text-muted">{{ room.last_message }}</small>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 聊天区域 -->
+                <div class="col-md-9">
+                    <div class="card chat-container">
+                        <!-- 聊天室标题 -->
+                        <div class="card-header" v-if="currentRoom">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">{{ currentRoom.name }}</h5>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-primary me-1" @click="showRoomMembers">
+                                        <i class="fas fa-users me-1"></i>成员
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" @click="leaveRoom">
+                                        <i class="fas fa-sign-out-alt me-1"></i>退出
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 消息区域 -->
+                        <div class="chat-messages" ref="messageContainer" v-if="currentRoom">
+                            <div 
+                                v-for="message in messages" 
+                                :key="message.message_id"
+                                class="message-bubble"
+                                :class="message.user_id === currentUser.user_id ? 'message-sent' : 'message-received'"
+                            >
+                                <div class="d-flex align-items-center mb-1">
+                                    <strong v-if="message.user_id !== currentUser.user_id">{{ message.nickname }}</strong>
+                                    <small class="ms-auto text-muted">{{ formatMessageTime(message.sent_at) }}</small>
+                                </div>
+                                <div v-if="message.message_type === 'text'">
+                                    {{ message.content }}
+                                </div>
+                                <div v-else-if="message.message_type === 'image'">
+                                    <img :src="message.file_url" alt="图片" class="img-fluid rounded">
+                                </div>
+                                <div v-else-if="message.message_type === 'file'">
+                                    <a :href="message.file_url" target="_blank">
+                                        <i class="fas fa-file me-1"></i>{{ getFileName(message.file_url) }}
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 输入区域 -->
+                        <div class="chat-input" v-if="currentRoom">
+                            <div class="input-group">
+                                <input 
+                                    type="text" 
+                                    class="form-control" 
+                                    placeholder="输入消息..." 
+                                    v-model="newMessage"
+                                    @keyup.enter="sendMessage"
+                                >
+                                <button class="btn btn-outline-secondary" type="button" @click="showFileUpload">
+                                    <i class="fas fa-paperclip"></i>
+                                </button>
+                                <button class="btn btn-primary" type="button" @click="sendMessage">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- 未选择聊天室提示 -->
+                        <div class="d-flex align-items-center justify-content-center h-100" v-else>
+                            <div class="text-center text-muted">
+                                <i class="fas fa-comments fa-3x mb-3"></i>
+                                <h5>选择一个聊天室开始聊天</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 创建聊天室模态框 -->
+    <div class="modal fade" id="createRoomModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">创建聊天室</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form @submit.prevent="createRoom">
+                        <div class="mb-3">
+                            <label class="form-label">聊天室名称</label>
+                            <input type="text" class="form-control" v-model="newRoom.name" required>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="privateRoom" v-model="newRoom.is_private">
+                            <label class="form-check-label" for="privateRoom">私有聊天室</label>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="requireApproval" v-model="newRoom.require_approval" checked>
+                            <label class="form-check-label" for="requireApproval">需要审批</label>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="allowImages" v-model="newRoom.allow_images" checked>
+                            <label class="form-check-label" for="allowImages">允许发送图片</label>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="allowVideos" v-model="newRoom.allow_videos" checked>
+                            <label class="form-check-label" for="allowVideos">允许发送视频</label>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="allowFiles" v-model="newRoom.allow_files" checked>
+                            <label class="form-check-label" for="allowFiles">允许发送文件</label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" @click="createRoom">创建</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 文件上传模态框 -->
+    <div class="modal fade" id="fileUploadModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">上传文件</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">选择文件</label>
+                        <input type="file" class="form-control" ref="fileInput" @change="handleFileSelect">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" @click="uploadFile" :disabled="!selectedFile">上传</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script>
+        const { createApp, ref, onMounted, nextTick } = Vue;
+        
+        createApp({
+            setup() {
+                // 用户信息
+                const currentUser = ref(null);
+                
+                // 聊天室相关
+                const rooms = ref([]);
+                const currentRoom = ref(null);
+                const messages = ref([]);
+                
+                // 消息相关
+                const newMessage = ref('');
+                const newRoom = ref({
+                    name: '',
+                    is_private: false,
+                    require_approval: true,
+                    allow_images: true,
+                    allow_videos: true,
+                    allow_files: true
+                });
+                
+                // 文件上传相关
+                const selectedFile = ref(null);
+                
+                // WebSocket连接
+                let ws = null;
+                
+                // 初始化
+                const init = async () => {
+                    // 从localStorage获取用户信息
+                    const user = JSON.parse(localStorage.getItem('user'));
+                    if (!user) {
+                        window.location.href = '/public/login.html';
+                        return;
+                    }
+                    
+                    currentUser.value = user;
+                    document.getElementById('user-nickname').textContent = user.nickname;
+                    
+                    // 连接WebSocket
+                    connectWebSocket();
+                    
+                    // 加载聊天室列表
+                    await loadRooms();
+                };
+                
+                // 连接WebSocket
+                const connectWebSocket = () => {
+                    const token = localStorage.getItem('token');
+                    if (!token) {
+                        window.location.href = '/public/login.html';
+                        return;
+                    }
+                    
+                    ws = new WebSocket(`ws://localhost:3000/ws?token=${token}`);
+                    
+                    ws.onopen = () => {
+                        console.log('WebSocket连接已建立');
+                    };
+                    
+                    ws.onmessage = (event) => {
+                        const message = JSON.parse(event.data);
+                        handleWebSocketMessage(message);
+                    };
+                    
+                    ws.onclose = () => {
+                        console.log('WebSocket连接已关闭');
+                    };
+                    
+                    ws.onerror = (error) => {
+                        console.error('WebSocket错误:', error);
+                    };
+                };
+                
+                // 处理WebSocket消息
+                const handleWebSocketMessage = (message) => {
+                    switch (message.type) {
+                        case 'Success':
+                            console.log('成功:', message.message);
+                            break;
+                        case 'Error':
+                            console.error('错误:', message.message);
+                            alert(message.message);
+                            break;
+                        case 'ChatMessage':
+                            // 如果是当前聊天室的消息，则添加到消息列表
+                            if (currentRoom.value && currentRoom.value.room_id === message.room_id) {
+                                messages.value.push(message);
+                                scrollToBottom();
+                            }
+                            break;
+                    }
+                };
+                
+                // 加载聊天室列表
+                const loadRooms = async () => {
+                    try {
+                        // 模拟数据
+                        rooms.value = [
+                            {
+                                room_id: 1,
+                                name: '默认聊天室',
+                                creator_id: 1,
+                                is_private: false,
+                                require_approval: false,
+                                allow_images: true,
+                                allow_videos: true,
+                                allow_files: true,
+                                unread_count: 0,
+                                last_message: '欢迎来到默认聊天室'
+                            }
+                        ];
+                    } catch (error) {
+                        console.error('加载聊天室列表失败:', error);
+                    }
+                };
+                
+                // 加载消息
+                const loadMessages = async (roomId) => {
+                    try {
+                        // 模拟数据
+                        messages.value = [
+                            {
+                                message_id: 1,
+                                room_id: roomId,
+                                user_id: 1,
+                                nickname: '管理员',
+                                content: '欢迎来到聊天室！',
+                                message_type: 'text',
+                                sent_at: new Date().toISOString()
+                            }
+                        ];
+                        scrollToBottom();
+                    } catch (error) {
+                        console.error('加载消息失败:', error);
+                    }
+                };
+                
+                // 加入聊天室
+                const joinRoom = async (room) => {
+                    try {
+                        currentRoom.value = room;
+                        await loadMessages(room.room_id);
+                        
+                        // 通过WebSocket加入房间
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({
+                                type: 'JoinRoom',
+                                room_id: room.room_id
+                            }));
+                        }
+                    } catch (error) {
+                        console.error('加入聊天室失败:', error);
+                    }
+                };
+                
+                // 发送消息
+                const sendMessage = async () => {
+                    if (!newMessage.value.trim() || !currentRoom.value) return;
+                    
+                    try {
+                        const message = {
+                            type: 'ChatMessage',
+                            room_id: currentRoom.value.room_id,
+                            content: newMessage.value,
+                            message_type: 'text'
+                        };
+                        
+                        // 通过WebSocket发送消息
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify(message));
+                            
+                            // 添加到本地消息列表
+                            messages.value.push({
+                                message_id: Date.now(),
+                                room_id: currentRoom.value.room_id,
+                                user_id: currentUser.value.user_id,
+                                nickname: currentUser.value.nickname,
+                                content: newMessage.value,
+                                message_type: 'text',
+                                sent_at: new Date().toISOString()
+                            });
+                            
+                            newMessage.value = '';
+                            scrollToBottom();
+                        }
+                    } catch (error) {
+                        console.error('发送消息失败:', error);
+                    }
+                };
+                
+                // 创建聊天室
+                const createRoom = async () => {
+                    try {
+                        // 关闭模态框
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('createRoomModal'));
+                        modal.hide();
+                        
+                        // 重置表单
+                        newRoom.value = {
+                            name: '',
+                            is_private: false,
+                            require_approval: true,
+                            allow_images: true,
+                            allow_videos: true,
+                            allow_files: true
+                        };
+                        
+                        // 重新加载聊天室列表
+                        await loadRooms();
+                        
+                        alert('聊天室创建成功');
+                    } catch (error) {
+                        console.error('创建聊天室失败:', error);
+                    }
+                };
+                
+                // 显示创建聊天室模态框
+                const showCreateRoomModal = () => {
+                    const modal = new bootstrap.Modal(document.getElementById('createRoomModal'));
+                    modal.show();
+                };
+                
+                // 退出聊天室
+                const leaveRoom = async () => {
+                    if (!currentRoom.value) return;
+                    
+                    if (confirm('确定要退出这个聊天室吗？')) {
+                        try {
+                            // 通过WebSocket离开房间
+                            if (ws && ws.readyState === WebSocket.OPEN) {
+                                ws.send(JSON.stringify({
+                                    type: 'LeaveRoom',
+                                    room_id: currentRoom.value.room_id
+                                }));
+                            }
+                            
+                            currentRoom.value = null;
+                            messages.value = [];
+                        } catch (error) {
+                            console.error('退出聊天室失败:', error);
+                        }
+                    }
+                };
+                
+                // 显示文件上传模态框
+                const showFileUpload = () => {
+                    const modal = new bootstrap.Modal(document.getElementById('fileUploadModal'));
+                    modal.show();
+                };
+                
+                // 处理文件选择
+                const handleFileSelect = (event) => {
+                    selectedFile.value = event.target.files[0];
+                };
+                
+                // 上传文件
+                const uploadFile = async () => {
+                    if (!selectedFile.value || !currentRoom.value) return;
+                    
+                    try {
+                        // 关闭模态框
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('fileUploadModal'));
+                        modal.hide();
+                        
+                        // 重置文件选择
+                        selectedFile.value = null;
+                        document.querySelector('#fileUploadModal input[type="file"]').value = '';
+                        
+                        alert('文件上传成功');
+                    } catch (error) {
+                        console.error('文件上传失败:', error);
+                    }
+                };
+                
+                // 显示聊天室成员
+                const showRoomMembers = () => {
+                    alert('显示聊天室成员功能');
+                };
+                
+                // 格式化消息时间
+                const formatMessageTime = (dateString) => {
+                    const date = new Date(dateString);
+                    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+                };
+                
+                // 获取文件名
+                const getFileName = (url) => {
+                    if (!url) return '';
+                    return url.split('/').pop();
+                };
+                
+                // 滚动到底部
+                const scrollToBottom = () => {
+                    nextTick(() => {
+                        const container = document.querySelector('.chat-messages');
+                        if (container) {
+                            container.scrollTop = container.scrollHeight;
+                        }
+                    });
+                };
+                
+                // 退出登录
+                const logout = () => {
+                    if (confirm('确定要退出登录吗？')) {
+                        localStorage.removeItem('user');
+                        localStorage.removeItem('token');
+                        window.location.href = '/public/login.html';
+                    }
+                };
+                
+                // 组件挂载时初始化
+                onMounted(() => {
+                    init();
+                });
+                
+                return {
+                    currentUser,
+                    rooms,
+                    currentRoom,
+                    messages,
+                    newMessage,
+                    newRoom,
+                    selectedFile,
+                    joinRoom,
+                    sendMessage,
+                    createRoom,
+                    showCreateRoomModal,
+                    leaveRoom,
+                    showFileUpload,
+                    handleFileSelect,
+                    uploadFile,
+                    showRoomMembers,
+                    formatMessageTime,
+                    getFileName,
+                    logout
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

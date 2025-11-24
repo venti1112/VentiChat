@@ -1,6 +1,49 @@
 [package]
-name = "VentiChat"
+name = "venti_chat"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+
+[lib]
+name = "venti_chat"
+path = "src/lib.rs"
+
+[[bin]]
+name = "venti_chat"
+path = "src/main.rs"
 
 [dependencies]
+# Web框架
+axum = { version = "0.7", features = ["macros", "ws", "multipart"] }
+axum-extra = { version = "0.9", features = ["typed-routing"] }
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.5", features = ["fs", "trace"] }
+
+# 数据库相关
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "mysql", "chrono", "uuid"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4"] }
+
+# 环境变量和配置
+dotenvy = "0.15"
+envy = "0.4"
+
+# 密码加密
+bcrypt = "0.15"
+
+# JSON处理
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# 日志
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# 其他工具
+jsonwebtoken = "9.0"
+rand = "0.8"
+thiserror = "1.0"
+anyhow = "1.0"
+
+# WebSocket
+tokio-tungstenite = "0.20"
+futures-util = "0.3"
