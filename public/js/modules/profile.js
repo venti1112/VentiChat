@@ -115,7 +115,6 @@ export async function updateProfile(event) {
         // 关闭弹窗
         window.closeProfilePopup();
     } catch (error) {
-        console.error('更新个人资料失败:', error);
         window.showMessage(`更新失败: ${error.message}`, 'danger');
     } finally {
         // 恢复按钮状态
@@ -129,9 +128,7 @@ export async function updateProfile(event) {
 export function bindProfileForm() {
     const profileForm = document.getElementById('profileForm');
     if (profileForm) {
-        console.info('找到个人中心表单，绑定提交事件');
         profileForm.addEventListener('submit', function(e) {
-            console.info('个人中心表单提交事件触发');
             e.preventDefault();
             
             const formData = new FormData(this);
@@ -150,14 +147,12 @@ export function bindProfileForm() {
                 body: formData
             })
             .then(response => {
-                console.info('收到个人中心更新响应，状态码:', response.status);
                 if (!response.ok) {
                     throw new Error('网络响应错误');
                 }
                 return response.json();
             })
             .then(data => {
-                console.info('个人中心更新响应数据:', data);
                 if (data.success) {
                     window.showMessage('个人信息更新成功', 'success');
                     
@@ -176,11 +171,9 @@ export function bindProfileForm() {
                 }
             })
             .catch(error => {
-                console.error('更新个人信息错误:', error);
                 window.showMessage('网络错误，请稍后再试', 'danger');
             });
         });
     } else {
-        console.info('未找到个人中心表单');
     }
 }

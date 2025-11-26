@@ -3,7 +3,6 @@
 // 初始化WebSocket连接
 export function initializeWebSocket(token) {
     if (!token) {
-        console.warn('未提供token，无法建立WebSocket连接');
         return;
     }
     
@@ -18,7 +17,6 @@ export function initializeWebSocket(token) {
     
     // 监听连接事件
     socket.on('connect', () => {
-        console.info('WebSocket连接成功');
         
         // 如果有当前聊天室，加入该聊天室
         const currentRoomId = localStorage.getItem('currentRoomId');
@@ -75,7 +73,6 @@ export function initializeWebSocket(token) {
                         }
                     }
                 } catch (error) {
-                    console.error('自动刷新消息失败:', error);
                 }
             }
         }, 5000); // 每5秒刷新一次
@@ -105,7 +102,6 @@ export function initializeWebSocket(token) {
     
     // 监听新消息事件
     socket.on('newMessage', async (message) => {
-        console.info('收到新消息:', message);
         // 检查是否是当前聊天室的消息
         const currentRoomId = localStorage.getItem('currentRoomId');
         if (currentRoomId && currentRoomId == message.roomId) {
@@ -119,7 +115,6 @@ export function initializeWebSocket(token) {
             }
         } else {
             // 不是当前聊天室的消息，更新房间列表中的未读数
-            console.info('收到其他房间消息，当前房间ID:', currentRoomId);
             updateRoomUnreadCount(message.roomId);
         }
     });
@@ -146,12 +141,10 @@ export function initializeWebSocket(token) {
     
     // 监听连接错误事件
     socket.on('connect_error', (error) => {
-        console.error('WebSocket连接错误:', error);
     });
     
     // 监听断开连接事件
     socket.on('disconnect', () => {
-        console.info('WebSocket连接断开');
     });
     
     return socket;
@@ -160,7 +153,6 @@ export function initializeWebSocket(token) {
 // 更新未读计数显示
 export function updateUnreadCount(count) {
     // 这里可以更新UI上的未读计数显示
-    console.info('未读消息数更新:', count);
 }
 
 // 更新房间未读数显示

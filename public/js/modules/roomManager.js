@@ -4,7 +4,6 @@
 export function displayRooms(rooms) {
     const roomList = document.getElementById('roomList');
     if (!roomList) {
-        console.warn('未找到聊天室列表容器');
         return;
     }
     
@@ -86,14 +85,12 @@ export function loadMessageHistory(roomId) {
     // 确保roomId是数字类型
     const roomIdInt = parseInt(roomId);
     if (isNaN(roomIdInt)) {
-        console.error('无效的聊天室ID:', roomId);
         window.showMessage('无效的聊天室ID', 'danger');
         return;
     }
     
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) {
-        console.warn('未找到消息显示区域');
         return;
     }
     
@@ -117,7 +114,6 @@ export function loadMessageHistory(roomId) {
         await window.displayMessages(messages);
     })
     .catch(error => {
-        console.error('加载消息历史错误:', error);
         chatMessages.innerHTML = `<div class="text-center text-muted my-3"><p>加载消息失败: ${error.message}</p></div>`;
         window.showMessage('加载消息历史失败: ' + error.message, 'danger');
     });

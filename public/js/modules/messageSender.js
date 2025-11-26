@@ -78,7 +78,6 @@ export function sendMessage() {
         }
     })
     .catch(error => {
-        console.error('发送消息失败:', error);
         window.showMessage(error.message || '发送消息失败', 'danger');
         
         // 移除临时消息
