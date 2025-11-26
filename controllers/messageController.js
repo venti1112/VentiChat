@@ -107,6 +107,9 @@ exports.sendMessage = async (req, res) => {
             Sender: sender
         };
         
+        // 添加日志查看消息对象结构
+        console.log('Message object structure:', JSON.stringify(messageWithSender, null, 2));
+        
         // 广播消息到房间（使用正确的房间名格式）
         io.to(`room_${roomId}`).emit('newMessage', messageWithSender);
         
@@ -365,14 +368,4 @@ exports.getRoomMessages = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
-
-
-
-
-
-
-
-
-
-
 

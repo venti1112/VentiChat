@@ -22,7 +22,9 @@ function sendLogToServer(level, message) {
     switch (level) {
         case LOG_LEVELS.INFO:
         case LOG_LEVELS.WARN:
-        case LOG_LEVELS.ERROR;
+        case LOG_LEVELS.ERROR:
+            // 添加具体的日志处理逻辑
+            break;
     }
 
     // 日志发送已在上面的switch语句中处理

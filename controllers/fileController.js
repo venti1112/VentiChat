@@ -6,6 +6,10 @@ const { getFileType, getFileUrl } = require('../utils/fileUpload');
 // 处理文件上传
 exports.handleUpload = async (req, res) => {
     try {
+        // 获取模型对象
+        const models = req.app.get('models');
+        const RoomMember = models.RoomMember;
+        
         if (!req.file) {
             return res.status(400).json({ error: '没有文件上传' });
         }
@@ -24,10 +28,10 @@ exports.handleUpload = async (req, res) => {
         }
         
         // 获取文件类型
-        const fileType = getFileType(req.file);
+        const fileType = getFileType(req.file.mimetype);
         
-        // 构建文件URL
-        const fileUrl = getFileUrl(req.file, fileType);
+        // 构建文件URL（修复参数传递）
+        const fileUrl = getFileUrl(req.file.filename, fileType);
         
         // 返回文件信息
         res.json({

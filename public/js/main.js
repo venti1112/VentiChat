@@ -1082,13 +1082,55 @@ function bindFormEvents() {
                 content = message.content || '';
                 break;
             case 'image':
-                content = `<img src="${message.fileUrl}" alt="图片" class="message-image" style="max-width: 200px; max-height: 200px;">`;
+                // 改进图片URL处理逻辑 - 如果fileUrl为空则使用content字段
+                let imageUrl = '';
+                if (message.fileUrl) {
+                    imageUrl = message.fileUrl;
+                } else if (message.dataValues && message.dataValues.fileUrl) {
+                    imageUrl = message.dataValues.fileUrl;
+                } else if (message.data && message.data.fileUrl) {
+                    imageUrl = message.data.fileUrl;
+                } else if (message.content) {
+                    // fallback到content字段
+                    imageUrl = message.content;
+                }
+                content = `<img src="${imageUrl}" alt="图片" class="message-image" style="max-width: 200px; max-height: 200px;">`;
                 break;
             case 'video':
-                content = `<video src="${message.fileUrl}" controls class="message-video" style="max-width: 200px; max-height: 200px;"></video>`;
+                // 改进视频URL处理逻辑 - 如果fileUrl为空则使用content字段
+                let videoUrl = '';
+                if (message.fileUrl) {
+                    videoUrl = message.fileUrl;
+                } else if (message.dataValues && message.dataValues.fileUrl) {
+                    videoUrl = message.dataValues.fileUrl;
+                } else if (message.data && message.data.fileUrl) {
+                    videoUrl = message.data.fileUrl;
+                } else if (message.content) {
+                    // fallback到content字段
+                    videoUrl = message.content;
+                }
+                content = `<video src="${videoUrl}" controls class="message-video" style="max-width: 200px; max-height: 200px;"></video>`;
                 break;
             case 'file':
-                content = `<a href="${message.fileUrl}" target="_blank" class="message-file">文件: ${message.content || '文件'}</a>`;
+                // 改进文件URL处理逻辑 - 如果fileUrl为空则使用content字段
+                let fileUrl = '';
+                let fileName = message.fileName || '文件';
+                if (message.fileUrl) {
+                    fileUrl = message.fileUrl;
+                } else if (message.dataValues && message.dataValues.fileUrl) {
+                    fileUrl = message.dataValues.fileUrl;
+                } else if (message.data && message.data.fileUrl) {
+                    fileUrl = message.data.fileUrl;
+                } else if (message.content) {
+                    // fallback到content字段
+                    fileUrl = message.content;
+                    // 尝试从URL中提取文件名
+                    const urlParts = fileUrl.split('/');
+                    if (urlParts.length > 0) {
+                        fileName = urlParts[urlParts.length - 1];
+                    }
+                }
+                content = `<a href="${fileUrl}" target="_blank" class="message-file">文件: ${fileName}</a>`;
                 break;
             case 'recall':
                 content = '<em>消息已被撤回</em>';
@@ -1702,8 +1744,8 @@ function bindFormEvents() {
             },
             body: JSON.stringify({
                 roomId: parseInt(currentRoomId),
-                content: fileUrl,
-                fileName: fileName,
+                content: fileName,
+                fileUrl: fileUrl,  // 添加fileUrl字段
                 type: messageType
             })
         })

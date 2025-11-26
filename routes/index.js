@@ -124,6 +124,9 @@ router.post('/messages/image', authMiddleware, uploadSingle('file', 'image'), fi
 router.post('/messages/video', authMiddleware, uploadSingle('file', 'video'), fileController.handleUpload);
 router.post('/messages/file', authMiddleware, uploadSingle('file', 'file'), fileController.handleUpload);
 
+// 添加缺失的文件上传路由
+router.post('/upload/image', authMiddleware, uploadSingle('file', 'image'), fileController.handleUpload);
+
 // 分片上传路由
 router.post('/messages/chunked/initiate', authMiddleware, fileController.initiateChunkedUpload);
 router.post('/messages/chunked/upload', authMiddleware, uploadSingle('file', 'chunk'), fileController.uploadChunk);

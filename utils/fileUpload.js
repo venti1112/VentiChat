@@ -41,7 +41,7 @@ const getUrlPrefix = (fileType) => {
     case 'video':
       return '/userdata/video';
     default:
-      return '/userdata/flie';
+      return '/userdata/file'; // 修复拼写错误: flie -> file
   }
 };
 
