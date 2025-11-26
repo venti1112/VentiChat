@@ -819,6 +819,13 @@ function bindFormEvents() {
         rooms.forEach(room => {
             const li = document.createElement('li');
             li.className = 'list-group-item list-group-item-action';
+            
+            // 检查是否为当前选中的聊天室
+            const currentRoomId = localStorage.getItem('currentRoomId');
+            if (currentRoomId && currentRoomId == room.id) {
+                li.classList.add('active');
+            }
+            
             li.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
@@ -832,6 +839,12 @@ function bindFormEvents() {
             li.addEventListener('click', () => {
                 // 添加进入聊天室的逻辑
                 enterRoom(room);
+                
+                // 更新选中的聊天室样式
+                document.querySelectorAll('#roomList .list-group-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                li.classList.add('active');
             });
             roomList.appendChild(li);
         });

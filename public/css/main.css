@@ -1,8 +1,8 @@
 :root {
   --border-radius: 15px;
   --blur-amount: 10px;
-  --primary-color: #0b93f6;
-  --primary-bg-color: rgba(13, 110, 253, 0.8);
+  --primary-color: #4cd8b8;
+  --primary-bg-color: rgba(76, 216, 184, 0.8);
   --secondary-bg-color: rgba(255, 255, 255, 0.8);
   --card-bg-color: rgba(255, 255, 255, 0.4);
   --text-color: #000;
@@ -12,9 +12,9 @@
   --danger-color: #dc3545;
   --secondary-color: #6c757d;
   --received-message-bg: #ffffff;
-  --sent-message-bg: #0b93f6;
+  --sent-message-bg: #4cd8b8;
   --received-message-border: #e0e0e0;
-  --sent-message-border: #0b93f6;
+  --sent-message-border: #4cd8b8;
 }
 
 * {
@@ -193,14 +193,13 @@ body {
 #membersBtn, #settingsBtn {
     margin-right: 5px;
     margin-top: 5px;
-    background-color: #0d6efd; /* Bootstrap primary color */
+    background-color: var(--primary-color);
     border: none; /* 去掉边框 */
     color: white;
 }
 
 #membersBtn:hover, #settingsBtn:hover {
-    background-color: #0b5ed7; /* Slightly darker on hover */
-    border-color: #0a58ca;
+    filter: brightness(0.9);
 }
 
 /* 消息气泡样式 */
@@ -372,6 +371,33 @@ body {
 
 .create-room-card .card-header {
     border-radius: var(--border-radius) var(--border-radius) 0 0 !important;
+}
+
+/* 聊天室列表项样式 */
+#roomList .list-group-item {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border-radius: 10px !important;
+    margin: 5px 10px;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+#roomList .list-group-item:hover {
+    background: rgba(255, 255, 255, 0.8);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+#roomList .list-group-item.active {
+    background: var(--primary-color);
+    color: var(--text-light-color);
+}
+
+#roomList .list-group-item.active .text-muted {
+    color: var(--text-light-color);
+    opacity: 0.7;
 }
 
 /* 响应式设计 */
