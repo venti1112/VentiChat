@@ -970,6 +970,18 @@ function bindFormEvents() {
             chatMessages.innerHTML = renderedMessages.join('');
         }
         
+        // 为图片添加点击事件以全屏查看
+        const imageElements = chatMessages.querySelectorAll('.message-image');
+        imageElements.forEach(img => {
+            img.style.cursor = 'pointer';
+            img.addEventListener('click', function() {
+                const fullScreenImage = document.getElementById('fullScreenImage');
+                const imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
+                fullScreenImage.src = this.src;
+                imageModal.show();
+            });
+        });
+        
         // 滚动到底部
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }

@@ -159,7 +159,7 @@ body {
 /* 聊天界面样式 */
 .chat-container { 
     height: calc(100vh - 180px); 
-    background: var(--card-bg-color);
+    background: rgba(255, 255, 255, 0.3);
     backdrop-filter: blur(var(--blur-amount));
     -webkit-backdrop-filter: blur(var(--blur-amount));
     border-radius: var(--border-radius);
@@ -251,11 +251,13 @@ body {
     position: relative;
     word-wrap: break-word;
     max-width: 100%;
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
 }
 
 /* 接收到的消息气泡样式 */
 .message-left .message-bubble {
-    background-color: var(--received-message-bg);
+    background-color: rgba(255, 255, 255, 0.6);
     color: #000;
     border: 1px solid var(--received-message-border);
     border-top-left-radius: 5px;
@@ -263,7 +265,7 @@ body {
 
 /* 发送的消息气泡样式 */
 .message-right .message-bubble {
-    background-color: var(--sent-message-bg);
+    background-color: rgba(76, 216, 184, 0.6);
     color: white;
     border: 1px solid var(--sent-message-border);
     border-top-right-radius: 5px;
@@ -302,6 +304,21 @@ body {
 .message-right .message-sender {
     color: var(--primary-color);
     align-self: flex-end;
+}
+
+/* 图片查看模态框样式 */
+#imageModal .modal-content {
+    background-color: rgba(0, 0, 0, 0.9);
+    border: none;
+    backdrop-filter: none;
+}
+
+#imageModal .modal-header {
+    border: none;
+}
+
+#imageModal .btn-close {
+    filter: invert(1);
 }
 
 /* 输入区域 */
