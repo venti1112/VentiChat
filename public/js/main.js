@@ -1114,7 +1114,10 @@ function bindFormEvents() {
             case 'file':
                 // 改进文件URL处理逻辑 - 如果fileUrl为空则使用content字段
                 let fileUrl = '';
-                let fileName = message.fileName || '文件';
+                // 使用content作为默认文件名
+                let fileName = message.content || '文件';
+                
+                // 尝试从各种可能的位置获取fileUrl
                 if (message.fileUrl) {
                     fileUrl = message.fileUrl;
                 } else if (message.dataValues && message.dataValues.fileUrl) {
@@ -1122,14 +1125,18 @@ function bindFormEvents() {
                 } else if (message.data && message.data.fileUrl) {
                     fileUrl = message.data.fileUrl;
                 } else if (message.content) {
-                    // fallback到content字段
+                    // fallback到content字段作为URL
                     fileUrl = message.content;
-                    // 尝试从URL中提取文件名
-                    const urlParts = fileUrl.split('/');
+                }
+                
+                // 如果content字段包含URL路径，尝试从中提取文件名
+                if (message.content && message.content.includes('/')) {
+                    const urlParts = message.content.split('/');
                     if (urlParts.length > 0) {
                         fileName = urlParts[urlParts.length - 1];
                     }
                 }
+                
                 content = `<a href="${fileUrl}" target="_blank" class="message-file">文件: ${fileName}</a>`;
                 break;
             case 'recall':
