@@ -175,6 +175,16 @@ body {
     border: none;
     border-radius: var(--border-radius);
     margin-top: 0; /* 确保顶部没有额外边距，与用户信息栏对齐 */
+    display: flex;
+    flex-direction: column;
+}
+
+.room-list .list-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0;
+    width: 100%;
 }
 
 .chat-messages { 
@@ -365,10 +375,17 @@ body {
     border-radius: 15px;
     transition: transform 0.3s ease;
     margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
 }
 
 .room-list .card:hover {
     transform: translateY(-5px);
+}
+
+.room-list .card .card-body {
+    flex: 1;
+    overflow-y: auto;
 }
 
 /* 移除聊天室列表头部的蓝色背景，改为透明背景，文字颜色改为黑色 */
@@ -396,9 +413,16 @@ body {
     backdrop-filter: blur(5px);
     -webkit-backdrop-filter: blur(5px);
     border-radius: 10px !important;
-    margin: 5px 10px;
+    margin: 5px auto;
     border: none;
     transition: all 0.3s ease;
+    width: fit-content;
+    min-width: 85%;
+    max-width: 95%;
+    display: block;
+    padding: 12px 15px;
+    text-align: left;
+    cursor: pointer;
 }
 
 #roomList .list-group-item:hover {
