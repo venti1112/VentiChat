@@ -63,6 +63,7 @@ app.set('models', models);
 app.use(express.json());
 app.use(cookieParser()); // 添加 cookie-parser 中间件
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/userdata', express.static(path.join(__dirname, 'public', 'userdata')));
 
 // IP封禁中间件
 const ipBanMiddleware = require('./middleware/ipBanMiddleware');

@@ -1579,11 +1579,11 @@ function bindFormEvents() {
         formData.append('roomId', currentRoomId);
         
         // 根据文件类型确定上传端点
-        let uploadEndpoint = '/api/upload';
+        let uploadEndpoint = '/api/messages/file';
         if (file.type.startsWith('image/')) {
-            uploadEndpoint = '/api/upload/image';
+            uploadEndpoint = '/api/messages/image';
         } else if (file.type.startsWith('video/')) {
-            uploadEndpoint = '/api/upload/video';
+            uploadEndpoint = '/api/messages/video';
         }
         
         fetch(uploadEndpoint, {
