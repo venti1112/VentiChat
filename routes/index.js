@@ -105,6 +105,7 @@ router.get('/rooms/:id', authMiddleware, roomController.getRoom);
 router.delete('/rooms/:roomId/members/:userId', authMiddleware, roomController.kickMember);
 // 新增加入请求相关路由
 router.post('/rooms/:id/join-request', authMiddleware, roomController.sendJoinRequest);
+router.get('/rooms/:id/pending-requests', authMiddleware, roomController.getPendingRequests);
 router.post('/rooms/:id/approve-join-request', authMiddleware, roomController.approveJoinRequest);
 // 添加更新聊天室设置的路由
 router.put('/rooms/:id/settings', authMiddleware, roomController.updateRoomSettings);

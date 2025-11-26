@@ -605,10 +605,22 @@ exports.approveJoinRequest = async (req, res) => {
         const { id } = req.params; // 聊天室RID
         const { userId, action } = req.body; // action: 'approve' or 'reject'
         
-        // 检查聊天室是否存在且当前用户是创建者
+        // 检查聊天室是否存在
         const room = await models.Room.findByPk(id);
-        if (!room || room.creatorId !== req.user.userId) {
-            return res.status(403).json({ error: '您没有权限审批该请求' });
+        if (!room) {
+            return res.status(404).json({ error: '聊天室不存在' });
+        }
+        
+        // 检查当前用户是否是聊天室创建者或管理员
+        const roomMember = await models.RoomMember.findOne({
+            where: { 
+                roomId: id, 
+                userId: req.user.userId 
+            }
+        });
+        
+        if (!roomMember || (!roomMember.isModerator && room.creatorId !== req.user.userId)) {
+            return res.status(403).json({ error: '只有聊天室创建者或管理员可以审批加入请求' });
         }
         
         // 检查请求是否存在
@@ -646,6 +658,70 @@ exports.approveJoinRequest = async (req, res) => {
         }
         
         res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 获取待处理的加入请求
+exports.getPendingRequests = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // 检查聊天室是否存在
+        const room = await models.Room.findByPk(id);
+        if (!room) {
+            return res.status(404).json({ error: '聊天室不存在' });
+        }
+        
+        // 检查当前用户是否是聊天室创建者或管理员
+        const roomMember = await models.RoomMember.findOne({
+            where: { 
+                roomId: id, 
+                userId: req.user.userId 
+            }
+        });
+        
+        if (!roomMember || (!roomMember.isModerator && room.creatorId !== req.user.userId)) {
+            return res.status(403).json({ error: '只有聊天室创建者或管理员可以查看加入请求' });
+        }
+        
+        // 获取所有待处理的加入请求
+        const pendingRequests = await models.JoinRequest.findAll({
+            where: { 
+                roomId: id, 
+                status: 'pending' 
+            },
+            order: [['requestTime', 'ASC']]
+        });
+        
+        // 手动获取用户信息（因为模型关联已被移除）
+        const userIds = pendingRequests.map(request => request.userId);
+        let users = [];
+        if (userIds.length > 0) {
+            users = await models.User.findAll({
+                where: {
+                    userId: userIds
+                },
+                attributes: ['userId', 'username', 'nickname', 'avatarUrl']
+            });
+        }
+        
+        // 创建用户映射
+        const userMap = {};
+        users.forEach(user => {
+            userMap[user.userId] = user;
+        });
+        
+        // 将用户信息附加到请求中
+        const requestsWithUsers = pendingRequests.map(request => {
+            return {
+                ...request.toJSON(),
+                User: userMap[request.userId] || null
+            };
+        });
+        
+        res.json(requestsWithUsers);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
