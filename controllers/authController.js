@@ -106,9 +106,10 @@ exports.login = async (req, res) => {
         const maxAge = rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
         
         // 将token写入Cookie（开发环境放宽安全限制）
+        const isProduction = process.env.NODE_ENV === 'production';
         res.cookie('token', token, {
-          httpOnly: false,
-          secure: false,
+          httpOnly: isProduction, // 生产环境开启httpOnly保护
+          secure: isProduction,   // 生产环境开启secure保护
           maxAge: maxAge,
           sameSite: 'lax'
         });
@@ -229,8 +230,16 @@ exports.register = async (req, res) => {
             return res.status(400).json({ message: '两次输入的密码不一致' });
         }
         
-        if (password.length < 6) {
-            return res.status(400).json({ message: '密码至少需要6位字符' });
+        if (password.length < 8) {
+            return res.status(400).json({ message: '密码至少需要8位字符' });
+        }
+
+        // 检查密码强度（至少包含字母和数字）
+        const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*#?&]/;
+        if (!passwordRegex.test(password)) {
+            return res.status(400).json({ 
+                message: '密码必须包含字母和数字，可选择包含特殊字符' 
+            });
         }
         
         // 检查用户名是否已存在

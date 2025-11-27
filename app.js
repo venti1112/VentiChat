@@ -1,3 +1,4 @@
+require('dotenv').config();
 // 导入依赖
 const express = require('express');
 const http = require('http');
@@ -15,10 +16,27 @@ const app = express();
 const server = http.createServer(app);
 
 // 设置Socket.IO
+const allowedOrigins = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'https://yourdomain.com' // 添加你的生产域名
+];
+
 const io = socketIo(server, {
     cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
+        origin: function (origin, callback) {
+            // 允许没有origin的请求（如移动应用或curl）
+            if (!origin) return callback(null, true);
+            
+            // 检查origin是否在允许列表中
+            if (allowedOrigins.indexOf(origin) !== -1) {
+                callback(null, true);
+            } else {
+                callback(new Error('Not allowed by CORS'));
+            }
+        },
+        methods: ["GET", "POST"],
+        credentials: true
     }
 });
 
@@ -182,10 +200,15 @@ app.use(async (err, req, res, next) => {
         }
     }
     
+    // 在日志中记录完整的错误信息
     logHttpError(clientIP, username, method, url, 500, err.message || '内部服务器错误');
     
+    // 向用户返回通用错误信息，避免泄露敏感细节
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const errorMessage = isDevelopment ? (err.message || '内部服务器错误') : '服务器内部错误';
+    
     res.status(500).json({ 
-        error: '内部服务器错误' 
+        error: errorMessage
     });
 });
 
