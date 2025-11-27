@@ -73,8 +73,7 @@ VentiChat/
 │   └── js/             # JavaScript 文件
 ├── routes/             # 路由定义
 ├── scripts/            # 脚本文件
-├── utils/              # 工具函数
-└── views/              # 视图模板（如果有）
+└── utils/              # 工具函数
 ```
 
 ## 主要功能模块
