@@ -37,11 +37,7 @@
 
 ### 安装步骤
 
-1. 克隆项目代码：
-   ```bash
-   git clone <repository-url>
-   cd ventichat
-   ```
+1. 在 Releases 中下载源码包并解压
 
 2. 安装依赖：
    ```bash
