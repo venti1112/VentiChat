@@ -117,6 +117,7 @@ export async function uploadLargeFile(file) {
             chunkFormData.append('uploadId', uploadId);
             chunkFormData.append('chunkIndex', i);
             chunkFormData.append('totalChunks', totalChunks);
+            chunkFormData.append('roomId', currentRoomId);
             
             const chunkResponse = await fetch('/api/upload/chunk', {
                 method: 'POST',
@@ -147,7 +148,8 @@ export async function uploadLargeFile(file) {
                 uploadId: uploadId,
                 fileName: file.name,
                 fileType: file.type,
-                roomId: currentRoomId
+                roomId: currentRoomId,
+                totalChunks: totalChunks
             })
         });
         

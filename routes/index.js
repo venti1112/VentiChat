@@ -127,9 +127,18 @@ router.post('/messages/file', authMiddleware, uploadSingle('file', 'file'), file
 // 添加缺失的文件上传路由
 router.post('/upload/image', authMiddleware, uploadSingle('file', 'image'), fileController.handleUpload);
 
+// 添加缺失的上传初始化路由
+router.post('/upload/initiate', authMiddleware, fileController.initiateChunkedUpload);
+
+// 添加缺失的分片上传路由
+router.post('/upload/chunk', authMiddleware, uploadSingle('chunk', 'chunk'), fileController.uploadChunk);
+
+// 添加缺失的分片完成路由
+router.post('/upload/complete', authMiddleware, fileController.completeChunkedUpload);
+
 // 分片上传路由
 router.post('/messages/chunked/initiate', authMiddleware, fileController.initiateChunkedUpload);
-router.post('/messages/chunked/upload', authMiddleware, uploadSingle('file', 'chunk'), fileController.uploadChunk);
+router.post('/messages/chunked/upload', authMiddleware, uploadSingle('chunk', 'chunk'), fileController.uploadChunk);
 router.post('/messages/chunked/complete', authMiddleware, fileController.completeChunkedUpload);
 
 // 管理后台路由

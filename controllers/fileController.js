@@ -6,15 +6,15 @@ const { getFileType, getFileUrl } = require('../utils/fileUpload');
 // 处理文件上传
 exports.handleUpload = async (req, res) => {
     try {
-        // 获取模型对象
-        const models = req.app.get('models');
-        const RoomMember = models.RoomMember;
-        
         if (!req.file) {
             return res.status(400).json({ error: '没有文件上传' });
         }
         
         const { roomId } = req.body;
+
+        // 获取模型对象
+        const models = req.app.get('models');
+        const RoomMember = models.RoomMember;
         
         // 验证用户在聊天室中
         const roomMember = await RoomMember.findOne({
@@ -49,6 +49,10 @@ exports.handleUpload = async (req, res) => {
 exports.initiateChunkedUpload = async (req, res) => {
     try {
         const { fileName, fileSize, roomId } = req.body;
+
+        // 获取模型对象
+        const models = req.app.get('models');
+        const RoomMember = models.RoomMember;
         
         // 验证用户在聊天室中
         const roomMember = await RoomMember.findOne({
@@ -84,18 +88,38 @@ exports.uploadChunk = async (req, res) => {
         if (!req.file) {
             return res.status(400).json({ error: '没有文件上传' });
         }
+
+        const { uploadId, chunkIndex, roomId } = req.body;
         
-        const { uploadId, chunkIndex } = req.body;
-        
+        // 检查roomId是否存在
+        if (!roomId) {
+            // 删除已上传的分片文件
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({ error: '缺少roomId参数' });
+        }
+
+        // 验证用户在聊天室中
+        const models = req.app.get('models');
+        const RoomMember = models.RoomMember;
+        const roomMember = await RoomMember.findOne({
+            where: { userId: req.user.userId, roomId }
+        });
+
+        if (!roomMember) {
+            // 删除已上传的分片文件
+            fs.unlinkSync(req.file.path);
+            return res.status(403).json({ error: '您不是该聊天室的成员' });
+        }
+
         // 移动分片到临时目录
         const tempDir = path.join('public', 'temp', uploadId);
         if (!fs.existsSync(tempDir)) {
             return res.status(400).json({ error: '无效的上传ID' });
         }
-        
+
         const chunkPath = path.join(tempDir, `chunk-${chunkIndex}`);
         fs.renameSync(req.file.path, chunkPath);
-        
+
         res.json({
             message: `分片 ${chunkIndex} 上传成功`
         });
@@ -109,12 +133,19 @@ exports.uploadChunk = async (req, res) => {
 exports.completeChunkedUpload = async (req, res) => {
     try {
         const { uploadId, fileName, fileSize, roomId, totalChunks } = req.body;
-        
+
+        // 检查roomId是否存在
+        if (!roomId) {
+            return res.status(400).json({ error: '缺少roomId参数' });
+        }
+
         // 验证用户在聊天室中
+        const models = req.app.get('models');
+        const RoomMember = models.RoomMember;
         const roomMember = await RoomMember.findOne({
             where: { userId: req.user.userId, roomId }
         });
-        
+
         if (!roomMember) {
             // 清理临时文件
             const tempDir = path.join('public', 'temp', uploadId);
@@ -123,20 +154,20 @@ exports.completeChunkedUpload = async (req, res) => {
             }
             return res.status(403).json({ error: '您不是该聊天室的成员' });
         }
-        
+
         // 组装分片
         const tempDir = path.join('public', 'temp', uploadId);
         const finalPath = path.join('public', 'userdata', 'files', fileName);
-        
+
         // 确保目标目录存在
         const targetDir = path.dirname(finalPath);
         if (!fs.existsSync(targetDir)) {
             fs.mkdirSync(targetDir, { recursive: true });
         }
-        
+
         // 创建写入流
         const writeStream = fs.createWriteStream(finalPath);
-        
+
         // 按顺序合并分片
         for (let i = 0; i < totalChunks; i++) {
             const chunkPath = path.join(tempDir, `chunk-${i}`);
@@ -144,16 +175,22 @@ exports.completeChunkedUpload = async (req, res) => {
             writeStream.write(chunkData);
             fs.unlinkSync(chunkPath); // 删除已合并的分片
         }
-        
+
         writeStream.end();
         
+        // 等待写入完成
+        await new Promise((resolve, reject) => {
+            writeStream.on('finish', resolve);
+            writeStream.on('error', reject);
+        });
+
         // 清理临时目录
         fs.rmdirSync(tempDir);
-        
+
         // 获取文件类型和URL
         const fileType = path.extname(fileName).toLowerCase().substring(1);
         const fileUrl = `/userdata/files/${fileName}`;
-        
+
         res.json({
             fileUrl: fileUrl,
             fileName: fileName,
@@ -175,7 +212,7 @@ exports.downloadFile = async (req, res) => {
         let found = false;
         
         // 在所有可能的子目录中查找文件
-        const subDirs = ['avatar', 'picture', 'video', 'flie'];
+        const subDirs = ['avatar', 'picture', 'video', 'files'];
         for (const subDir of subDirs) {
             const possiblePath = path.join(baseDir, subDir, filename);
             if (fs.existsSync(possiblePath)) {

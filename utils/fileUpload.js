@@ -137,7 +137,7 @@ const limits = {
     files: 1
   },
   chunk: {
-    fileSize: 25 * 1024 * 1024, // 25MB for each chunk
+    fileSize: 30 * 1024 * 1024, // 30MB for each chunk (稍微大于前端设置的25MB以提供缓冲空间)
     files: 1
   }
 };
