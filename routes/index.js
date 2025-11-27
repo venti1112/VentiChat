@@ -77,6 +77,7 @@ const authController = require('../controllers/authController');
 router.post('/auth/login', authController.login);
 router.post('/auth/register', upload.single('avatar'), authController.register);
 router.post('/auth/logout', authMiddleware, authController.logout);
+router.get('/auth/logout', authMiddleware, authController.logout);  // 添加对GET方法的支持
 router.get('/auth/verify', authController.verifyToken);
 const userController = require('../controllers/userController');
 router.get('/users/preferences', authMiddleware, userController.getUserPreferences);

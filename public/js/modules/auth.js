@@ -265,7 +265,7 @@ export function bindFormEvents() {
                 // 调用后端退出登录接口
                 if (token) {
                     fetch('/api/auth/logout', {
-                        method: 'GET',
+                        method: 'POST',
                         headers: {
                             'Authorization': `Bearer ${token}`
                         }
