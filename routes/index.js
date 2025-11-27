@@ -76,7 +76,7 @@ if (!fs.existsSync(backgroundDir)){
 const authController = require('../controllers/authController');
 router.post('/auth/login', authController.login);
 router.post('/auth/register', upload.single('avatar'), authController.register);
-router.get('/auth/logout', authController.logout);
+router.post('/auth/logout', authMiddleware, authController.logout);
 router.get('/auth/verify', authController.verifyToken);
 const userController = require('../controllers/userController');
 router.get('/users/preferences', authMiddleware, userController.getUserPreferences);

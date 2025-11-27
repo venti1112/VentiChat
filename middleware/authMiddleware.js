@@ -36,7 +36,7 @@ exports.authMiddleware = async (req, res, next) => {
         }
         
         if (!token) {
-            logUnauthorizedAccess(clientIP, '未知用户', req.method, req.path, 403, '未提供认证令牌');
+            logUnauthorizedAccess(clientIP, '未认证用户', req.method, req.path, 403, '未提供认证令牌');
             return res.status(403).json({ 
                 message: '未提供认证令牌',
                 redirect: '/login'

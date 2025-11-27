@@ -294,6 +294,7 @@ exports.register = async (req, res) => {
 // 退出登录
 exports.logout = async (req, res) => {
     try {
+        // 支持GET和POST方法，但推荐使用POST
         const token = req.headers.authorization?.split(' ')[1] || req.cookies.token;
 
         if (token) {
@@ -305,9 +306,27 @@ exports.logout = async (req, res) => {
         res.clearCookie('token');
 
         // 记录退出日志
-        logUserLogout(req.ip, req.user?.username);
+        // 尝试从JWT token中获取用户名（即使认证中间件未附加req.user）
+        let username = '未知用户';
+        try {
+            if (token) {
+                const decoded = jwt.verify(token, config.encryptionKey);
+                username = decoded.username || '未知用户';
+            }
+        } catch (error) {
+            // 如果token无效，保持默认值
+        }
+        
+        logUserLogout(req.ip, username, true);
 
-        res.json({ message: '退出登录成功' });
+        // 根据请求方法返回合适的响应
+        if (req.method === 'GET') {
+            // GET请求重定向到登录页
+            res.redirect('/login');
+        } else {
+            // POST请求返回JSON响应
+            res.json({ message: '退出登录成功' });
+        }
     } catch (error) {
         log('ERROR', '退出登录错误: ' + error);
         res.status(500).json({ message: '服务器内部错误' });

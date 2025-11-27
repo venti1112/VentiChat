@@ -157,14 +157,14 @@ app.use(async (req, res, next) => {
     const url = req.url;
     
     // 获取用户名
-    let username = '未知用户';
+    let username = '未认证用户';
     const token = req.cookies.token;
     if (token) {
         try {
             const decoded = jwt.verify(token, config.encryptionKey);
             username = decoded.username || '未知用户';
         } catch (error) {
-            // token无效，保持"未知用户"状态
+            // token无效，保持"未认证用户"状态
         }
     }
     
@@ -189,14 +189,14 @@ app.use(async (err, req, res, next) => {
     const url = req.url;
     
     // 获取用户名
-    let username = '未知用户';
+    let username = '未认证用户';
     const token = req.cookies.token;
     if (token) {
         try {
             const decoded = jwt.verify(token, config.encryptionKey);
             username = decoded.username || '未知用户';
         } catch (error) {
-            // token无效，保持"未知用户"状态
+            // token无效，保持"未认证用户"状态
         }
     }
     
