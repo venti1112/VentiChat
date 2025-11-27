@@ -3,6 +3,12 @@ const { log } = require('../utils/logger');
 
 // 获取客户端IP地址的辅助函数
 function getClientIP(req) {
+    // 使用新添加的realIP（如果可用）
+    if (req.realIP && req.realIP !== 'unknown') {
+        return req.realIP;
+    }
+    
+    // 回退到原来的IP获取逻辑
     return req.ip || 
            req.connection.remoteAddress || 
            (req.headers['x-forwarded-for'] || '').split(',')[0] || 

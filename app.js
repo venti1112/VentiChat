@@ -15,6 +15,9 @@ const { log, logHttpError, logDatabaseQuery, logDatabaseRetry, logBrowserDevTool
 const app = express();
 const server = http.createServer(app);
 
+// 配置Express信任代理
+app.set('trust proxy', true);
+
 // 设置Socket.IO
 const allowedOrigins = [
     'http://localhost:3000',
@@ -83,6 +86,10 @@ app.use(cookieParser()); // 添加 cookie-parser 中间件
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/userdata', express.static(path.join(__dirname, 'public', 'userdata')));
 
+// IP处理中间件 - 从反向代理获取真实IP
+const realIpMiddleware = require('./middleware/realIpMiddleware');
+app.use(realIpMiddleware);
+
 // IP封禁中间件
 const ipBanMiddleware = require('./middleware/ipBanMiddleware');
 app.use(ipBanMiddleware);
@@ -119,7 +126,7 @@ let isDatabaseConnected = false;
 app.use(async (req, res, next) => {
     if (!isDatabaseConnected) {
         // 记录500错误访问日志
-        const clientIP = req.ip || req.connection.remoteAddress || 
+        const clientIP = req.realIP || req.ip || req.connection.remoteAddress || 
                         (req.headers['x-forwarded-for'] || '').split(',')[0] || '未知用户';
         const method = req.method;
         const url = req.url;
@@ -151,7 +158,7 @@ app.use('/api', require('./routes/index'));
 // 404错误处理中间件
 app.use(async (req, res, next) => {
     // 记录404错误访问日志
-    const clientIP = req.ip || req.connection.remoteAddress || 
+    const clientIP = req.realIP || req.ip || req.connection.remoteAddress || 
                     (req.headers['x-forwarded-for'] || '').split(',')[0] || '未知用户';
     const method = req.method;
     const url = req.url;
@@ -183,7 +190,7 @@ app.use(async (req, res, next) => {
 // 500错误处理中间件
 app.use(async (err, req, res, next) => {
     // 记录500错误访问日志
-    const clientIP = req.ip || req.connection.remoteAddress || 
+    const clientIP = req.realIP || req.ip || req.connection.remoteAddress || 
                     (req.headers['x-forwarded-for'] || '').split(',')[0] || '未知用户';
     const method = req.method;
     const url = req.url;
@@ -200,15 +207,10 @@ app.use(async (err, req, res, next) => {
         }
     }
     
-    // 在日志中记录完整的错误信息
-    logHttpError(clientIP, username, method, url, 500, err.message || '内部服务器错误');
-    
-    // 向用户返回通用错误信息，避免泄露敏感细节
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    const errorMessage = isDevelopment ? (err.message || '内部服务器错误') : '服务器内部错误';
+    logHttpError(clientIP, username, method, url, 500, `服务器内部错误: ${err.message}`);
     
     res.status(500).json({ 
-        error: errorMessage
+        error: '服务器内部错误' 
     });
 });
 
