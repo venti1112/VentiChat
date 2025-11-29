@@ -398,10 +398,19 @@ body {
 
 #imageModal .modal-header {
     border: none;
+    position: absolute;
+    right: 1rem;
+    z-index: 1050;
+    padding: 1rem 1rem 0 0;
 }
 
 #imageModal .btn-close {
     filter: invert(1);
+}
+
+#fullScreenImage {
+    transition: transform 0.2s ease;
+    user-select: none;
 }
 
 /* 输入区域 */
