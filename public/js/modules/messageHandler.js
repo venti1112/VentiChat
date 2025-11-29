@@ -148,7 +148,15 @@ export async function renderMessage(message) {
                 // fallback到content字段
                 videoUrl = message.content;
             }
-            content = `<video src="${videoUrl}" controls class="message-video" style="max-width: 200px; max-height: 200px;"></video>`;
+            // 使用playVideoInFullscreen函数实现点击播放并自动全屏
+            content = `
+                <div style="position: relative; display: inline-block;" onclick="playVideoInFullscreen('${videoUrl}')">
+                    <video src="${videoUrl}" class="message-video" style="max-width: 200px; max-height: 200px;"></video>
+                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(0, 0, 0, 0.7); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                        <i class="bi bi-play-fill" style="color: white; font-size: 20px;"></i>
+                    </div>
+                </div>
+            `;
             break;
         case 'file':
             // 改进文件URL处理逻辑 - 如果fileUrl为空则使用content字段

@@ -504,5 +504,47 @@
             </div>
         </div>
     </div>
+
+    <!-- 视频播放模态框 -->
+    <div class="modal fade" id="videoModal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content" style="background-color: rgba(0, 0, 0, 0.9); height: 100%;">
+                <div class="modal-header border-0" style="position: absolute; right: 10px; top: 10px; z-index: 1000; padding: 0;">
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="background-color: rgba(0,0,0,0.5); width: 30px; height: 30px;"></button>
+                </div>
+                <div class="modal-body d-flex align-items-center justify-content-center p-0" style="height: 100%;">
+                    <video id="fullscreenVideo" controls autoplay style="max-height: 100%; max-width: 100%; width: 100%; height: 100%; object-fit: contain;"></video>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全屏播放视频的功能
+        function playVideoInFullscreen(videoUrl) {
+            // 获取或创建视频模态框
+            let modal = document.getElementById('videoModal');
+            
+            // 更新视频源
+            const video = document.getElementById('fullscreenVideo');
+            video.src = videoUrl;
+            
+            // 显示模态框
+            const bootstrapModal = new bootstrap.Modal(modal);
+            bootstrapModal.show();
+            
+            // 监听模态框隐藏事件，暂停视频
+            modal.addEventListener('hidden.bs.modal', function() {
+                // 暂停视频播放
+                const video = document.getElementById('fullscreenVideo');
+                if (video) {
+                    video.pause();
+                }
+            }, {once: true});
+        }
+        
+        // 将函数附加到全局对象以便在HTML中使用
+        window.playVideoInFullscreen = playVideoInFullscreen;
+    </script>
 </body>
 </html>
