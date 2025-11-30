@@ -41,6 +41,7 @@ const upload = multer({
 // 引入中间件
 const authMiddleware = require('../middleware/authMiddleware').authMiddleware;
 const { messageRateLimiter, vipMessageRateLimiter } = require('../middleware/messageRateLimiter');
+const { loginRateLimiter, registerRateLimiter } = require('../middleware/authRateLimiter');
 
 // 创建用于背景图上传的 multer 实例
 const backgroundStorage = multer.diskStorage({
@@ -75,8 +76,8 @@ if (!fs.existsSync(backgroundDir)){
 
 // 用户相关路由
 const authController = require('../controllers/authController');
-router.post('/auth/login', authController.login);
-router.post('/auth/register', upload.single('avatar'), authController.register);
+router.post('/auth/login', loginRateLimiter, authController.login);
+router.post('/auth/register', registerRateLimiter, upload.single('avatar'), authController.register);
 router.post('/auth/logout', authMiddleware, authController.logout);
 router.get('/auth/logout', authMiddleware, authController.logout);  // 添加对GET方法的支持
 router.get('/auth/verify', authController.verifyToken);
