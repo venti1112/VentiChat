@@ -40,7 +40,7 @@ const upload = multer({
 
 // 引入中间件
 const authMiddleware = require('../middleware/authMiddleware').authMiddleware;
-const { messageRateLimiter, vipMessageRateLimiter } = require('../middleware/messageRateLimiter');
+const { messageRateLimiter } = require('../middleware/messageRateLimiter');
 const { loginRateLimiter, registerRateLimiter } = require('../middleware/authRateLimiter');
 
 // 创建用于背景图上传的 multer 实例
@@ -118,15 +118,8 @@ const messageController = require('../controllers/messageController');
 router.get('/messages/history/:roomId', authMiddleware, messageController.getMessageHistory);
 router.get('/messages/:roomId/history', authMiddleware, messageController.getMessageHistory);
 router.get('/messages/:roomId', authMiddleware, messageController.getRoomMessages);
-// 应用速率限制中间件到发送消息的路由，根据用户VIP等级选择不同的限流器
-router.post('/messages', authMiddleware, (req, res, next) => {
-  // 假设 req.user.vipLevel 存在且大于0表示VIP用户
-  if (req.user && req.user.vipLevel > 0) {
-    vipMessageRateLimiter(req, res, next);
-  } else {
-    messageRateLimiter(req, res, next);
-  }
-}, messageController.sendMessage);
+// 应用速率限制中间件到发送消息的路由
+router.post('/messages', authMiddleware, messageRateLimiter, messageController.sendMessage);
 router.put('/messages/:messageId/retract', authMiddleware, messageController.recallMessage);
 
 // 文件相关路由
