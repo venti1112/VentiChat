@@ -11,6 +11,7 @@ if (!fs.existsSync(logDir)) {
 
 // 进程编号映射
 const processIds = new Map();
+let nextWorkerId = 1;
 
 // ANSI颜色代码
 const colors = {
@@ -97,7 +98,12 @@ function colorizeConsoleMessage(message) {
         .replace(/(原因: [^,\n]+)/g, `${colors.fg.yellow}$1${colors.reset}`)
         .replace(/(代码: [^,\n]+)/g, `${colors.fg.magenta}$1${colors.reset}`)
         .replace(/(状态码: [45]\d\d)/g, `${colors.fg.red}$1${colors.reset}`)
-        .replace(/(状态码: [23]\d\d)/g, `${colors.fg.green}$1${colors.reset}`);
+        .replace(/(状态码: [23]\d\d)/g, `${colors.fg.green}$1${colors.reset}`)
+        .replace(/(信息: [^,\n]+)/g, `${colors.fg.yellow}$1${colors.reset}`)
+        .replace(/(错误: [^,\n]+)/g, `${colors.fg.red}$1${colors.reset}`)
+        .replace(/(警告：使用浏览器开发者工具)/g, `${colors.fg.yellow}$1${colors.reset}`)
+        .replace(/(\b401\b)/g, `${colors.fg.red}$1${colors.reset}`)
+        .replace(/(\b403\b)/g, `${colors.fg.red}$1${colors.reset}`);
 }
 
 /**
@@ -274,6 +280,29 @@ function logServerShutdown() {
     const processInternalId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
     log(LOG_LEVELS.INFO, `${processType} ${processInternalId} 正常退出`);
 }
+
+// 在进程启动时分配ID
+if (cluster.isMaster || cluster.isPrimary) {
+    // 主进程使用ID 0
+    processIds.set(process.pid, 0);
+} else if (cluster.worker) {
+    // 工作进程尝试获取worker.id
+    const workerId = cluster.worker.id !== undefined ? cluster.worker.id : nextWorkerId++;
+    processIds.set(process.pid, workerId);
+}
+
+// 监听工作进程创建事件（仅主进程需要监听）
+if (cluster.isMaster || cluster.isPrimary) {
+    cluster.on('fork', (worker) => {
+        processIds.set(worker.process.pid, nextWorkerId++);
+    });
+}
+
+// 监听工作进程退出事件
+cluster.on('exit', (worker) => {
+    processIds.delete(worker.process.pid);
+    // 重用ID不是必须的，让ID持续增长更简单且避免冲突
+});
 
 module.exports = {
     log,
