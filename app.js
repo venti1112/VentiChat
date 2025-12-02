@@ -376,17 +376,16 @@ if (require.main === module) {
     // 导出服务器实例
     module.exports.server = server;
     
-    // 在下一tick启动服务器，确保所有模块都已加载完毕
-    process.nextTick(() => {
-        startServer(server);
-    });
-    
     // 在工作进程启动后进行日志输出
     server.on('listening', () => {
-        const cluster = require('cluster');
         const { processIds } = require('./utils/logger');
         const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
         log(LOG_LEVELS.INFO, `工作进程 ${workerId} 启动完成`);
+    });
+    
+    // 在下一tick启动服务器，确保所有模块都已加载完毕
+    process.nextTick(() => {
+        startServer(server);
     });
     
     io.on('connection', async (socket) => {

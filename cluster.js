@@ -21,23 +21,47 @@ if (cluster.isMaster || cluster.isPrimary) {
     
     log(LOG_LEVELS.INFO, `主进程准备就绪，将创建 ${numCPUs} 个工作进程`);
     
-    // 衍生工作进程，并立即分配内部编号
+    // 衍生工作进程
     for (let i = 0; i < numCPUs; i++) {
         const worker = cluster.fork();
-        // 立即为工作进程分配内部编号
+    }
+    
+    // 监听工作进程创建事件，在这里分配ID
+    cluster.on('fork', (worker) => {
         const workerId = getNextWorkerId();
         processIds.set(worker.process.pid, workerId);
-    }
+        // 通过环境变量将workerId传递给工作进程
+        worker.send({ type: 'assignWorkerId', workerId });
+        log(LOG_LEVELS.INFO, `已创建工作进程 ${workerId} PID: ${worker.process.pid}`);
+    });
+    
+    // 监听工作进程的消息
+    cluster.on('message', (worker, message) => {
+        if (message.type === 'requestWorkerId') {
+            const workerId = processIds.get(worker.process.pid);
+            worker.send({ type: 'assignWorkerId', workerId });
+        }
+    });
     
     cluster.on('exit', (worker, code, signal) => {
         const workerId = processIds.get(worker.process.pid);
         log(LOG_LEVELS.INFO, `工作进程 ${workerId} 已退出 (代码: ${code}, 信号: ${signal})`);
         log(LOG_LEVELS.INFO, '正在启动新的工作进程...');
         const newWorker = cluster.fork();
-        const newWorkerId = getNextWorkerId();
-        processIds.set(newWorker.process.pid, newWorkerId);
     });
 } else {
+    // 工作进程代码
+    // 监听来自主进程的消息
+    process.on('message', (message) => {
+        if (message.type === 'assignWorkerId') {
+            const { processIds } = require('./utils/logger');
+            processIds.set(process.pid, message.workerId);
+        }
+    });
+    
+    // 请求主进程分配workerId
+    process.send({ type: 'requestWorkerId' });
+    
     require('./app.js');
     // 工作进程的日志由 app.js 内部处理
 }
