@@ -3,7 +3,7 @@ const { Sequelize } = require('sequelize');
 
 const { RoomMember, Room, Message, User } = models;
 
-// 计算用户的总未读消息数（私有方法）
+// 计算用户的总未读消息数
 const calculateTotalUnreadCount = async (userId) => {
     // 获取用户加入的所有聊天室
     const roomMembers = await RoomMember.findAll({
@@ -107,10 +107,7 @@ exports.sendMessage = async (req, res) => {
             Sender: sender
         };
         
-        // 添加日志查看消息对象结构
-        console.log('Message object structure:', JSON.stringify(messageWithSender, null, 2));
-        
-        // 广播消息到房间（使用正确的房间名格式）
+        // 广播消息到房间
         io.to(`room_${roomId}`).emit('newMessage', messageWithSender);
         
         // 实时推送未读计数更新

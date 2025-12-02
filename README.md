@@ -6,28 +6,20 @@
 
 ## 功能特性
 
-- 实时聊天：通过 WebSocket 实现实时消息传递
-- 聊天室：支持创建公共和私人聊天室
-- 用户系统：注册、登录和个人资料管理
-- 消息类型：支持文本、图片、视频和文件消息
-- 权限控制：基于角色的访问控制（管理员、普通用户）
-- 安全性：JWT 认证和密码加密存储
-- 响应式设计：适配桌面和移动端设备
+- 实时聊天：通过 WebSocket 实现消息即时收发
+- 聊天室管理：支持创建公开/私有聊天室，成员加入与退出
+- 用户系统：注册、登录、JWT 认证、密码加密（bcrypt）、个人资料编辑
+- 消息类型：支持文本、图片、视频、文件上传与展示
+- 权限控制：基于角色的访问控制（管理员/普通用户）
+- 安全机制：JWT 身份验证、IP 封禁中间件、真实 IP 解析
+- 消息历史与在线状态：保留历史记录并显示用户在线状态
 
 ## 技术栈
 
-### 后端
-- Node.js
-- Express.js - Web 应用框架
-- Socket.IO - 实时通信
-- MySQL - 数据库存储
-- Sequelize - ORM 框架
-- JWT - 用户认证
-
-### 前端
-- HTML/CSS/JavaScript
-- Bootstrap 5 - UI 框架
-- Socket.IO Client - WebSocket 客户端
+- 后端：Node.js, Express.js, Socket.IO
+- 数据库：MySQL (Sequelize ORM)
+- 前端：HTML/CSS/JavaScript, Bootstrap 5
+- 其他：JWT, bcrypt, multer, dotenv
 
 ## 快速开始
 
@@ -48,33 +40,27 @@
    ```bash
    npm run init
    ```
-   运行此命令将引导您完成以下配置：
-   - 数据库连接设置
-   - 管理员账户创建
-   - 服务器端口配置
+  这将引导您完成数据库配置、管理员账户创建和端口设置。
 
 4. 启动应用：
    ```bash
    npm start
    ```
 
-5. 在浏览器中访问 `http://localhost:3011`（默认端口）
+5. 浏览器访问 `http://localhost:[端口号]`（默认端口在初始化时配置）
 
-## 项目结构
+## 目录结构
 
-```
-VentiChat/
-├── config/              # 配置文件
-├── controllers/         # 控制器逻辑
-├── middleware/         # 中间件
-├── models/             # 数据模型
-├── public/             # 静态资源文件
-│   ├── css/            # 样式文件
-│   └── js/             # JavaScript 文件
-├── routes/             # 路由定义
-├── scripts/            # 脚本文件
-└── utils/              # 工具函数
-```
+- `app.js`: 主应用文件
+- `cluster.js`: 集群控制器
+- `config/`: 配置文件目录
+- `controllers/`: 控制器逻辑
+- `middleware/`: 自定义中间件
+- `models/`: 数据模型
+- `public/`: 静态资源文件
+- `routes/`: 路由配置
+- `scripts/`: 脚本文件
+- `utils/`: 工具函数
 
 ## 主要功能模块
 

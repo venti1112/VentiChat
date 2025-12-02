@@ -170,8 +170,22 @@ async function handleFailedLoginAttempt(clientIP, username) {
             // 如果记录存在，增加失败次数
             const currentAttempts = (ipRecord.failedAttempts || 0) + 1;
             
-            // 如果还在封禁期内，不增加次数
+            // 如果还在封禁期内，也要增加次数
             if (now < new Date(ipRecord.unbanTime)) {
+                // 更新失败次数
+                await BanIp.update({
+                    failedAttempts: currentAttempts
+                }, {
+                    where: {
+                        ip: clientIP
+                    }
+                });
+                
+                // 如果达到最大失败次数，记录日志
+                if (currentAttempts >= maxLoginAttempts) {
+                    const banDuration = loginLockTime / (60 * 1000); // 分钟
+                    log('WARN', `IP因多次登录失败被封禁 - IP: ${clientIP}, 用户名: ${username}, 封禁时长: ${banDuration}分钟`);
+                }
                 return;
             }
             

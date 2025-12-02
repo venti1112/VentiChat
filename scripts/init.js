@@ -17,7 +17,8 @@ async function init() {
             { type: 'input', name: 'adminUsername', message: '管理员用户名:' },
             { type: 'password', name: 'adminPassword', message: '管理员密码:' },
             { type: 'input', name: 'baseUrl', message: '基础URL:', default: 'http://localhost' },
-            { type: 'input', name: 'port', message: '服务端口:', default: '3011' }
+            { type: 'input', name: 'port', message: '服务端口:', default: '3011' },
+            { type: 'input', name: 'workerCount', message: '工作进程数量 (0表示使用CPU核心数):', default: '0' }
         ];
 
         const answers = await inquirer.prompt(questions);
@@ -205,7 +206,9 @@ async function init() {
             },
             encryptionKey,
             baseUrl: answers.baseUrl,
-            port: answers.port
+            port: answers.port,
+            logLevel: 2,
+            workerCount: parseInt(answers.workerCount, 10) || 0
         };
 
         const configDir = path.join(__dirname, '../config');

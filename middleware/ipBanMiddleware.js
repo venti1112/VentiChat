@@ -56,6 +56,9 @@ async function ipBanMiddleware(req, res, next) {
             });
         }
         
+        // 将clientIP附加到请求对象，供后续中间件使用
+        req.clientIP = clientIP;
+        
         // 继续处理请求
         next();
     } catch (error) {

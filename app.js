@@ -1,50 +1,21 @@
-require('dotenv').config();
-// 导入依赖
+
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
-const { Sequelize } = require('sequelize'); // 只导入Sequelize类
+const { Sequelize } = require('sequelize');
 const multer = require('multer');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
+const cluster = require('cluster');
 const config = require('./config/config.json');
-const { log, logHttpError, logDatabaseQuery, logDatabaseRetry, logBrowserDevToolsWarning, LOG_LEVELS } = require('./utils/logger');
+const { log, logHttpError, logDatabaseQuery, logDatabaseRetry, logBrowserDevToolsWarning, LOG_LEVELS, logServerShutdown, processIds } = require('./utils/logger');
 
 // 创建Express应用
 const app = express();
-const server = http.createServer(app);
 
 // 配置Express信任代理
 app.set('trust proxy', true);
-
-// 设置Socket.IO
-const allowedOrigins = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'https://yourdomain.com' // 添加你的生产域名
-];
-
-const io = socketIo(server, {
-    cors: {
-        origin: function (origin, callback) {
-            // 允许没有origin的请求（如移动应用或curl）
-            if (!origin) return callback(null, true);
-            
-            // 检查origin是否在允许列表中
-            if (allowedOrigins.indexOf(origin) !== -1) {
-                callback(null, true);
-            } else {
-                callback(new Error('Not allowed by CORS'));
-            }
-        },
-        methods: ["GET", "POST"],
-        credentials: true
-    }
-});
-
-// 将io实例挂载到app上，以便在路由中使用
-app.set('io', io);
 
 // 初始化Sequelize
 const sequelize = new Sequelize(config.db.database, config.db.user, config.db.password, {
@@ -83,6 +54,15 @@ app.set('models', models);
 // 中间件
 app.use(express.json());
 app.use(cookieParser()); // 添加 cookie-parser 中间件
+
+// 添加Worker ID到响应头的中间件（放在最前面，确保所有请求都有这个header）
+app.use((req, res, next) => {
+    const { processIds } = require('./utils/logger');
+    const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
+    res.setHeader('X-Worker-Id', workerId);
+    next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/userdata', express.static(path.join(__dirname, 'public', 'userdata')));
 
@@ -216,19 +196,11 @@ app.use(async (err, req, res, next) => {
 
 // 数据库连接函数
 async function connectToDatabase() {
-    log('INFO', '正在连接数据库...');
     try {
         await sequelize.authenticate();
-        log('INFO', '数据库连接成功');
-        
-        // log('INFO', '正在同步数据库...');
-        // await sequelize.sync({ alter: true });
-        // log('INFO', '数据库同步完成');
-        
         isDatabaseConnected = true;
         return true;
     } catch (err) {
-        log('ERROR', '数据库连接失败：' + err.message);
         isDatabaseConnected = false;
         return false;
     }
@@ -239,11 +211,9 @@ async function retryDatabaseConnection() {
     const retryInterval = 3 * 60 * 1000; // 3分钟
     
     while (!isDatabaseConnected) {
-        log('INFO', '尝试重新连接数据库...');
         const connected = await connectToDatabase();
         
         if (!connected) {
-            logDatabaseRetry();
             await new Promise(resolve => setTimeout(resolve, retryInterval));
         }
     }
@@ -251,124 +221,234 @@ async function retryDatabaseConnection() {
 
 // 错误处理
 process.on('unhandledRejection', (err) => {
-    log('ERROR', '未处理的Promise拒绝: ' + err);
-    // 不直接退出进程，而是继续运行并尝试重新连接数据库
 });
 
-// 添加服务器正常退出日志
+// 优雅关闭
 process.on('SIGINT', () => {
-    log('INFO', '服务器正常退出');
+    logServerShutdown();
     process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-    log('INFO', '服务器正常退出');
+    logServerShutdown();
     process.exit(0);
 });
 
 // 启动服务器函数
-async function startServer() {
+async function startServer(httpServer) {
     // 先尝试连接数据库
     const connected = await connectToDatabase();
     
     if (connected) {
         // 启动服务器
-        server.listen(config.port, () => {
-            log('INFO', `服务器成功启动，监听端口: ` + config.port);
-        });
+        httpServer.listen(config.port);
     } else {
         // 如果初始连接失败，启动重试机制
-        log('INFO', '数据库初始连接失败，系统将在三分钟后重试');
         retryDatabaseConnection();
         
         // 即使数据库未连接也启动服务器，但会返回500错误
-        server.listen(config.port, () => {
-            log('INFO', `服务器成功启动，监听端口: ` + config.port);
-        });
+        httpServer.listen(config.port);
     }
+
 }
 
 // 导出应用实例和模型
 module.exports = { 
     app, 
-    server, 
     sequelize, 
-    models 
+    models,
+    startServer
 };
 
-io.on('connection', async (socket) => {
-    // 获取客户端IP地址
-    const clientIP = socket.handshake.address || 
-                   (socket.request.headers['x-forwarded-for'] || 
-                    socket.request.connection.remoteAddress || 
-                    '未知用户');
+// 只有在直接运行此文件时才启动Socket.IO服务器
+if (require.main === module) {
+    // 创建HTTP服务器
+    const server = http.createServer(app);
     
-    // 从查询参数或auth中获取token
-    const token = socket.handshake.query.token || socket.handshake.auth?.token;
-    let userId = '未知用户';
-    let username = '未知用户';
+    // 设置Socket.IO
+    const allowedOrigins = [
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'https://yourdomain.com' // 添加你的生产域名
+    ];
+
+    const io = socketIo(server, {
+        cors: {
+            origin: function (origin, callback) {
+                // 允许没有origin的请求（如移动应用或curl）
+                if (!origin) return callback(null, true);
+                
+                // 检查origin是否在允许列表中
+                if (allowedOrigins.indexOf(origin) !== -1) {
+                    callback(null, true);
+                } else {
+                    callback(new Error('Not allowed by CORS'));
+                }
+            },
+            methods: ["GET", "POST"],
+            credentials: true
+        }
+    });
+
+    // 将io实例挂载到app上，以便在路由中使用
+    app.set('io', io);
     
-    // 验证token并获取用户信息
-    if (token) {
-        try {
-            const decoded = jwt.verify(token, config.encryptionKey);
-            const user = await models.User.findByPk(decoded.id || decoded.userId);
-            if (user) {
-                userId = user.userId;
-                username = user.username;
-            } else {
-                // Token有效但用户不存在
-                log('WARN', `Socket.IO连接被拒绝 - IP: ${clientIP}, 原因: 用户不存在`);
-                socket.emit('unauthorized', { message: '用户不存在' });
+    // 启动服务器
+    startServer(server);
+
+    io.on('connection', async (socket) => {
+        // 获取客户端IP地址
+        const clientIP = socket.handshake.address || 
+                       (socket.request.headers['x-forwarded-for'] || 
+                        socket.request.connection.remoteAddress || 
+                        '未知用户');
+        
+        // 从查询参数或auth中获取token
+        const token = socket.handshake.query.token || socket.handshake.auth?.token;
+        let userId = '未知用户';
+        let username = '未知用户';
+        
+        // 验证token并获取用户信息
+        if (token) {
+            try {
+                const decoded = jwt.verify(token, config.encryptionKey);
+                const user = await models.User.findByPk(decoded.id || decoded.userId);
+                if (user) {
+                    userId = user.userId;
+                    username = user.username;
+                } else {
+                    socket.emit('unauthorized', { message: '用户不存在' });
+                    socket.disconnect(true);
+                    return;
+                }
+            } catch (error) {
+                socket.emit('unauthorized', { message: '令牌无效' });
                 socket.disconnect(true);
                 return;
             }
-        } catch (error) {
-            log('WARN', `Socket.IO连接token验证失败 - IP: ${clientIP}, 错误: ${error.message}`);
-            socket.emit('unauthorized', { message: '令牌无效' });
+        } else {
+            socket.emit('unauthorized', { message: '缺少访问令牌' });
             socket.disconnect(true);
             return;
         }
-    } else {
-        // 没有提供token
-        log('WARN', `Socket.IO连接被拒绝 - IP: ${clientIP}, 原因: 缺少访问令牌`);
-        socket.emit('unauthorized', { message: '缺少访问令牌' });
-        socket.disconnect(true);
-        return;
-    }
-    
-    // 记录连接日志
-    log('INFO', `用户连接Socket.IO - IP: ${clientIP}, 用户名: ${username}, 结果: 成功`);
-    
-    // 获取用户ID并建立映射
-    userSocketMap.set(userId, socket.id);
-    
-    // 断开连接时清除映射
-    socket.on('disconnect', () => {
-        userSocketMap.delete(userId);
-        log('INFO', `用户断开Socket.IO - IP: ${clientIP}, 用户名: ${username}, 结果: 成功`);
-    });
+        
+        // 获取用户ID并建立映射
+        userSocketMap.set(userId, socket.id);
+        
+        // 断开连接时清除映射
+        socket.on('disconnect', () => {
+            userSocketMap.delete(userId);
+        });
 
-    // 加入聊天室
-    socket.on('joinRoom', (data) => {
-        // 兼容两种数据格式：直接传roomId或传{roomId: ...}对象
-        const roomId = typeof data === 'object' ? data.rid || data.roomId : data;
-        if (roomId) {
-            socket.join(`room_${roomId}`);
-            log('INFO', `用户 ${username} 加入聊天室 ${roomId}`);
+        // 加入聊天室
+        socket.on('joinRoom', (data) => {
+            // 兼容两种数据格式：直接传roomId或传{roomId: ...}对象
+            const roomId = typeof data === 'object' ? data.rid || data.roomId : data;
+            if (roomId) {
+                socket.join(`room_${roomId}`);
+            }
+        });
+        
+        // 离开聊天室
+        socket.on('leaveRoom', (data) => {
+            // 兼容两种数据格式：直接传roomId或传{roomId: ...}对象
+            const roomId = typeof data === 'object' ? data.rid || data.roomId : data;
+            if (roomId) {
+                socket.leave(`room_${roomId}`);
+            }
+        });
+    });
+} else {
+    // 当作为模块引入时，只创建HTTP服务器而不启动它
+    const server = http.createServer(app);
+    
+    // 设置Socket.IO
+    const io = socketIo(server, {
+        cors: {
+            origin: "*",
+            methods: ["GET", "POST"]
         }
     });
     
-    // 离开聊天室
-    socket.on('leaveRoom', (data) => {
-        // 兼容两种数据格式：直接传roomId或传{roomId: ...}对象
-        const roomId = typeof data === 'object' ? data.rid || data.roomId : data;
-        if (roomId) {
-            socket.leave(`room_${roomId}`);
-            log('INFO', `用户 ${username} 离开聊天室 ${roomId}`);
-        }
+    // 将io实例挂载到app上，以便在路由中使用
+    app.set('io', io);
+    
+    // 导出服务器实例
+    module.exports.server = server;
+    
+    // 在下一tick启动服务器，确保所有模块都已加载完毕
+    process.nextTick(() => {
+        startServer(server);
     });
-});
+    
+    // 在工作进程启动后进行日志输出
+    server.on('listening', () => {
+        const cluster = require('cluster');
+        const { processIds } = require('./utils/logger');
+        const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
+        log(LOG_LEVELS.INFO, `工作进程 ${workerId} 启动完成`);
+    });
+    
+    io.on('connection', async (socket) => {
+        // 获取客户端IP地址
+        const clientIP = socket.handshake.address || 
+                       (socket.request.headers['x-forwarded-for'] || 
+                        socket.request.connection.remoteAddress || 
+                        '未知用户');
+        
+        // 从查询参数或auth中获取token
+        const token = socket.handshake.query.token || socket.handshake.auth?.token;
+        let userId = '未知用户';
+        let username = '未知用户';
+        
+        // 验证token并获取用户信息
+        if (token) {
+            try {
+                const decoded = jwt.verify(token, config.encryptionKey);
+                const user = await models.User.findByPk(decoded.id || decoded.userId);
+                if (user) {
+                    userId = user.userId;
+                    username = user.username;
+                } else {
+                    socket.emit('unauthorized', { message: '用户不存在' });
+                    socket.disconnect(true);
+                    return;
+                }
+            } catch (error) {
+                socket.emit('unauthorized', { message: '令牌无效' });
+                socket.disconnect(true);
+                return;
+            }
+        } else {
+            socket.emit('unauthorized', { message: '缺少访问令牌' });
+            socket.disconnect(true);
+            return;
+        }
+        
+        // 获取用户ID并建立映射
+        userSocketMap.set(userId, socket.id);
+        
+        // 断开连接时清除映射
+        socket.on('disconnect', () => {
+            userSocketMap.delete(userId);
+        });
 
-// 启动服务器
-startServer();
+        // 加入聊天室
+        socket.on('joinRoom', (data) => {
+            // 兼容两种数据格式：直接传roomId或传{roomId: ...}对象
+            const roomId = typeof data === 'object' ? data.rid || data.roomId : data;
+            if (roomId) {
+                socket.join(`room_${roomId}`);
+            }
+        });
+        
+        // 离开聊天室
+        socket.on('leaveRoom', (data) => {
+            // 兼容两种数据格式：直接传roomId或传{roomId: ...}对象
+            const roomId = typeof data === 'object' ? data.rid || data.roomId : data;
+            if (roomId) {
+                socket.leave(`room_${roomId}`);
+            }
+        });
+    });
+}

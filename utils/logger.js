@@ -1,11 +1,17 @@
 const fs = require('fs');
 const path = require('path');
+const cluster = require('cluster');
+const config = require('../config/config.json');
 
 // 确保日志目录存在
 const logDir = path.join(__dirname, '..', 'logs');
 if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir, { recursive: true });
 }
+
+// 进程编号映射
+const processIds = new Map();
+let nextWorkerId = 1;
 
 // ANSI颜色代码
 const colors = {
@@ -40,36 +46,37 @@ const colors = {
     }
 };
 
-// 日志级别
+// 日志级别枚举（数值型，便于比较）
 const LOG_LEVELS = {
-    INFO: 'INFO',
-    WARN: 'WARN',
-    ERROR: 'ERROR'
+    ERROR: 0,
+    WARN: 1,
+    INFO: 2,
+    DEBUG: 3
 };
+
+// 获取当前时间戳
+function getTimestamp() {
+    return new Date().toISOString().replace('T', ' ').substring(0, 19);
+}
+
+// 获取日志级别名称
+function getLevelName(level) {
+    switch (level) {
+        case LOG_LEVELS.ERROR: return 'ERROR';
+        case LOG_LEVELS.WARN: return 'WARN';
+        case LOG_LEVELS.INFO: return 'INFO';
+        case LOG_LEVELS.DEBUG: return 'DEBUG';
+        default: return 'UNKNOWN';
+    }
+}
 
 // 日志级别颜色映射
 const levelColors = {
-    [LOG_LEVELS.INFO]: colors.fg.green,
-    [LOG_LEVELS.WARN]: colors.fg.yellow,
-    [LOG_LEVELS.ERROR]: colors.fg.red
+    ERROR: colors.fg.red,
+    WARN: colors.fg.yellow,
+    INFO: colors.fg.green,
+    DEBUG: colors.fg.blue
 };
-
-/**
- * 格式化时间戳
- * @returns {string} 格式化后的时间戳
- */
-function getFormattedTimestamp() {
-    const now = new Date();
-    return now.toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-    }).replace(/\//g, '-');
-}
 
 /**
  * 为控制台输出添加颜色
@@ -85,7 +92,7 @@ function colorizeConsoleMessage(message) {
         .replace(/(\b(?:[0-9a-fA-F]{1,4}:)*::(?:[0-9a-fA-F]{1,4}:)*[0-9a-fA-F]{1,4}\b)/g, `${colors.fg.blue}$1${colors.reset}`)
         .replace(/(\b(?:[0-9a-fA-F]{1,4}:)+:(?:[0-9a-fA-F]{1,4})?\b)/g, `${colors.fg.blue}$1${colors.reset}`)
         .replace(/(\b::1\b)/g, `${colors.fg.blue}$1${colors.reset}`)
-        .replace(/(用户名: )([^,\n]+)/g, `$1${colors.fg.green}$2${colors.reset}`)
+        .replace(/(用户: |用户名: )([^,\n]+)/g, `$1${colors.fg.green}$2${colors.reset}`)
         .replace(/(结果: 成功)/g, `${colors.fg.green}$1${colors.reset}`)
         .replace(/(结果: 失败)/g, `${colors.fg.red}$1${colors.reset}`)
         .replace(/(原因: [^,\n]+)/g, `${colors.fg.yellow}$1${colors.reset}`)
@@ -93,48 +100,64 @@ function colorizeConsoleMessage(message) {
         .replace(/(状态码: [45]\d\d)/g, `${colors.fg.red}$1${colors.reset}`)
         .replace(/(状态码: [23]\d\d)/g, `${colors.fg.green}$1${colors.reset}`)
         .replace(/(信息: [^,\n]+)/g, `${colors.fg.yellow}$1${colors.reset}`)
+        .replace(/(错误: [^,\n]+)/g, `${colors.fg.red}$1${colors.reset}`)
         .replace(/(警告：使用浏览器开发者工具)/g, `${colors.fg.yellow}$1${colors.reset}`)
         .replace(/(\b401\b)/g, `${colors.fg.red}$1${colors.reset}`)
         .replace(/(\b403\b)/g, `${colors.fg.red}$1${colors.reset}`);
 }
 
 /**
- * 写入日志到文件和控制台
- * @param {string} level 日志级别
+ * 格式化日志消息
+ * @param {number} level 日志级别
+ * @param {string} message 日志消息
+ * @returns {string} 格式化后的日志消息
+ */
+function formatMessage(level, message) {
+    const timestamp = getTimestamp();
+    const levelName = getLevelName(level);
+    const processType = cluster.isMaster || cluster.isPrimary ? '主进程' : '工作进程';
+    const processInternalId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
+    
+    return `[${timestamp}] [${levelName}] [${processType}:${processInternalId}] ${message}`;
+}
+
+/**
+ * 主日志函数
+ * @param {number} level 日志级别
  * @param {string} message 日志消息
  */
 function log(level, message) {
-    const timestamp = getFormattedTimestamp();
-    const logMessage = `[${timestamp}] [${level}] ${message}\n`;
+    // 从配置中获取日志级别，如果未设置则默认为 INFO
+    const configLogLevel = config.logLevel !== undefined ? config.logLevel : LOG_LEVELS.INFO;
+    
+    // 只有当日志级别小于等于配置的日志级别时才输出
+    // 注意：这里的level是LOG_LEVELS中的数值，比如WARN是1，INFO是2
+    if (level > configLogLevel) {
+        return;
+    }
+    
+    const formattedMessage = formatMessage(level, message);
+    const coloredLevel = `${levelColors[getLevelName(level)] || ''}[${getLevelName(level)}]${colors.reset}`;
+    const coloredMessage = formattedMessage.replace(`[${getLevelName(level)}]`, coloredLevel);
     
     // 输出到控制台（带颜色）
-    const coloredLevel = `${levelColors[level] || ''}[${level}]${colors.reset}`;
-    const coloredMessage = `[${timestamp}] ${coloredLevel} ${colorizeConsoleMessage(message)}`;
-    
-    // 直接输出到控制台，避免递归调用
-    if (level === LOG_LEVELS.ERROR) {
-        console.error(coloredMessage);
-    } else if (level === LOG_LEVELS.WARN) {
-        console.warn(coloredMessage);
-    } else {
-        console.log(coloredMessage);
-    }
+    console.log(colorizeConsoleMessage(coloredMessage));
     
     // 异步写入文件（不带颜色）
     const logFileName = `${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}.log`;
     const logFilePath = path.join(logDir, logFileName);
+    const fileLogMessage = `[${getTimestamp()}] [${getLevelName(level)}] ${message}\n`;
     
-    fs.appendFile(logFilePath, logMessage, { encoding: 'utf8' }, (err) => {
+    fs.appendFile(logFilePath, fileLogMessage, { encoding: 'utf8' }, (err) => {
         if (err) {
-            // 使用console直接输出文件写入错误，避免再次调用log函数
-            console.error(`[${getFormattedTimestamp()}] [ERROR] 日志写入文件失败: ${err.message}`);
+            console.error(`[${getTimestamp()}] [ERROR] 日志写入文件失败: ${err.message}`);
         }
     });
 }
 
 /**
  * 记录用户登录信息
- * 用户IP地址
+ * @param {string} ip 用户IP地址
  * @param {string} username 用户名
  * @param {boolean} success 是否登录成功
  * @param {string} errorMessage 错误信息（如果登录失败）
@@ -143,7 +166,7 @@ function logUserLogin(ip, username, success, errorMessage = null) {
     if (success) {
         log(LOG_LEVELS.INFO, `用户登录 - IP: ${ip}, 用户名: ${username}, 结果: 成功`);
     } else {
-        log(LOG_LEVELS.INFO, `用户登录 - IP: ${ip}, 用户名: ${username}, 结果: 失败, 原因: ${errorMessage}`);
+        log(LOG_LEVELS.WARN, `用户登录 - IP: ${ip}, 用户名: ${username}, 结果: 失败, 原因: ${errorMessage}`);
     }
 }
 
@@ -158,7 +181,7 @@ function logUserLogout(ip, username, success, errorMessage = null) {
     if (success) {
         log(LOG_LEVELS.INFO, `用户退出登录 - IP: ${ip}, 用户名: ${username}, 结果: 成功`);
     } else {
-        log(LOG_LEVELS.INFO, `用户退出登录 - IP: ${ip}, 用户名: ${username}, 结果: 失败, 原因: ${errorMessage}`);
+        log(LOG_LEVELS.WARN, `用户退出登录 - IP: ${ip}, 用户名: ${username}, 结果: 失败, 原因: ${errorMessage}`);
     }
 }
 
@@ -173,7 +196,7 @@ function logSocketConnect(ip, username, success, errorMessage = null) {
     if (success) {
         log(LOG_LEVELS.INFO, `用户连接Socket.IO - IP: ${ip}, 用户名: ${username}, 结果: 成功`);
     } else {
-        log(LOG_LEVELS.INFO, `用户连接Socket.IO - IP: ${ip}, 用户名: ${username}, 结果: 失败, 原因: ${errorMessage}`);
+        log(LOG_LEVELS.WARN, `用户连接Socket.IO - IP: ${ip}, 用户名: ${username}, 结果: 失败, 原因: ${errorMessage}`);
     }
 }
 
@@ -188,7 +211,7 @@ function logSocketDisconnect(ip, username, success, errorMessage = null) {
     if (success) {
         log(LOG_LEVELS.INFO, `用户断开Socket.IO - IP: ${ip}, 用户名: ${username}, 结果: 成功`);
     } else {
-        log(LOG_LEVELS.INFO, `用户断开Socket.IO - IP: ${ip}, 用户名: ${username}, 结果: 失败, 原因: ${errorMessage}`);
+        log(LOG_LEVELS.WARN, `用户断开Socket.IO - IP: ${ip}, 用户名: ${username}, 结果: 失败, 原因: ${errorMessage}`);
     }
 }
 
@@ -202,67 +225,97 @@ function logSocketDisconnect(ip, username, success, errorMessage = null) {
  * @param {string} errorMessage 错误信息
  */
 function logUnauthorizedAccess(ip, username, method, path, statusCode, errorMessage) {
-    log('WARN', `异常访问 - IP: ${ip}, 用户名: ${username}, 方法: ${method}, 路径: ${path}, 状态码: ${statusCode}, 原因: ${errorMessage}`);
+    log(LOG_LEVELS.WARN, `异常访问 - IP: ${ip}, 用户名: ${username}, 方法: ${method}, 路径: ${path}, 状态码: ${statusCode}, 原因: ${errorMessage}`);
 }
 
 /**
- * 记录HTTP错误访问日志（如404、500等HTTP错误）
+ * HTTP错误日志记录函数
  * @param {string} ip 用户IP地址
  * @param {string} username 用户名
  * @param {string} method HTTP方法（GET、POST等）
  * @param {string} url 请求的URL
  * @param {number} statusCode HTTP状态码
- * @param {string} message 错误信息
+ * @param {string} errorMessage 错误信息
  */
-function logHttpError(ip, username, method, url, statusCode, message) {
-    log('ERROR', `HTTP错误 - IP: ${ip}, 用户名: ${username || '未知用户'}, 方法: ${method}, URL: ${url}, 状态码: ${statusCode}, 信息: ${message}`);
+function logHttpError(ip, username, method, url, statusCode, errorMessage) {
+    let level = LOG_LEVELS.INFO;
+    if (statusCode >= 500) level = LOG_LEVELS.ERROR;
+    else if (statusCode >= 400) level = LOG_LEVELS.WARN;
+    
+    log(level, `HTTP ${statusCode} - IP: ${ip}, 用户: ${username || '未知用户'}, 方法: ${method}, URL: ${url}, 错误: ${errorMessage}`);
 }
 
 /**
- * 记录浏览器开发者工具相关警告
+ * 数据库查询日志记录函数
+ * @param {string} message 查询信息
+ */
+function logDatabaseQuery(message) {
+    // 仅在DEBUG级别时记录数据库查询
+    if (config.logLevel >= LOG_LEVELS.DEBUG) {
+        log(LOG_LEVELS.DEBUG, `数据库查询: ${message}`);
+    }
+}
+
+/**
+ * 数据库重试日志记录函数
+ */
+function logDatabaseRetry() {
+    log(LOG_LEVELS.INFO, '数据库连接重试中...');
+}
+
+/**
+ * 浏览器开发者工具警告日志记录函数
  * @param {string} ip 用户IP地址
  * @param {string} username 用户名
  */
 function logBrowserDevToolsWarning(ip, username) {
-    log('WARN', `浏览器开发者工具，IP: ${ip}, 用户名: ${username} , 警告：使用浏览器开发者工具`);
+    log(LOG_LEVELS.DEBUG, `浏览器开发者工具探测 - IP: ${ip}, 用户: ${username}`);
 }
 
 /**
- * 记录数据库查询日志
- * @param {string} query SQL查询语句
+ * 记录服务器正常退出
  */
-function logDatabaseQuery(query) {
-    const timestamp = getFormattedTimestamp();
-    const logMessage = `[${timestamp}] [${LOG_LEVELS.INFO}] 数据库操作: ${query}\n`;
-    
-    // 只写入文件，不在控制台输出
-    const logFileName = `${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}.log`;
-    const logFilePath = path.join(logDir, logFileName);
-    
-    fs.appendFile(logFilePath, logMessage, { encoding: 'utf8' }, (err) => {
-        if (err) {
-            log(LOG_LEVELS.ERROR, `日志写入文件失败: ${err.message}`);
-        }
+function logServerShutdown() {
+    const processType = cluster.isMaster || cluster.isPrimary ? '主进程' : '工作进程';
+    const processInternalId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
+    log(LOG_LEVELS.INFO, `${processType} ${processInternalId} 正常退出`);
+}
+
+// 在进程启动时分配ID
+if (cluster.isMaster || cluster.isPrimary) {
+    // 主进程使用ID 0
+    processIds.set(process.pid, 0);
+} else if (cluster.worker) {
+    // 工作进程尝试获取worker.id
+    const workerId = cluster.worker.id !== undefined ? cluster.worker.id : nextWorkerId++;
+    processIds.set(process.pid, workerId);
+}
+
+// 监听工作进程创建事件（仅主进程需要监听）
+if (cluster.isMaster || cluster.isPrimary) {
+    cluster.on('fork', (worker) => {
+        processIds.set(worker.process.pid, nextWorkerId++);
     });
 }
 
-/**
- * 记录数据库重试日志
- */
-function logDatabaseRetry() {
-    log('INFO', '数据库连接失败，将在3分钟后重试');
-}
+// 监听工作进程退出事件
+cluster.on('exit', (worker) => {
+    processIds.delete(worker.process.pid);
+    // 重用ID不是必须的，让ID持续增长更简单且避免冲突
+});
 
 module.exports = {
+    log,
     logUserLogin,
     logUserLogout,
     logSocketConnect,
     logSocketDisconnect,
     logUnauthorizedAccess,
     logHttpError,
-    logBrowserDevToolsWarning,
     logDatabaseQuery,
     logDatabaseRetry,
-    log,
-    LOG_LEVELS
+    logBrowserDevToolsWarning,
+    logServerShutdown,
+    LOG_LEVELS,
+    processIds // 导出processIds以便其他模块可以使用
 };
