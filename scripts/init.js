@@ -210,7 +210,7 @@ async function init() {
         );
 
         log('INFO', '初始化完成！配置文件已保存到 config/config.json');
-        log('INFO', '请运行 `npm install` 安装Redis依赖，然后运行 `npm start` 启动服务');
+        log('INFO', '请运行 `npm start` 启动服务');
         process.exit(0);
     } catch (error) {
         log('ERROR', `初始化失败: ${error.message}`);
