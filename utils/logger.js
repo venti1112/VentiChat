@@ -19,9 +19,8 @@ if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir, { recursive: true });
 }
 
-// 进程编号映射
+// 进程编号映射 - 使用 cluster.worker.id 作为进程ID
 const processIds = new Map();
-let nextWorkerId = 1;
 
 // ANSI颜色代码
 const colors = {
@@ -72,11 +71,20 @@ function getTimestamp() {
 // 获取日志级别名称
 function getLevelName(level) {
     switch (level) {
-        case LOG_LEVELS.ERROR: return 'ERROR';
-        case LOG_LEVELS.WARN: return 'WARN';
-        case LOG_LEVELS.INFO: return 'INFO';
-        case LOG_LEVELS.DEBUG: return 'DEBUG';
-        default: return 'UNKNOWN';
+        case 'ERROR': 
+        case 0: 
+            return 'ERROR';
+        case 'WARN': 
+        case 1: 
+            return 'WARN';
+        case 'INFO': 
+        case 2: 
+            return 'INFO';
+        case 'DEBUG': 
+        case 3: 
+            return 'DEBUG';
+        default: 
+            return 'UNKNOWN';
     }
 }
 
@@ -126,7 +134,7 @@ function formatMessage(level, message) {
     const timestamp = getTimestamp();
     const levelName = getLevelName(level);
     const processType = cluster.isMaster || cluster.isPrimary ? '主进程' : '工作进程';
-    const processInternalId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
+    const processInternalId = processIds.has(process.pid) ? processIds.get(process.pid) : process.pid;
     
     return `[${timestamp}] [${levelName}] [${processType}:${processInternalId}] ${message}`;
 }
@@ -142,7 +150,13 @@ function log(level, message) {
     
     // 只有当日志级别小于等于配置的日志级别时才输出
     // 注意：这里的level是LOG_LEVELS中的数值，比如WARN是1，INFO是2
-    if (level > configLogLevel) {
+    if (typeof level === 'string') {
+        // 如果传入的是字符串形式的日志级别，转换为对应数值
+        const levelValue = LOG_LEVELS[level];
+        if (levelValue === undefined || levelValue > configLogLevel) {
+            return;
+        }
+    } else if (level > configLogLevel) {
         return;
     }
     
@@ -291,21 +305,16 @@ function logServerShutdown() {
     log(LOG_LEVELS.INFO, `${processType} ${processInternalId} 正常退出`);
 }
 
-// 在进程启动时分配ID
+// 在进程启动时分配ID - 使用 cluster.worker.id 作为工作进程ID
 if (cluster.isMaster || cluster.isPrimary) {
     // 主进程使用ID 0
     processIds.set(process.pid, 0);
 } else if (cluster.worker) {
-    // 工作进程尝试获取worker.id
-    const workerId = cluster.worker.id !== undefined ? cluster.worker.id : nextWorkerId++;
-    processIds.set(process.pid, workerId);
-}
-
-// 监听工作进程创建事件（仅主进程需要监听）
-if (cluster.isMaster || cluster.isPrimary) {
-    cluster.on('fork', (worker) => {
-        processIds.set(worker.process.pid, nextWorkerId++);
-    });
+    // 工作进程使用 cluster 模块提供的 id
+    processIds.set(process.pid, cluster.worker.id);
+} else {
+    // 如果既不是主进程也没有worker信息，则使用PID作为ID
+    processIds.set(process.pid, process.pid);
 }
 
 // 监听工作进程退出事件

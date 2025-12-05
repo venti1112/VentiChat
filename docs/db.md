@@ -97,6 +97,16 @@
 | login_lock_time | INT | DEFAULT 120 | IP登录失败锁定时间（分钟），超过时间后自动解锁 |
 | max_room_members | INT | DEFAULT 1000 | 单个聊天室最大成员数量 |
 
+### 8. ban_ip 表 - IP封禁表
+存储被临时封禁的IP地址
+
+| 字段名 | 数据类型 | 约束条件 | 用途说明 |
+|--------|----------|----------|----------|
+| ip | VARCHAR(45) | PRIMARY KEY | 被封禁的IP地址 |
+| ban_time | TIMESTAMP | NOT NULL | IP被封禁的时间 |
+| unban_time | TIMESTAMP | NOT NULL | IP解封时间 |
+| failed_attempts | INT | DEFAULT 0 | 登录失败尝试次数 |
+
 ## 权限层级说明
 
 ### 1. 系统管理员 (users.is_admin)
@@ -141,7 +151,7 @@
 - **特点**：值必须唯一且不能为空
 
 ### 自动递增 (AUTO_INCREMENT)
-- **作用**：自动为每行记录生成唯一的递增值
+- **作用**：自动为每行记录生成唯一的递减值
 - **特点**：通常与主键配合使用，保证标识符唯一性
 
 ### 唯一约束 (UNIQUE)
@@ -163,6 +173,69 @@
 ### 复合主键
 - **作用**：使用多个列的组合作为主键
 - **特点**：确保多个列的组合是唯一的
+
+## 多进程架构说明
+
+### Cluster模式
+系统采用Node.js的Cluster模块实现多进程架构，以充分利用多核CPU性能并提高系统稳定性。
+
+#### 工作原理
+1. 主进程负责管理工作进程
+2. 工作进程实际处理用户请求
+3. 每个工作进程独立运行，拥有自己的内存空间
+4. 工作进程之间通过主进程进行通信
+
+#### 配置参数
+- `workerCount`: 工作进程数量（0表示使用CPU核心数）
+
+#### 注意事项
+1. 每个工作进程都维护独立的数据库连接池
+2. WebSocket连接分布在不同的工作进程中
+3. 日志记录包含了进程ID以便区分不同工作进程的日志
+
+## Redis缓存说明
+
+为了支持跨进程的WebSocket会话管理、用户认证和IP封禁，系统引入了Redis作为分布式缓存。
+
+### Redis配置
+- `redis.host`: Redis服务器主机地址
+- `redis.port`: Redis服务器端口
+- `redis.password`: Redis访问密码（可选）
+
+### Redis数据结构
+
+1. 用户Socket映射哈希表 (`user:{userId}`)：
+   - 存储用户在各个工作进程中的Socket连接信息
+   - Key: `user:{userId}`
+   - Field: `{workerId}`
+   - Value: `{socketId, timestamp}`
+
+2. Socket用户映射 (`socket:{socketId}`)：
+   - 快速查找Socket关联的用户
+   - Key: `socket:{socketId}`
+   - Value: `{userId}`
+
+3. 用户Token信息 (`token:{token}`)：
+   - 存储Token及其关联的用户信息和过期时间
+   - Key: `token:{tokenString}`
+   - Value: `{userId, expiresAt}`
+
+4. 用户Token集合 (`user_tokens:{userId}`)：
+   - 存储用户所有的有效Token
+   - Key: `user_tokens:{userId}`
+   - Type: Set
+
+5. 封禁IP信息 (`banned_ip:{ip}`)：
+   - 存储被封禁的IP地址及其相关信息
+   - Key: `banned_ip:{ip}`
+   - Value: `{banTime, unbanTime, failedAttempts}`
+
+### 使用场景
+1. WebSocket会话管理：跨进程识别用户连接
+2. 实时消息推送：向用户的所有连接广播消息
+3. 用户状态同步：在多个工作进程间同步用户状态
+4. Token管理：跨进程验证用户身份
+5. IP封禁：在所有工作进程中统一IP封禁策略
 
 ## 设计特点总结
 

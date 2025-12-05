@@ -14,6 +14,9 @@ async function init() {
             { type: 'input', name: 'dbUser', message: 'MySQL用户名:', default: 'root' },
             { type: 'password', name: 'dbPassword', message: 'MySQL密码:' },
             { type: 'input', name: 'dbName', message: '数据库名称:', default: 'ventichat' },
+            { type: 'input', name: 'redisHost', message: 'Redis主机地址:', default: 'localhost' },
+            { type: 'input', name: 'redisPort', message: 'Redis端口:', default: '6379' },
+            { type: 'password', name: 'redisPassword', message: 'Redis密码 (留空表示无密码):' },
             { type: 'input', name: 'adminUsername', message: '管理员用户名:' },
             { type: 'password', name: 'adminPassword', message: '管理员密码:' },
             { type: 'input', name: 'baseUrl', message: '基础URL:', default: 'http://localhost' },
@@ -117,15 +120,6 @@ async function init() {
             ) ENGINE=InnoDB;
         `);
 
-        // 创建token表
-        await connection.query(`
-            CREATE TABLE IF NOT EXISTS tokens (
-                token_str VARCHAR(255) PRIMARY KEY,
-                user_id INT NOT NULL,
-                expires_at DATETIME NOT NULL
-            ) ENGINE=InnoDB;
-        `);
-
         // 创建系统设置表
         await connection.query(`
             CREATE TABLE IF NOT EXISTS system_settings (
@@ -137,16 +131,6 @@ async function init() {
                 max_login_attempts INT DEFAULT 5,
                 max_room_members INT DEFAULT 1000,
                 login_lock_time INT DEFAULT 30
-            ) ENGINE=InnoDB;
-        `);
-
-        // 创建IP封禁表
-        await connection.query(`
-            CREATE TABLE IF NOT EXISTS ban_ip (
-                ip VARCHAR(45) PRIMARY KEY,
-                ban_time TIMESTAMP NOT NULL,
-                unban_time TIMESTAMP NOT NULL,
-                failed_attempts INT DEFAULT 0
             ) ENGINE=InnoDB;
         `);
 
@@ -204,6 +188,11 @@ async function init() {
                 password: answers.dbPassword,
                 database: answers.dbName
             },
+            redis: {
+                host: answers.redisHost,
+                port: answers.redisPort,
+                password: answers.redisPassword || null
+            },
             encryptionKey,
             baseUrl: answers.baseUrl,
             port: answers.port,
@@ -221,7 +210,7 @@ async function init() {
         );
 
         log('INFO', '初始化完成！配置文件已保存到 config/config.json');
-        log('INFO', '请运行 `npm start` 启动服务');
+        log('INFO', '请运行 `npm install` 安装Redis依赖，然后运行 `npm start` 启动服务');
         process.exit(0);
     } catch (error) {
         log('ERROR', `初始化失败: ${error.message}`);

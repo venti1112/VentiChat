@@ -40,7 +40,7 @@ module.exports = (sequelize) => {
         },
         loginLockTime: {
             type: DataTypes.INTEGER,
-            defaultValue: 30,
+            defaultValue: 120,
             field: 'login_lock_time'
         }
     }, {

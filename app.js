@@ -9,7 +9,19 @@ const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const cluster = require('cluster');
 const config = require('./config/config.json');
+const redisClient = require('./utils/redisClient');
 const { log, logHttpError, logDatabaseQuery, logDatabaseRetry, logBrowserDevToolsWarning, LOG_LEVELS, logServerShutdown, processIds } = require('./utils/logger');
+
+// 处理来自主进程的转发消息
+if (cluster.isWorker) {
+    process.on('message', (msg) => {
+        if (msg.type === 'emitToSocket') {
+            const io = app.get('io');
+            const WebSocketManager = require('./utils/websocketManager');
+            WebSocketManager.emitToSocket(msg.socketId, msg.event, msg.data, io);
+        }
+    });
+}
 
 // 创建Express应用
 const app = express();
@@ -17,7 +29,7 @@ const app = express();
 // 配置Express信任代理
 app.set('trust proxy', true);
 
-// 初始化Sequelize
+// 初始化Sequelize，配置连接池
 const sequelize = new Sequelize(config.db.database, config.db.user, config.db.password, {
     host: config.db.host,
     port: config.db.port,
@@ -26,6 +38,12 @@ const sequelize = new Sequelize(config.db.database, config.db.user, config.db.pa
     dialectOptions: {
         dateStrings: true,
         typeCast: true
+    },
+    pool: {
+        max: 10,         // 最大连接数
+        min: 0,          // 最小连接数
+        acquire: 30000,  // 获取连接的最长等待时间（毫秒）
+        idle: 10000      // 连接的最大空闲时间（毫秒）
     }
 });
 
@@ -36,9 +54,7 @@ const models = {
     RoomMember: require('./models/roomMember')(sequelize),
     Message: require('./models/message')(sequelize),
     JoinRequest: require('./models/joinRequest')(sequelize),
-    Token: require('./models/token')(sequelize),
     SystemSetting: require('./models/systemSetting')(sequelize),
-    BanIp: require('./models/banIp')(sequelize)
 };
 
 // 调用各模型的associate方法设置关联关系
@@ -94,7 +110,7 @@ const upload = multer({ storage });
 // 将upload实例挂载到app上
 app.set('upload', upload);
 
-// 用户Socket映射
+// 使用Redis存储用户Socket映射，替代原来的本地Map
 const userSocketMap = new Map();
 // 将userSocketMap挂载到app上
 app.set('userSocketMap', userSocketMap);
@@ -332,12 +348,14 @@ if (require.main === module) {
             return;
         }
         
-        // 获取用户ID并建立映射
-        userSocketMap.set(userId, socket.id);
+        // 获取用户ID并建立映射（使用Redis存储，支持跨进程）
+        const WebSocketManager = require('./utils/websocketManager');
+        const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
+        await WebSocketManager.storeUserSocket(userId, socket.id, workerId);
         
         // 断开连接时清除映射
-        socket.on('disconnect', () => {
-            userSocketMap.delete(userId);
+        socket.on('disconnect', async () => {
+            await WebSocketManager.removeUserSocket(userId, socket.id, workerId);
         });
 
         // 加入聊天室
@@ -425,12 +443,14 @@ if (require.main === module) {
             return;
         }
         
-        // 获取用户ID并建立映射
-        userSocketMap.set(userId, socket.id);
+        // 获取用户ID并建立映射（使用Redis存储，支持跨进程）
+        const WebSocketManager = require('./utils/websocketManager');
+        const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
+        await WebSocketManager.storeUserSocket(userId, socket.id, workerId);
         
         // 断开连接时清除映射
-        socket.on('disconnect', () => {
-            userSocketMap.delete(userId);
+        socket.on('disconnect', async () => {
+            await WebSocketManager.removeUserSocket(userId, socket.id, workerId);
         });
 
         // 加入聊天室

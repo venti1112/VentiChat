@@ -2,11 +2,10 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const config = require('../config/config.json');
 const { hashPassword, comparePassword } = require('../utils/auth');
-const { generateToken, verifyToken } = require('../utils/jwt');
+const { verifyToken } = require('../utils/jwt');
 const { log, logUserLogin, logUserLogout } = require('../utils/logger');
-
-// 修复：正确导入User模型和新的BanIp、SystemSetting模型
-const { User, Token, SystemSetting, BanIp } = require('../models/index');
+const redisClient = require('../utils/redisClient');
+const { User, SystemSetting } = require('../models/index');
 
 // 获取客户端IP地址的辅助函数
 function getClientIP(req) {
@@ -36,12 +35,8 @@ exports.login = async (req, res) => {
             return res.status(400).json({ message: '用户名和密码不能为空' });
         }
         
-        // 检查IP是否被封禁
-        const bannedIP = await BanIp.findOne({
-            where: {
-                ip: clientIP
-            }
-        });
+        // 检查IP是否被封禁（使用Redis）
+        const bannedIP = await redisClient.checkBannedIP(clientIP);
         
         // 如果IP被封禁且未到解封时间，并且失败次数达到上限
         if (bannedIP && new Date() < new Date(bannedIP.unbanTime)) {
@@ -61,11 +56,7 @@ exports.login = async (req, res) => {
         
         // 如果IP被封禁但已到解封时间，则从封禁列表中移除
         if (bannedIP && new Date() >= new Date(bannedIP.unbanTime)) {
-            await BanIp.destroy({
-                where: {
-                    ip: clientIP
-                }
-            });
+            await redisClient.removeBannedIP(clientIP);
         }
         
         // 查找用户
@@ -120,13 +111,9 @@ exports.login = async (req, res) => {
           sameSite: 'lax'
         });
         
-        // 存储token到数据库
+        // 存储token到Redis
         const expiresAt = new Date(Date.now() + maxAge);
-        await Token.create({
-            tokenStr: token,
-            userId: user.userId,
-            expiresAt: expiresAt
-        });
+        await redisClient.storeUserToken(token, user.userId, expiresAt);
         
         // 记录登录日志
         logUserLogin(clientIP, username, true);
@@ -157,64 +144,13 @@ async function handleFailedLoginAttempt(clientIP, username) {
         const maxLoginAttempts = systemSettings?.maxLoginAttempts || 5;
         const loginLockTime = (systemSettings?.loginLockTime || 30) * 60 * 1000; // 转换为毫秒
         
-        // 查找该IP的失败登录记录
-        let ipRecord = await BanIp.findOne({
-            where: {
-                ip: clientIP
-            }
-        });
+        // 增加IP失败尝试次数（使用Redis）
+        const result = await redisClient.incrementIPFailures(clientIP, maxLoginAttempts, loginLockTime/60/1000);
         
-        const now = new Date();
-        
-        if (ipRecord) {
-            // 如果记录存在，增加失败次数
-            const currentAttempts = (ipRecord.failedAttempts || 0) + 1;
-            
-            // 如果还在封禁期内，也要增加次数
-            if (now < new Date(ipRecord.unbanTime)) {
-                // 更新失败次数
-                await BanIp.update({
-                    failedAttempts: currentAttempts
-                }, {
-                    where: {
-                        ip: clientIP
-                    }
-                });
-                
-                // 如果达到最大失败次数，记录日志
-                if (currentAttempts >= maxLoginAttempts) {
-                    const banDuration = loginLockTime / (60 * 1000); // 分钟
-                    log('WARN', `IP因多次登录失败被封禁 - IP: ${clientIP}, 用户名: ${username}, 封禁时长: ${banDuration}分钟`);
-                }
-                return;
-            }
-            
-            // 如果封禁期已过，重新计算
-            const newUnbanTime = new Date(now.getTime() + loginLockTime);
-            await BanIp.update({
-                banTime: now,
-                unbanTime: newUnbanTime,
-                failedAttempts: currentAttempts
-            }, {
-                where: {
-                    ip: clientIP
-                }
-            });
-            
-            // 如果达到最大失败次数，记录日志
-            if (currentAttempts >= maxLoginAttempts) {
-                const banDuration = loginLockTime / (60 * 1000); // 分钟
-                log('WARN', `IP因多次登录失败被封禁 - IP: ${clientIP}, 用户名: ${username}, 封禁时长: ${banDuration}分钟`);
-            }
-        } else {
-            // 如果没有记录，创建新记录
-            const unbanTime = new Date(now.getTime() + loginLockTime);
-            await BanIp.create({
-                ip: clientIP,
-                banTime: now,
-                unbanTime: unbanTime,
-                failedAttempts: 1
-            });
+        // 如果达到最大失败次数，记录日志
+        if (result.banned) {
+            const banDuration = loginLockTime / (60 * 1000); // 分钟
+            log('WARN', `IP因多次登录失败被封禁 - IP: ${clientIP}, 用户名: ${username}, 封禁时长: ${banDuration}分钟`);
         }
     } catch (error) {
         log('ERROR', '处理失败登录尝试错误: ' + error);
@@ -224,12 +160,8 @@ async function handleFailedLoginAttempt(clientIP, username) {
 // 清除失败登录尝试记录
 async function clearFailedLoginAttempts(clientIP) {
     try {
-        // 登录成功，删除该IP的封禁记录
-        await BanIp.destroy({
-            where: {
-                ip: clientIP
-            }
-        });
+        // 登录成功，删除该IP的封禁记录（使用Redis）
+        await redisClient.removeBannedIP(clientIP);
     } catch (error) {
         log('ERROR', '清除失败登录尝试记录错误: ' + error);
     }
@@ -318,8 +250,8 @@ exports.logout = async (req, res) => {
         const token = req.headers.authorization?.split(' ')[1] || req.cookies.token;
 
         if (token) {
-            // 从数据库中删除token
-            await Token.destroy({ where: { tokenStr: token } });
+            // 从Redis中删除token
+            await redisClient.removeToken(token);
         }
 
         // 清除cookie
@@ -363,19 +295,17 @@ exports.verifyToken = async (req, res) => {
             return res.status(401).json({ message: '未提供认证令牌' });
         }
 
-        // 验证JWT签名
-        const decoded = jwt.verify(token, config.encryptionKey);
+        // 使用utils/jwt.js中的verifyToken函数验证JWT签名
+        const decoded = verifyToken(token);
         
-        // 检查token是否存在于数据库中
-        const storedToken = await Token.findOne({ where: { tokenStr: token } });
+        if (!decoded) {
+            return res.status(401).json({ message: '令牌无效' });
+        }
+        
+        // 检查token是否存在于Redis中
+        const storedToken = await redisClient.validateToken(token);
         if (!storedToken) {
             return res.status(401).json({ message: '令牌无效或已过期' });
-        }
-
-        // 检查令牌是否过期
-        if (storedToken.expiresAt < new Date()) {
-            await Token.destroy({ where: { tokenStr: token } });
-            return res.status(401).json({ message: '令牌已过期' });
         }
 
         // 获取用户信息
@@ -401,9 +331,6 @@ exports.verifyToken = async (req, res) => {
             }
         });
     } catch (error) {
-        if (error.name === 'JsonWebTokenError') {
-            return res.status(401).json({ message: '令牌无效' });
-        }
         if (error.name === 'TokenExpiredError') {
             return res.status(401).json({ message: '令牌已过期' });
         }

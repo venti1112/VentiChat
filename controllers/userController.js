@@ -1,44 +1,99 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const Room = require('../models/room');
-const RoomMember = require('../models/roomMember');
-const { Sequelize } = require('sequelize');
-const { getAvatarUrl } = require('../utils/fileUpload');
+const { generateToken, removeToken, removeAllUserTokens } = require('../utils/auth');
+const { logUserLogin, logUserLogout, LOG_LEVELS, log } = require('../utils/logger');
+const redisClient = require('../utils/redisClient');
+const config = require('../config/config.json');
 
 // 用户登录
 exports.login = async (req, res) => {
     try {
         const { username, password } = req.body;
+        const clientIP = req.realIP || req.ip;
         
-        const User = req.app.get('models').User;
+        // 获取系统设置
+        const models = req.app.get('models');
+        const systemSettings = await models.SystemSetting.findOne();
+        const maxLoginAttempts = systemSettings ? systemSettings.maxLoginAttempts : 5;
+        const lockTime = systemSettings ? systemSettings.loginLockTime : 30;
+        
+        // 检查IP是否被封禁
+        const banInfo = await redisClient.checkBannedIP(clientIP);
+        if (banInfo) {
+            logUserLogin(clientIP, username, false, 'IP被封禁');
+            return res.status(403).json({ 
+                error: '访问被拒绝：由于多次失败尝试，您的IP已被临时封禁',
+                unbanTime: banInfo.unbanTime
+            });
+        }
+        
+        // 查找用户
+        const User = models.User;
         const user = await User.findOne({ where: { username } });
         if (!user) {
+            // 增加失败尝试次数
+            const failResult = await redisClient.incrementIPFailures(clientIP, maxLoginAttempts, lockTime);
+            
+            logUserLogin(clientIP, username, false, '用户不存在');
             return res.status(401).json({ error: '用户名或密码错误' });
         }
         
+        // 检查用户状态
+        if (user.status === 'banned') {
+            logUserLogin(clientIP, username, false, '用户被封禁');
+            return res.status(403).json({ error: '用户账号已被封禁' });
+        }
+        
+        // 验证密码
         const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
         if (!isPasswordValid) {
+            // 增加失败尝试次数
+            const failResult = await redisClient.incrementIPFailures(clientIP, maxLoginAttempts, lockTime);
+            
+            logUserLogin(clientIP, username, false, '密码错误');
             return res.status(401).json({ error: '用户名或密码错误' });
         }
         
-        // 生成JWT令牌
-        const token = jwt.sign(
-            { id: user.userId, username: user.username },
-            process.env.JWT_SECRET || 'your-secret-key',
-            { expiresIn: '24h' }
-        );
+        // 登录成功，清除失败尝试记录
+        await redisClient.removeBannedIP(clientIP);
+        await redisClient.clearIPFailures(clientIP);
         
-        res.json({
-            token,
+        // 重置登录尝试次数
+        await user.update({ loginAttempts: 0, lastLoginAttempt: new Date() });
+        
+        // 生成Token
+        const payload = { 
+            id: user.userId, 
+            userId: user.userId, 
+            username: user.username 
+        };
+        
+        const token = await generateToken(payload, user.userId);
+        
+        // 设置Cookie
+        res.cookie('token', token, { 
+            httpOnly: true, 
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 24 * 60 * 60 * 1000 // 24小时
+        });
+        
+        logUserLogin(clientIP, username, true);
+        
+        res.json({ 
+            message: '登录成功',
             user: {
-                id: user.userId,
+                userId: user.userId,
                 username: user.username,
                 nickname: user.nickname,
-                avatarUrl: user.avatarUrl
+                avatarUrl: user.avatarUrl,
+                backgroundUrl: user.backgroundUrl,
+                themeColor: user.themeColor,
+                isAdmin: user.isAdmin
             }
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        log(LOG_LEVELS.ERROR, `用户登录错误: ${error.message}`);
+        res.status(500).json({ error: '服务器内部错误' });
     }
 };
 
@@ -124,6 +179,56 @@ exports.getUserPreferences = async (req, res) => {
     }
 };
 
+// 用户退出登录
+exports.logout = async (req, res) => {
+    try {
+        const clientIP = req.realIP || req.ip;
+        const token = req.cookies.token;
+        let username = '未知用户';
+        
+        if (token) {
+            // 解码Token获取用户名
+            try {
+                const decoded = jwt.verify(token, config.jwt.secret);
+                username = decoded.username;
+                
+                // 从Redis中移除Token
+                await removeToken(token);
+            } catch (error) {
+                // Token无效，不影响退出流程
+            }
+        }
+        
+        // 清除Cookie
+        res.clearCookie('token');
+        
+        logUserLogout(clientIP, username, true);
+        
+        res.json({ message: '退出登录成功' });
+    } catch (error) {
+        log(LOG_LEVELS.ERROR, `用户退出登录错误: ${error.message}`);
+        res.status(500).json({ error: '服务器内部错误' });
+    }
+};
+
+// 强制退出登录（管理员功能）
+exports.forceLogout = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const clientIP = req.realIP || req.ip;
+        
+        // 移除用户的所有Tokens
+        await removeAllUserTokens(userId);
+        
+        log(LOG_LEVELS.INFO, `管理员 ${req.user.username} 强制用户 ${userId} 退出登录 - IP: ${clientIP}`);
+        
+        res.json({ message: '用户已强制退出登录' });
+    } catch (error) {
+        log(LOG_LEVELS.ERROR, `强制用户退出登录错误: ${error.message}`);
+        res.status(500).json({ error: '服务器内部错误' });
+    }
+};
+
 // 用户注册
 exports.register = async (req, res) => {
     try {
@@ -188,6 +293,7 @@ exports.updateProfile = async (req, res) => {
             updateData.avatarUrl = getAvatarUrl(req.file.filename);
         }
         
+        const User = req.app.get('models').User;
         await User.update(
             updateData,
             {
