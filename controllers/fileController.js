@@ -202,6 +202,30 @@ exports.completeChunkedUpload = async (req, res) => {
     }
 };
 
+// 清理上传的文件块（当用户取消上传时调用）
+exports.cleanupChunkedUpload = async (req, res) => {
+    try {
+        const { uploadId } = req.body;
+        
+        if (!uploadId) {
+            return res.status(400).json({ error: '缺少uploadId参数' });
+        }
+        
+        // 删除临时目录及其内容
+        const tempDir = path.join('public', 'temp', uploadId);
+        if (fs.existsSync(tempDir)) {
+            fs.rmSync(tempDir, { recursive: true });
+        }
+        
+        res.json({
+            message: '上传文件块清理成功'
+        });
+    } catch (error) {
+        console.error('清理上传文件块错误:', error);
+        res.status(500).json({ error: '清理上传文件块失败' });
+    }
+};
+
 // 文件下载（可选）
 exports.downloadFile = async (req, res) => {
     try {

@@ -140,6 +140,9 @@ router.post('/upload/chunk', authMiddleware, uploadSingle('chunk', 'chunk'), fil
 // 添加缺失的分片完成路由
 router.post('/upload/complete', authMiddleware, fileController.completeChunkedUpload);
 
+// 添加清理上传文件块路由
+router.post('/upload/cleanup', authMiddleware, fileController.cleanupChunkedUpload);
+
 // 分片上传路由
 router.post('/messages/chunked/initiate', authMiddleware, fileController.initiateChunkedUpload);
 router.post('/messages/chunked/upload', authMiddleware, uploadSingle('chunk', 'chunk'), fileController.uploadChunk);

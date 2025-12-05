@@ -1,9 +1,16 @@
 // 文件上传模块
 
+// 用于存储当前的XMLHttpRequest对象，以便可以取消请求
+let currentXHR = null;
+let currentUploadId = null;
+
 // 处理文件选择
 export function handleFileSelect(event) {
     const file = event.target.files[0];
     if (!file) return;
+    
+    // 显示文件名
+    document.getElementById('uploadFileName').textContent = file.name;
     
     // 检查文件大小（大于25MB需要分片上传）
     if (file.size > 25 * 1024 * 1024) {
@@ -28,6 +35,10 @@ export function uploadFile(file) {
         return;
     }
     
+    // 显示进度条模态框
+    const progressModal = new bootstrap.Modal(document.getElementById('uploadProgressModal'));
+    progressModal.show();
+    
     const formData = new FormData();
     formData.append('file', file);
     formData.append('roomId', currentRoomId);
@@ -40,29 +51,89 @@ export function uploadFile(file) {
         uploadEndpoint = '/api/messages/video';
     }
     
-    fetch(uploadEndpoint, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`
-        },
-        body: formData
-    })
-    .then(response => {
-        if (!response.ok) {
-            return response.json().then(data => {
-                throw new Error(data.error || '上传失败');
-            });
+    const xhr = new XMLHttpRequest();
+    currentXHR = xhr; // 保存当前请求的引用
+    
+    // 绑定取消按钮事件
+    const cancelBtn = document.getElementById('cancelUploadBtn');
+    if (cancelBtn) {
+        // 清除之前的事件监听器
+        const newCancelBtn = cancelBtn.cloneNode(true);
+        cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+        
+        newCancelBtn.addEventListener('click', () => {
+            if (currentXHR) {
+                currentXHR.abort();
+                currentXHR = null;
+            }
+        });
+    }
+    
+    // 初始化上传速度计算变量
+    let startTime = Date.now();
+    let lastLoaded = 0;
+    let lastTime = startTime;
+    
+    // 监听上传进度
+    xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100);
+            updateProgress(percentComplete);
+            
+            // 计算上传速度
+            const currentTime = Date.now();
+            const elapsedTime = (currentTime - lastTime) / 1000; // 转换为秒
+            const loadedDiff = e.loaded - lastLoaded;
+            
+            if (elapsedTime > 0) {
+                const speed = loadedDiff / elapsedTime; // bytes per second
+                updateUploadSpeed(speed);
+            }
+            
+            // 更新变量
+            lastLoaded = e.loaded;
+            lastTime = currentTime;
         }
-        return response.json();
-    })
-    .then(data => {
-        // 文件上传成功，创建文件消息
-        sendFileMessage(data.fileUrl, file.name, file.type);
-    })
-    .catch(error => {
-        console.error('文件上传失败:', error);
-        window.showMessage('文件上传失败: ' + error.message, 'danger');
     });
+    
+    // 处理上传完成
+    xhr.addEventListener('load', () => {
+        currentXHR = null; // 清除引用
+        
+        if (xhr.status === 200) {
+            const data = JSON.parse(xhr.responseText);
+            // 文件上传成功，创建文件消息
+            sendFileMessage(data.fileUrl, file.name, file.type);
+            // 隐藏进度条模态框
+            bootstrap.Modal.getInstance(document.getElementById('uploadProgressModal')).hide();
+        } else {
+            try {
+                const errorData = JSON.parse(xhr.responseText);
+                throw new Error(errorData.error || '上传失败');
+            } catch (e) {
+                throw new Error('上传失败');
+            }
+        }
+    });
+    
+    // 处理上传错误
+    xhr.addEventListener('error', () => {
+        currentXHR = null; // 清除引用
+        window.showMessage('文件上传失败: 网络错误', 'danger');
+        bootstrap.Modal.getInstance(document.getElementById('uploadProgressModal')).hide();
+    });
+    
+    // 处理用户取消上传
+    xhr.addEventListener('abort', () => {
+        currentXHR = null; // 清除引用
+        window.showMessage('文件上传已取消', 'info');
+        bootstrap.Modal.getInstance(document.getElementById('uploadProgressModal')).hide();
+    });
+    
+    // 发送请求
+    xhr.open('POST', uploadEndpoint, true);
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.send(formData);
 }
 
 // 上传大文件（分片上传）
@@ -78,6 +149,56 @@ export async function uploadLargeFile(file) {
     if (!currentRoomId) {
         window.showMessage('请先选择一个聊天室', 'warning');
         return;
+    }
+    
+    // 显示进度条模态框
+    const progressModal = new bootstrap.Modal(document.getElementById('uploadProgressModal'));
+    progressModal.show();
+    
+    // 初始化上传速度计算变量
+    let startTime = Date.now();
+    let lastLoaded = 0;
+    let lastTime = startTime;
+    let totalLoaded = 0;
+    const fileSize = file.size;
+    
+    // 用于存储当前分片的请求，以便可以取消
+    let currentChunkXHR = null;
+    let uploadId = null;
+    
+    // 绑定取消按钮事件
+    const cancelBtn = document.getElementById('cancelUploadBtn');
+    if (cancelBtn) {
+        // 清除之前的事件监听器
+        const newCancelBtn = cancelBtn.cloneNode(true);
+        cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+        
+        newCancelBtn.addEventListener('click', async () => {
+            // 取消当前请求
+            if (currentChunkXHR) {
+                currentChunkXHR.abort();
+                currentChunkXHR = null;
+            }
+            
+            // 如果已有uploadId，通知后端清理
+            if (uploadId) {
+                try {
+                    await fetch('/api/upload/cleanup', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ uploadId })
+                    });
+                } catch (e) {
+                    console.error('清理上传文件失败:', e);
+                }
+            }
+            
+            window.showMessage('文件上传已取消', 'info');
+            bootstrap.Modal.getInstance(document.getElementById('uploadProgressModal')).hide();
+        });
     }
     
     try {
@@ -101,7 +222,8 @@ export async function uploadLargeFile(file) {
         }
         
         const initData = await initResponse.json();
-        const { uploadId } = initData;
+        uploadId = initData.uploadId; // 保存uploadId用于可能的清理操作
+        currentUploadId = uploadId;
         
         // 2. 分片上传文件
         const chunkSize = 25 * 1024 * 1024; // 25MB per chunk
@@ -119,22 +241,65 @@ export async function uploadLargeFile(file) {
             chunkFormData.append('totalChunks', totalChunks);
             chunkFormData.append('roomId', currentRoomId);
             
-            const chunkResponse = await fetch('/api/upload/chunk', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                body: chunkFormData
+            // 创建新的XHR以便监听每个分片的进度
+            const xhr = new XMLHttpRequest();
+            currentChunkXHR = xhr; // 保存当前请求的引用
+            
+            // 创建Promise来等待这个分片上传完成
+            const chunkPromise = new Promise((resolve, reject) => {
+                // 监听上传进度
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        // 计算整体进度
+                        const chunkProgress = (e.loaded / e.total);
+                        const overallProgress = Math.round(((i + chunkProgress) / totalChunks) * 100);
+                        updateProgress(overallProgress);
+                        
+                        // 计算上传速度
+                        const currentTime = Date.now();
+                        const elapsedTime = (currentTime - lastTime) / 1000; // 转换为秒
+                        const loadedDiff = e.loaded - lastLoaded;
+                        
+                        if (elapsedTime > 0) {
+                            const speed = loadedDiff / elapsedTime; // bytes per second
+                            updateUploadSpeed(speed);
+                        }
+                        
+                        // 更新变量
+                        lastLoaded = e.loaded;
+                        lastTime = currentTime;
+                        totalLoaded = i * chunkSize + e.loaded;
+                    }
+                });
+                
+                xhr.addEventListener('load', () => {
+                    if (xhr.status === 200) {
+                        resolve();
+                    } else {
+                        try {
+                            const errorData = JSON.parse(xhr.responseText);
+                            reject(new Error(errorData.error || `上传分片 ${i + 1} 失败`));
+                        } catch (e) {
+                            reject(new Error(`上传分片 ${i + 1} 失败`));
+                        }
+                    }
+                });
+                
+                xhr.addEventListener('error', () => {
+                    reject(new Error(`上传分片 ${i + 1} 网络错误`));
+                });
+                
+                xhr.addEventListener('abort', () => {
+                    reject(new Error('上传已被用户取消'));
+                });
+                
+                xhr.open('POST', '/api/upload/chunk', true);
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                xhr.send(chunkFormData);
             });
             
-            if (!chunkResponse.ok) {
-                const errorData = await chunkResponse.json();
-                throw new Error(errorData.error || `上传分片 ${i + 1} 失败`);
-            }
-            
-            // 更新进度显示
-            const progress = Math.round(((i + 1) / totalChunks) * 100);
-            window.showMessage(`上传进度: ${progress}% (${i + 1}/${totalChunks})`, 'info');
+            // 等待分片上传完成
+            await chunkPromise;
         }
         
         // 3. 完成分片上传
@@ -160,11 +325,73 @@ export async function uploadLargeFile(file) {
         
         const completeData = await completeResponse.json();
         
+        // 隐藏进度条模态框
+        bootstrap.Modal.getInstance(document.getElementById('uploadProgressModal')).hide();
+        
         // 文件上传成功，创建文件消息
         sendFileMessage(completeData.fileUrl, file.name, file.type);
     } catch (error) {
-        console.error('分片上传失败:', error);
-        window.showMessage('文件上传失败: ' + error.message, 'danger');
+        // 如果是用户取消操作，则显示相应的消息
+        if (error.message === '上传已被用户取消') {
+            window.showMessage('文件上传已取消', 'info');
+        } else {
+            console.error('分片上传失败:', error);
+            window.showMessage('文件上传失败: ' + error.message, 'danger');
+        }
+        
+        // 如果有uploadId且不是用户主动取消，通知后端清理
+        if (uploadId && error.message !== '上传已被用户取消') {
+            try {
+                await fetch('/api/upload/cleanup', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ uploadId })
+                });
+            } catch (e) {
+                console.error('清理上传文件失败:', e);
+            }
+        }
+        
+        // 隐藏进度条模态框
+        bootstrap.Modal.getInstance(document.getElementById('uploadProgressModal')).hide();
+    } finally {
+        currentChunkXHR = null; // 清除引用
+        currentUploadId = null;
+    }
+}
+
+// 更新进度条显示
+function updateProgress(percent) {
+    const progressBar = document.getElementById('uploadProgressBar');
+    const progressText = document.getElementById('uploadProgressText');
+    
+    if (progressBar && progressText) {
+        progressBar.style.width = percent + '%';
+        progressBar.setAttribute('aria-valuenow', percent);
+        progressText.textContent = percent + '%';
+    }
+}
+
+// 更新上传速度显示
+function updateUploadSpeed(bytesPerSecond) {
+    const uploadSpeedText = document.getElementById('uploadSpeedText');
+    if (!uploadSpeedText) return;
+    
+    // 转换为更友好的单位
+    if (bytesPerSecond >= 1024 * 1024) {
+        // MB/s
+        const speedInMBs = (bytesPerSecond / (1024 * 1024)).toFixed(2);
+        uploadSpeedText.textContent = speedInMBs + ' MB/s';
+    } else if (bytesPerSecond >= 1024) {
+        // KB/s
+        const speedInKBs = (bytesPerSecond / 1024).toFixed(2);
+        uploadSpeedText.textContent = speedInKBs + ' KB/s';
+    } else {
+        // B/s
+        uploadSpeedText.textContent = bytesPerSecond.toFixed(2) + ' B/s';
     }
 }
 
