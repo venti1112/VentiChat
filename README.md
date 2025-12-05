@@ -300,14 +300,14 @@
 
 ### 添加新功能
 
-1. 在 [models/](file:///c%3A/Users/Venti/Documents/Project/VentiChat/models) 目录下创建对应的数据模型
-2. 在 [controllers/](file:///c%3A/Users/Venti/Documents/Project/VentiChat/controllers) 目录下实现业务逻辑
-3. 在 [routes/](file:///c%3A/Users/Venti/Documents/Project/VentiChat/routes) 目录下添加 API 路由
-4. 如果需要，在 [middleware/](file:///c%3A/Users/Venti/Documents/Project/VentiChat/middleware) 目录下添加中间件
+1. 在 [models/](models) 目录下创建对应的数据模型
+2. 在 [controllers/](controllers) 目录下实现业务逻辑
+3. 在 [routes/](routes) 目录下添加 API 路由
+4. 如果需要，在 [middleware/](middleware) 目录下添加中间件
 
 ### 自定义配置
 
-配置文件位于 [config/config.json](file:///c%3A/Users/Venti/Documents/Project/VentiChat/config/config.json)，可以修改以下参数：
+配置文件位于 [config/config.json](config)，可以修改以下参数：
 - 数据库连接信息
 - 服务器端口
 - 加密密钥
