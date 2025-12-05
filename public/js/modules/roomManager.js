@@ -327,7 +327,7 @@ export function bindRoomButtons() {
                 return;
             }
             
-            fetch(`/api/rooms/${currentRoomId}`, {
+            fetch(`/api/rooms/${currentRoomId}/settings`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -502,22 +502,27 @@ export function joinRoom(roomId) {
         return;
     }
     
-    fetch(`/api/rooms/${roomId}/join`, {
+    // 发送加入请求
+    fetch(`/api/rooms/${roomId}/join-request`, {
         method: 'POST',
         headers: {
-            'Authorization': `Bearer ${token}`
-        }
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
     })
     .then(response => {
-        if (!response.ok) {
-            return response.json().then(data => {
+        return response.json().then(data => {
+            if (!response.ok) {
                 throw new Error(data.error || '加入聊天室失败');
-            });
-        }
-        return response.json();
+            }
+            return data;
+        });
     })
     .then(result => {
-        window.showMessage('成功加入聊天室', 'success');
+        if (result.success) {
+            window.showMessage(result.message || '加入请求已发送，等待房主审批', 'success');
+        }
         // 重新加载聊天室列表
         if (typeof window.loadRooms === 'function') {
             window.loadRooms();
@@ -531,5 +536,25 @@ export function joinRoom(roomId) {
     .catch(error => {
         console.error('加入聊天室失败:', error);
         window.showMessage(error.message || '加入聊天室失败', 'danger');
+    });
+}
+
+// 直接加入房间（无需审批）
+function directJoinRoom(roomId, token) {
+    return fetch(`/api/rooms/${roomId}/join-request`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || '加入聊天室失败');
+            });
+        }
+        return response.json();
     });
 }

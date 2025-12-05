@@ -70,14 +70,14 @@ exports.createPrivateRoom = async (req, res) => {
                 [Op.and]: [
                     {
                         [Op.or]: [
-                            { creatorId: currentUser.id },
+                            { creatorId: currentUser.userId },
                             { creatorId: targetUserId }
                         ]
                     },
                     {
                         [Op.or]: [
                             { creatorId: targetUserId },
-                            { creatorId: currentUser.id }
+                            { creatorId: currentUser.userId }
                         ]
                     }
                 ]
@@ -94,19 +94,19 @@ exports.createPrivateRoom = async (req, res) => {
         // 创建私聊房间
         const privateRoom = await models.Room.create({
             name: `${currentUser.username} 与 ${targetUser.username} 的私聊`,
-            creatorId: currentUser.id,
+            creatorId: currentUser.userId,
             isPrivate: true,
             requireApproval: false,
             allowImages: true,
             allowVideos: true,
             allowFiles: true,
-            members: [currentUser.id, targetUserId]
+            members: [currentUser.userId, targetUserId]
         });
         
         // 将双方都加入房间
         await models.RoomMember.bulkCreate([
             {
-                userId: currentUser.id,
+                userId: currentUser.userId,
                 roomId: privateRoom.roomId,
                 isModerator: true
             },
@@ -641,7 +641,6 @@ exports.approveJoinRequest = async (req, res) => {
             });
             
             // 更新房间的成员列表
-            const room = await models.Room.findByPk(id);
             const currentMembers = room.members || [];
             if (!currentMembers.includes(userId)) {
                 currentMembers.push(userId);
