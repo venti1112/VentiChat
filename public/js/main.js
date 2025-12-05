@@ -48,6 +48,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // 检查登录状态
     checkLoginStatus();
     
+    // 如果已经登录，初始化WebSocket连接
+    const token = localStorage.getItem('token');
+    const chatSection = document.getElementById('chatSection');
+    if (token && chatSection && chatSection.style.display !== 'none') {
+        // 初始化WebSocket连接
+        initializeWebSocket(token);
+    }
+    
     // 绑定个人资料表单
     bindProfileForm();
     
@@ -55,7 +63,6 @@ document.addEventListener('DOMContentLoaded', function() {
     bindSendMessageEvents();
     
     // 页面加载完成后加载聊天室列表
-    const chatSection = document.getElementById('chatSection');
     if (chatSection && chatSection.style.display !== 'none') {
         // 如果聊天界面已显示，则加载聊天室列表
         loadRooms();

@@ -141,10 +141,12 @@ export function initializeWebSocket(token) {
     
     // 监听连接错误事件
     socket.on('connect_error', (error) => {
+        console.error('WebSocket连接错误:', error);
     });
     
     // 监听断开连接事件
     socket.on('disconnect', () => {
+        console.log('WebSocket连接断开');
     });
     
     return socket;
