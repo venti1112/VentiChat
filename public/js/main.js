@@ -37,6 +37,12 @@ window.sendMessage = sendMessage;
 
 // 页面加载完成后初始化应用
 document.addEventListener('DOMContentLoaded', function() {
+    // 隐藏加载动画
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    if (loadingSpinner) {
+        loadingSpinner.style.display = 'none';
+    }
+
     // 检查登录状态
     checkLoginStatus();
     
