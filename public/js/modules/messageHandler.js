@@ -214,6 +214,19 @@ export async function renderMessage(message) {
             content = message.content || '';
     }
     
+    // 检查是否为待发送消息（临时消息）
+    if (message.id && message.id.startsWith('temp_')) {
+        content = `
+            <div style="opacity: 0.7;">
+                ${content}
+                <div class="small text-muted mt-1">
+                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                    发送中...
+                </div>
+            </div>
+        `;
+    }
+    
     return `
         <div class="message ${isCurrentUser ? 'message-right' : 'message-left'}">
             <div class="message-bubble-container">

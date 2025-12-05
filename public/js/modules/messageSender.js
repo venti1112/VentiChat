@@ -1,5 +1,8 @@
 // 消息发送模块
 
+// 存储正在发送的消息的临时ID
+const pendingMessages = new Set();
+
 // 发送消息函数
 export function sendMessage() {
     const messageInput = document.getElementById('messageInput');
@@ -31,18 +34,43 @@ export function sendMessage() {
     // 获取当前用户信息
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
     
+    // 生成临时消息ID
+    const tempId = 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    
+    // 禁用发送按钮并显示发送中提示
+    const sendBtn = document.getElementById('sendBtn');
+    let originalSendBtnContent = '';
+    if (sendBtn) {
+        originalSendBtnContent = sendBtn.innerHTML;
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 发送中...';
+    }
+    
+    // 将临时ID添加到待处理列表
+    pendingMessages.add(tempId);
+    
     // 创建临时消息对象用于立即显示
     const tempMessage = {
-        id: Date.now(), // 临时ID
+        id: tempId,
         content: content,
         type: 'text',
         sentAt: new Date().toISOString(),
         Sender: {
+            id: currentUser.id,
             nickname: currentUser.nickname || currentUser.username,
             username: currentUser.username,
-            avatarUrl: currentUser.avatar || '/default-avatar.png'
+            avatarUrl: currentUser.avatarUrl || '/default-avatar.png'
         }
     };
+    
+    // 立即显示临时消息
+    window.displayMessages([tempMessage]).then(() => {
+        // 滚动到底部
+        const chatMessages = document.getElementById('chatMessages');
+        if (chatMessages) {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    });
     
     // 发送消息到服务器
     fetch('/api/messages', {
@@ -72,13 +100,26 @@ export function sendMessage() {
         // 用服务器返回的真实消息替换临时消息
         const chatMessages = document.getElementById('chatMessages');
         if (chatMessages) {
-            const tempMessageElement = chatMessages.querySelector(`.message-item[data-message-id="${tempMessage.id}"]`);
+            const tempMessageElement = chatMessages.querySelector(`.message-item[data-message-id="${tempId}"]`);
             if (tempMessageElement) {
                 window.renderMessage(data).then(renderedMessage => {
-                    tempMessageElement.outerHTML = renderedMessage;
+                    tempMessageElement.outerHTML = `
+                        <div class="message-item mb-3" data-message-id="${data.id}">
+                            ${renderedMessage}
+                        </div>
+                    `;
                 });
             }
         }
+        
+        // 恢复发送按钮
+        if (sendBtn) {
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = originalSendBtnContent || '<i class="bi bi-send"></i>';
+        }
+        
+        // 从待处理列表中移除
+        pendingMessages.delete(tempId);
     })
     .catch(error => {
         window.showMessage(error.message || '发送消息失败', 'danger');
@@ -86,12 +127,26 @@ export function sendMessage() {
         // 移除临时消息
         const chatMessages = document.getElementById('chatMessages');
         if (chatMessages) {
-            const tempMessageElement = chatMessages.querySelector(`.message-item[data-message-id="${tempMessage.id}"]`);
+            const tempMessageElement = chatMessages.querySelector(`.message-item[data-message-id="${tempId}"]`);
             if (tempMessageElement) {
                 tempMessageElement.remove();
             }
         }
+        
+        // 恢复发送按钮
+        if (sendBtn) {
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = originalSendBtnContent || '<i class="bi bi-send"></i>';
+        }
+        
+        // 从待处理列表中移除
+        pendingMessages.delete(tempId);
     });
+}
+
+// 检查消息是否正在发送中
+export function isMessagePending(tempId) {
+    return pendingMessages.has(tempId);
 }
 
 // 绑定发送消息相关事件
