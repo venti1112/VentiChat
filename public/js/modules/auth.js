@@ -449,6 +449,9 @@ export function applyUserPreferences(preferences) {
     
     // 应用自定义主题色
     if (preferences.themeColor) {
+        // 为body元素设置data-theme-color属性
+        document.body.setAttribute('data-theme-color', preferences.themeColor);
+        
         // 应用主题色到各种按钮元素
         const buttons = document.querySelectorAll('.btn');
         buttons.forEach(button => {
@@ -460,6 +463,9 @@ export function applyUserPreferences(preferences) {
         themeColorElements.forEach(element => {
             element.style.borderColor = preferences.themeColor;
         });
+    } else {
+        // 如果没有自定义主题色，移除data-theme-color属性
+        document.body.removeAttribute('data-theme-color');
     }
     
     // 将个性化设置保存到localStorage中
