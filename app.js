@@ -385,7 +385,13 @@ if (require.main === module) {
         cors: {
             origin: "*",
             methods: ["GET", "POST"]
-        }
+        },
+        // 添加连接配置以提高稳定性
+        pingTimeout: 60000, // 增加ping超时时间到60秒
+        pingInterval: 25000, // 设置ping间隔为25秒
+        upgradeTimeout: 30000, // 升级超时时间30秒
+        allowEIO3: true, // 允许Engine.IO v3客户端连接
+        transports: ["websocket", "polling"] // 允许websocket和轮询传输
     });
     
     // 将io实例挂载到app上，以便在路由中使用
@@ -448,8 +454,12 @@ if (require.main === module) {
         const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
         await WebSocketManager.storeUserSocket(userId, socket.id, workerId);
         
+        // 发送连接成功的事件给客户端
+        socket.emit('connected', { message: '连接成功', userId: userId });
+        
         // 断开连接时清除映射
-        socket.on('disconnect', async () => {
+        socket.on('disconnect', async (reason) => {
+            log(LOG_LEVELS.INFO, `用户 ${username}(${userId}) 断开连接，原因: ${reason}`);
             await WebSocketManager.removeUserSocket(userId, socket.id, workerId);
         });
 
@@ -459,6 +469,7 @@ if (require.main === module) {
             const roomId = typeof data === 'object' ? data.rid || data.roomId : data;
             if (roomId) {
                 socket.join(`room_${roomId}`);
+                socket.emit('joinedRoom', { roomId: roomId }); // 确认加入房间
             }
         });
         
@@ -468,7 +479,13 @@ if (require.main === module) {
             const roomId = typeof data === 'object' ? data.rid || data.roomId : data;
             if (roomId) {
                 socket.leave(`room_${roomId}`);
+                socket.emit('leftRoom', { roomId: roomId }); // 确认离开房间
             }
+        });
+        
+        // 处理错误
+        socket.on('error', (error) => {
+            log(LOG_LEVELS.ERROR, `Socket错误 [用户: ${username}(${userId})]: ${error.message}`);
         });
     });
 }

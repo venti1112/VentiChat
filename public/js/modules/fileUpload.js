@@ -38,8 +38,12 @@ export function uploadFile(file) {
         return;
     }
     
-    // 显示进度条模态框
-    const progressModal = new bootstrap.Modal(document.getElementById('uploadProgressModal'));
+    // 显示进度条模态框，设置 backdrop 为 static 防止点击外部关闭
+    const progressModalElement = document.getElementById('uploadProgressModal');
+    const progressModal = new bootstrap.Modal(progressModalElement, {
+        backdrop: 'static',
+        keyboard: false
+    });
     progressModal.show();
     
     const formData = new FormData();
@@ -157,8 +161,12 @@ export async function uploadLargeFile(file) {
         return;
     }
     
-    // 显示进度条模态框
-    const progressModal = new bootstrap.Modal(document.getElementById('uploadProgressModal'));
+    // 显示进度条模态框，设置 backdrop 为 static 防止点击外部关闭
+    const progressModalElement = document.getElementById('uploadProgressModal');
+    const progressModal = new bootstrap.Modal(progressModalElement, {
+        backdrop: 'static',
+        keyboard: false
+    });
     progressModal.show();
     
     // 初始化上传速度计算变量
@@ -300,20 +308,21 @@ export async function uploadLargeFile(file) {
                 });
                 
                 xhr.addEventListener('abort', () => {
-                    reject(new Error('上传已被用户取消'));
+                    reject(new Error(`上传分片 ${i + 1} 已取消`));
                 });
                 
+                // 发送请求
                 xhr.open('POST', '/api/upload/chunk', true);
                 xhr.setRequestHeader('Authorization', `Bearer ${token}`);
                 xhr.send(chunkFormData);
             });
             
-            // 等待分片上传完成
+            // 等待这个分片上传完成
             await chunkPromise;
         }
         
-        // 3. 完成分片上传
-        const completeResponse = await fetch('/api/upload/complete', {
+        // 3. 完成上传
+        const finalizeResponse = await fetch('/api/upload/finalize', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -322,35 +331,34 @@ export async function uploadLargeFile(file) {
             body: JSON.stringify({
                 uploadId: uploadId,
                 fileName: file.name,
-                fileType: file.type,
-                roomId: currentRoomId,
-                totalChunks: totalChunks
+                fileSize: file.size,
+                roomId: currentRoomId
             })
         });
         
-        if (!completeResponse.ok) {
-            const errorData = await completeResponse.json();
+        if (!finalizeResponse.ok) {
+            const errorData = await finalizeResponse.json();
             throw new Error(errorData.error || '完成上传失败');
         }
         
-        const completeData = await completeResponse.json();
+        const finalizeData = await finalizeResponse.json();
+        
+        // 文件上传成功，创建文件消息
+        sendFileMessage(finalizeData.fileUrl, file.name, file.type);
         
         // 隐藏进度条模态框
         bootstrap.Modal.getInstance(document.getElementById('uploadProgressModal')).hide();
         
-        // 文件上传成功，创建文件消息
-        sendFileMessage(completeData.fileUrl, file.name, file.type);
+        window.showMessage('文件上传成功', 'success');
     } catch (error) {
-        // 如果是用户取消操作，则显示相应的消息
-        if (error.message === '上传已被用户取消') {
-            window.showMessage('文件上传已取消', 'info');
-        } else {
-            console.error('分片上传失败:', error);
-            window.showMessage('文件上传失败: ' + error.message, 'danger');
-        }
+        console.error('文件上传失败:', error);
+        window.showMessage('文件上传失败: ' + error.message, 'danger');
         
-        // 如果有uploadId且不是用户主动取消，通知后端清理
-        if (uploadId && error.message !== '上传已被用户取消') {
+        // 隐藏进度条模态框
+        bootstrap.Modal.getInstance(document.getElementById('uploadProgressModal')).hide();
+        
+        // 如果已有uploadId，通知后端清理
+        if (uploadId) {
             try {
                 await fetch('/api/upload/cleanup', {
                     method: 'POST',
@@ -364,12 +372,6 @@ export async function uploadLargeFile(file) {
                 console.error('清理上传文件失败:', e);
             }
         }
-        
-        // 隐藏进度条模态框
-        bootstrap.Modal.getInstance(document.getElementById('uploadProgressModal')).hide();
-    } finally {
-        currentChunkXHR = null; // 清除引用
-        currentUploadId = null;
     }
 }
 
@@ -378,18 +380,21 @@ function updateProgress(percent) {
     const progressBar = document.getElementById('uploadProgressBar');
     const progressText = document.getElementById('uploadProgressText');
     
-    if (progressBar && progressText) {
+    if (progressBar) {
         progressBar.style.width = percent + '%';
         progressBar.setAttribute('aria-valuenow', percent);
+    }
+    
+    if (progressText) {
         progressText.textContent = percent + '%';
     }
 }
 
 // 更新已上传大小显示
-function updateUploadedSize(bytes) {
+function updateUploadedSize(loadedBytes) {
     const uploadedSizeText = document.getElementById('uploadedSizeText');
     if (uploadedSizeText) {
-        uploadedSizeText.textContent = formatFileSize(bytes);
+        uploadedSizeText.textContent = formatFileSize(loadedBytes) + ' / ';
     }
 }
 
@@ -480,4 +485,18 @@ export function sendFileMessage(fileUrl, fileName, fileType) {
         console.error('发送文件消息失败:', error);
         window.showMessage('发送文件消息失败: ' + error.message, 'danger');
     });
+}
+
+// 绑定文件上传事件
+export function bindFileUploadEvents() {
+    // 文件上传按钮事件
+    const attachFileBtn = document.getElementById('attachFileBtn');
+    if (attachFileBtn) {
+        attachFileBtn.addEventListener('click', function() {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.onchange = handleFileSelect;
+            fileInput.click();
+        });
+    }
 }

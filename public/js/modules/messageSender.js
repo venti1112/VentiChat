@@ -44,9 +44,6 @@ export function sendMessage() {
         }
     };
     
-    // 立即显示消息
-    window.displayMessages([tempMessage]);
-    
     // 发送消息到服务器
     fetch('/api/messages', {
         method: 'POST',
