@@ -318,7 +318,7 @@ body {
     height: 40px;
     border-radius: 50%;
     object-fit: cover;
-    align-self: flex-end;
+    align-self: flex-start; /* 修改此处，使头像始终在顶部 */
     margin: 0 10px;
 }
 

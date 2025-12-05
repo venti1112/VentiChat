@@ -102,8 +102,9 @@ exports.sendMessage = async (req, res) => {
         });
         
         // 组装包含发送者信息的消息对象
+        const messageData = message.toJSON();
         const messageWithSender = {
-            ...message.toJSON(),
+            ...messageData,
             Sender: sender
         };
         
@@ -120,9 +121,10 @@ exports.sendMessage = async (req, res) => {
             }
         }
         
+        // 返回消息对象，确保包含id字段
         res.json(messageWithSender);
     } catch (error) {
-        console.error('撤回消息错误:', error);
+        console.error('发送消息错误:', error);
         res.status(500).json({ error: error.message });
     }
 };
@@ -365,4 +367,12 @@ exports.getRoomMessages = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+
+
+
+
+
+
+
 

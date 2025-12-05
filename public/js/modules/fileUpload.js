@@ -3,14 +3,17 @@
 // 用于存储当前的XMLHttpRequest对象，以便可以取消请求
 let currentXHR = null;
 let currentUploadId = null;
+let currentFileSize = 0; // 用于存储当前文件大小
 
 // 处理文件选择
 export function handleFileSelect(event) {
     const file = event.target.files[0];
     if (!file) return;
     
-    // 显示文件名
+    // 显示文件名和文件大小
     document.getElementById('uploadFileName').textContent = file.name;
+    currentFileSize = file.size;
+    document.getElementById('fileSizeText').textContent = formatFileSize(file.size);
     
     // 检查文件大小（大于25MB需要分片上传）
     if (file.size > 25 * 1024 * 1024) {
@@ -79,6 +82,9 @@ export function uploadFile(file) {
         if (e.lengthComputable) {
             const percentComplete = Math.round((e.loaded / e.total) * 100);
             updateProgress(percentComplete);
+            
+            // 更新已上传大小显示
+            updateUploadedSize(e.loaded);
             
             // 计算上传速度
             const currentTime = Date.now();
@@ -255,6 +261,10 @@ export async function uploadLargeFile(file) {
                         const overallProgress = Math.round(((i + chunkProgress) / totalChunks) * 100);
                         updateProgress(overallProgress);
                         
+                        // 更新已上传大小显示
+                        const uploadedBytes = i * chunkSize + e.loaded;
+                        updateUploadedSize(uploadedBytes);
+                        
                         // 计算上传速度
                         const currentTime = Date.now();
                         const elapsedTime = (currentTime - lastTime) / 1000; // 转换为秒
@@ -375,6 +385,14 @@ function updateProgress(percent) {
     }
 }
 
+// 更新已上传大小显示
+function updateUploadedSize(bytes) {
+    const uploadedSizeText = document.getElementById('uploadedSizeText');
+    if (uploadedSizeText) {
+        uploadedSizeText.textContent = formatFileSize(bytes);
+    }
+}
+
 // 更新上传速度显示
 function updateUploadSpeed(bytesPerSecond) {
     const uploadSpeedText = document.getElementById('uploadSpeedText');
@@ -392,6 +410,19 @@ function updateUploadSpeed(bytesPerSecond) {
     } else {
         // B/s
         uploadSpeedText.textContent = bytesPerSecond.toFixed(2) + ' B/s';
+    }
+}
+
+// 格式化文件大小显示
+function formatFileSize(bytes) {
+    if (bytes >= 1024 * 1024 * 1024) {
+        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    } else if (bytes >= 1024 * 1024) {
+        return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+    } else if (bytes >= 1024) {
+        return (bytes / 1024).toFixed(2) + ' KB';
+    } else {
+        return bytes + ' B';
     }
 }
 

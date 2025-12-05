@@ -83,30 +83,51 @@ export async function renderMessage(message) {
     // 获取发送者信息
     let senderInfo;
     try {
-        // 正确解析用户ID，考虑不同来源的数据结构
-        let userId;
-        if (message.Sender && typeof message.Sender === 'object') {
-            // 从Sender对象中获取userId
-            userId = message.Sender.userId || message.Sender.id;
-        } else if (message.userId) {
-            // 直接从message.userId获取
-            userId = message.userId;
+        // 优先使用消息中已有的用户信息
+        if (message.User && typeof message.User === 'object') {
+            senderInfo = {
+                id: message.User.userId,
+                username: message.User.username,
+                nickname: message.User.nickname || message.User.username,
+                avatarUrl: message.User.avatarUrl || '/default-avatar.png'
+            };
+        } else if (message.Sender && typeof message.Sender === 'object') {
+            // 兼容旧的Sender字段
+            senderInfo = {
+                id: message.Sender.userId || message.Sender.id,
+                username: message.Sender.username,
+                nickname: message.Sender.nickname || message.Sender.username,
+                avatarUrl: message.Sender.avatarUrl || '/default-avatar.png'
+            };
+        } else {
+            // 如果没有现成的用户信息，则获取用户信息
+            // 正确解析用户ID，考虑不同来源的数据结构
+            let userId;
+            if (message.User && typeof message.User === 'object') {
+                userId = message.User.userId;
+            } else if (message.Sender && typeof message.Sender === 'object') {
+                // 从Sender对象中获取userId
+                userId = message.Sender.userId || message.Sender.id;
+            } else if (message.userId) {
+                // 直接从message.userId获取
+                userId = message.userId;
+            }
+            
+            // 验证userId是否有效
+            if (!userId || userId === 'undefined' || String(userId).trim() === '' || String(userId).trim() === 'undefined') {
+                throw new Error('无法获取有效的发送者ID');
+            }
+            
+            senderInfo = await getUserInfoById(userId);
         }
-        
-        // 验证userId是否有效
-        if (!userId || userId === 'undefined' || String(userId).trim() === '' || String(userId).trim() === 'undefined') {
-            throw new Error('无法获取有效的发送者ID');
-        }
-        
-        senderInfo = await getUserInfoById(userId);
     } catch (error) {
         console.error('获取发送者信息失败:', error);
         // 使用消息对象中的信息作为备选
         senderInfo = {
-            id: message.Sender?.userId || message.Sender?.id || message.userId || 'unknown',
-            username: message.Sender?.username || `用户${message.Sender?.userId || message.userId || '未知'}`,
-            nickname: message.Sender?.nickname || message.Sender?.username || `用户${message.Sender?.userId || message.userId || '未知'}`,
-            avatarUrl: message.Sender?.avatarUrl || '/default-avatar.png'
+            id: message.User?.userId || message.Sender?.userId || message.Sender?.id || message.userId || 'unknown',
+            username: message.User?.username || message.Sender?.username || `用户${message.User?.userId || message.Sender?.userId || message.userId || '未知'}`,
+            nickname: message.User?.nickname || message.Sender?.nickname || message.Sender?.username || `用户${message.User?.userId || message.Sender?.userId || message.userId || '未知'}`,
+            avatarUrl: message.User?.avatarUrl || message.Sender?.avatarUrl || '/default-avatar.png'
         };
     }
     
@@ -234,7 +255,7 @@ export async function displayMessages(messages) {
         // 添加新消息
         const messageElement = document.createElement('div');
         messageElement.className = 'message-item mb-3';
-        messageElement.setAttribute('data-message-id', message.id);
+        messageElement.setAttribute('data-message-id', message.messageId || message.id);
         messageElement.innerHTML = await renderMessage(message);
         chatMessages.appendChild(messageElement);
     } else {
@@ -248,7 +269,7 @@ export async function displayMessages(messages) {
         const renderedMessages = await Promise.all(messages.map(async (message) => {
             const rendered = await renderMessage(message);
             return `
-                <div class="message-item mb-3" data-message-id="${message.id}">
+                <div class="message-item mb-3" data-message-id="${message.messageId || message.id}">
                     ${rendered}
                 </div>
             `;
