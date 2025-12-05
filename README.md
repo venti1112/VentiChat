@@ -307,7 +307,7 @@
 
 ### 自定义配置
 
-配置文件位于 [config/config.json](config)，可以修改以下参数：
+配置文件位于 config/config.json，可以修改以下参数：
 - 数据库连接信息
 - 服务器端口
 - 加密密钥
