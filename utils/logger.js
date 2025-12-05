@@ -1,7 +1,17 @@
 const fs = require('fs');
 const path = require('path');
 const cluster = require('cluster');
-const config = require('../config/config.json');
+
+// 安全地加载配置文件，如果不存在则使用默认配置
+let config;
+try {
+    config = require('../config/config.json');
+} catch (error) {
+    // 如果配置文件不存在，则使用默认配置
+    config = {
+        logLevel: 2 // 默认为INFO级别
+    };
+}
 
 // 确保日志目录存在
 const logDir = path.join(__dirname, '..', 'logs');
