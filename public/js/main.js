@@ -7,7 +7,8 @@ import { displayRooms, enterRoom, loadMessageHistory, loadRooms, bindRoomButtons
 import { initializeWebSocket, updateUnreadCount, updateRoomUnreadCount } from './modules/websocket.js';
 import { handleFileSelect, uploadFile, uploadLargeFile, sendFileMessage } from './modules/fileUpload.js';
 import { sendMessage, bindSendMessageEvents } from './modules/messageSender.js';
-import './modules/imageViewer.js';
+import { playVideoInFullscreen } from './modules/videoPlayer.js';
+import { imageViewerInstance } from './modules/imageViewer.js';
 
 // 将函数暴露到全局作用域，以便HTML可以直接调用
 window.showMessage = showMessage;
@@ -34,13 +35,14 @@ window.uploadFile = uploadFile;
 window.uploadLargeFile = uploadLargeFile;
 window.sendFileMessage = sendFileMessage;
 window.sendMessage = sendMessage;
+window.playVideoInFullscreen = playVideoInFullscreen;
 
 // 页面加载完成后初始化应用
 document.addEventListener('DOMContentLoaded', function() {
     // 隐藏加载动画
-    const loadingSpinner = document.getElementById('loadingSpinner');
-    if (loadingSpinner) {
-        loadingSpinner.style.display = 'none';
+    const loadingElement = document.getElementById('initialLoading');
+    if (loadingElement) {
+        loadingElement.style.display = 'none';
     }
 
     // 检查登录状态

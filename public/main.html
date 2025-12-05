@@ -11,39 +11,73 @@
     <script src="/js/bootstrap.min.js" defer></script>
     <script src="/js/main.js" type="module" defer></script>
     <style>
-        /* 加载动画样式 */
-        .loading-spinner {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(255, 255, 255, 0.8);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
+        /* 独立的加载动画样式 - 使用完全不同的类名避免冲突 */
+        .initial-loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
         }
 
-        .loading-spinner .spinner-content {
-        text-align: center;
-        color: var(--primary-color);
+        .initial-loading .content {
+            text-align: center;
         }
 
-        .loading-spinner .spinner-border {
-        width: 3rem;
-        height: 3rem;
+        /* 左右交替显示的点动画 */
+        @keyframes blink {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 1; }
+        }
+
+        .dot-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 50px;
+            margin-bottom: 20px;
+        }
+
+        .dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: #4cd8b8;
+            margin: 0 10px;
+            opacity: 0.2;
+        }
+
+        .dot.left {
+            animation: blink 1.5s infinite;
+        }
+
+        .dot.right {
+            animation: blink 1.5s infinite 0.75s;
+        }
+
+        .loading-message {
+            margin-top: 20px;
+            font-family: Arial, sans-serif;
+            font-size: 50px;
+            color: #333;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
     <!-- 加载动画 -->
-    <div id="loadingSpinner" class="loading-spinner">
-        <div class="spinner-content">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">加载中...</span>
+    <div id="initialLoading" class="initial-loading">
+        <div class="content">
+            <div class="dot-container">
+                <div class="dot left"></div>
+                <div class="dot right"></div>
             </div>
-            <p class="mt-2">加载中，请稍候...</p>
+            <div class="loading-message">加载中，请稍候...</div>
         </div>
     </div>
 
@@ -593,33 +627,5 @@
             </div>
         </div>
     </div>
-
-    <script>
-        // 全屏播放视频的功能
-        function playVideoInFullscreen(videoUrl) {
-            // 获取或创建视频模态框
-            let modal = document.getElementById('videoModal');
-            
-            // 更新视频源
-            const video = document.getElementById('fullscreenVideo');
-            video.src = videoUrl;
-            
-            // 显示模态框
-            const bootstrapModal = new bootstrap.Modal(modal);
-            bootstrapModal.show();
-            
-            // 监听模态框隐藏事件，暂停视频
-            modal.addEventListener('hidden.bs.modal', function() {
-                // 暂停视频播放
-                const video = document.getElementById('fullscreenVideo');
-                if (video) {
-                    video.pause();
-                }
-            }, {once: true});
-        }
-        
-        // 将函数附加到全局对象以便在HTML中使用
-        window.playVideoInFullscreen = playVideoInFullscreen;
-    </script>
 </body>
 </html>

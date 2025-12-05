@@ -60,41 +60,36 @@ export function showVideoInModal(videoSrc) {
         });
     } else {
         // 更新现有模态框中的视频源
-        const video = modal.querySelector('video');
-        video.src = videoSrc;
+        const video = modal.querySelector('#fullscreenVideo');
+        if (video) {
+            video.src = videoSrc;
+        }
     }
     
     // 显示模态框
     const bootstrapModal = new bootstrap.Modal(modal);
     bootstrapModal.show();
+}
+
+// 全屏播放视频的功能
+export function playVideoInFullscreen(videoUrl) {
+    // 获取或创建视频模态框
+    let modal = document.getElementById('videoModal');
     
-    // 监听模态框隐藏事件，暂停视频播放
+    // 更新视频源
+    const video = document.getElementById('fullscreenVideo');
+    video.src = videoUrl;
+    
+    // 显示模态框
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+    
+    // 监听模态框隐藏事件，暂停视频
     modal.addEventListener('hidden.bs.modal', function() {
-        const video = modal.querySelector('video');
+        // 暂停视频播放
+        const video = document.getElementById('fullscreenVideo');
         if (video) {
             video.pause();
         }
-        
-        // 退出全屏模式（如果仍在全屏中）
-        if (document.fullscreenElement) {
-            document.exitFullscreen();
-        } else if (document.webkitFullscreenElement) {
-            document.webkitExitFullscreen();
-        } else if (document.mozFullScreenElement) {
-            document.mozCancelFullScreen();
-        } else if (document.msFullscreenElement) {
-            document.msExitFullscreen();
-        }
-    });
+    }, {once: true});
 }
-
-// 切换视频全屏播放
-export function toggleVideoFullscreen(videoElement) {
-    if (!videoElement) return;
-    
-    // 使用模态框方式显示视频并自动全屏
-    showVideoInModal(videoElement.src);
-}
-
-// 将函数附加到全局对象以便在HTML中使用
-window.toggleVideoFullscreen = toggleVideoFullscreen;

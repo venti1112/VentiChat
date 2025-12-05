@@ -110,11 +110,10 @@ class ImageViewer {
 }
 
 // 初始化图片查看器
+let imageViewerInstance = null;
 document.addEventListener('DOMContentLoaded', () => {
-    window.imageViewer = new ImageViewer();
+    imageViewerInstance = new ImageViewer();
 });
 
-// 导出模块（如果需要）
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = ImageViewer;
-}
+// 导出ImageViewer类和实例
+export { ImageViewer, imageViewerInstance };
