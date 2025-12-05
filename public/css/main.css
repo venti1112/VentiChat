@@ -325,6 +325,8 @@ body {
 .message-content {
     display: flex;
     flex-direction: column;
+    flex: 1; /* 添加此属性使消息内容占据可用空间 */
+    min-width: 0; /* 允许消息内容收缩以适应容器 */
 }
 
 .message-bubble {
@@ -332,7 +334,8 @@ body {
     border-radius: 18px;
     margin: 5px 0;
     position: relative;
-    word-wrap: break-word;
+    word-wrap: break-word; /* 保持现有的换行设置 */
+    word-break: break-word; /* 添加单词换行以处理长单词或URL */
     max-width: 100%;
     backdrop-filter: blur(5px);
     -webkit-backdrop-filter: blur(5px);
