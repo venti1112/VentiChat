@@ -459,7 +459,6 @@ if (require.main === module) {
         
         // 断开连接时清除映射
         socket.on('disconnect', async (reason) => {
-            log(LOG_LEVELS.INFO, `用户 ${username}(${userId}) 断开连接，原因: ${reason}`);
             await WebSocketManager.removeUserSocket(userId, socket.id, workerId);
         });
 

@@ -46,7 +46,7 @@ const { loginRateLimiter, registerRateLimiter } = require('../middleware/authRat
 // 创建用于背景图上传的 multer 实例
 const backgroundStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'public/userdata/background/');
+    cb(null, 'public/userdata/background');
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);

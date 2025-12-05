@@ -539,6 +539,122 @@ export function joinRoom(roomId) {
     });
 }
 
+/**
+ * 加载待审批请求
+ */
+export async function loadPendingRequests(roomId, token) {
+    try {
+        const response = await fetch(`/api/rooms/${roomId}/pending-requests`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('获取待处理请求失败');
+        }
+
+        const requests = await response.json();
+        displayPendingRequests(requests);
+    } catch (error) {
+        console.error('加载待审批请求失败:', error);
+        showMessage('加载待审批请求失败: ' + error.message, 'danger');
+    }
+}
+
+/**
+ * 显示待审批请求
+ */
+export function displayPendingRequests(requests) {
+    const container = document.getElementById('pendingRequestsContainer');
+    const noRequestsMessage = document.getElementById('noRequestsMessage');
+    const joinRequestsSection = document.getElementById('joinRequestsSection');
+    
+    if (!container) return;
+
+    // 如果没有请求，显示"暂无请求"消息
+    if (!requests || requests.length === 0) {
+        if (noRequestsMessage) {
+            noRequestsMessage.style.display = 'block';
+        }
+        container.innerHTML = '';
+        if (joinRequestsSection) {
+            joinRequestsSection.style.display = 'block';
+        }
+        return;
+    }
+
+    // 隐藏"暂无请求"消息
+    if (noRequestsMessage) {
+        noRequestsMessage.style.display = 'none';
+    }
+
+    let html = '';
+    requests.forEach(request => {
+        // 获取用户信息
+        const user = request.User || {};
+        
+        html += `
+            <div class="card mb-2">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <img src="${user.avatarUrl || '/default-avatar.png'}" 
+                                 alt="头像" 
+                                 class="rounded-circle me-3" 
+                                 width="40" 
+                                 height="40"
+                                 onerror="this.src='/default-avatar.png'">
+                            <div>
+                                <h6 class="mb-1">${user.nickname || user.username || '未知用户'}</h6>
+                                <p class="mb-1 text-muted small">@${user.username || 'unknown'}</p>
+                                ${request.message ? `<p class="mb-1">${request.message}</p>` : ''}
+                                <small class="text-muted">申请时间: ${new Date(request.requestTime).toLocaleString('zh-CN')}</small>
+                            </div>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-success approve-request-btn me-1" 
+                                    data-user-id="${user.userId}"
+                                    data-room-id="${request.roomId}">
+                                <i class="bi bi-check"></i> 允许
+                            </button>
+                            <button class="btn btn-sm btn-danger reject-request-btn" 
+                                    data-user-id="${user.userId}"
+                                    data-room-id="${request.roomId}">
+                                <i class="bi bi-x"></i> 拒绝
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+    
+    // 显示审批区域
+    if (joinRequestsSection) {
+        joinRequestsSection.style.display = 'block';
+    }
+
+    // 绑定批准和拒绝按钮事件
+    document.querySelectorAll('.approve-request-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const userId = this.getAttribute('data-user-id');
+            const roomId = this.getAttribute('data-room-id');
+            handleJoinRequest(roomId, userId, 'approve');
+        });
+    });
+
+    document.querySelectorAll('.reject-request-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const userId = this.getAttribute('data-user-id');
+            const roomId = this.getAttribute('data-room-id');
+            handleJoinRequest(roomId, userId, 'reject');
+        });
+    });
+}
+
 // 直接加入房间（无需审批）
 function directJoinRoom(roomId, token) {
     return fetch(`/api/rooms/${roomId}/join-request`, {

@@ -12,11 +12,11 @@
   --danger-color: #dc3545;
   --secondary-color: #6c757d;
   --received-message-bg: #ffffff;
-  --sent-message-bg: #4cd8b8;
+  --sent-message-bg: var(--primary-color);
   --received-message-border: #e0e0e0;
-  --sent-message-border: #4cd8b8;
+  --sent-message-border: var(--primary-color);
   /* 滚动条颜色变量 */
-  --scrollbar-thumb: #4cd8b8;
+  --scrollbar-thumb: var(--primary-color);
   --scrollbar-track: rgba(255, 255, 255, 0.3);
   --scrollbar-thumb-hover: #3ab09e;
 }
@@ -351,7 +351,7 @@ body {
 
 /* 发送的消息气泡样式 */
 .message-right .message-bubble {
-    background-color: rgba(76, 216, 184, 0.6);
+    background-color: var(--primary-color);
     color: white;
     border: 1px solid var(--sent-message-border);
     border-top-right-radius: 5px;

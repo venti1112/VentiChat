@@ -302,11 +302,18 @@ exports.updateProfile = async (req, res) => {
         );
         
         // 获取更新后的用户信息
-        const updatedUser = await User.findByPk(req.user.userId);
+        const updatedUser = await User.findByPk(req.user.userId, {
+            attributes: ['userId', 'username', 'nickname', 'avatarUrl']
+        });
         
         res.json({ 
             message: '资料更新成功',
-            user: updatedUser
+            user: {
+                id: updatedUser.userId,
+                username: updatedUser.username,
+                nickname: updatedUser.nickname,
+                avatarUrl: updatedUser.avatarUrl || '/default-avatar.png'
+            }
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -422,7 +429,7 @@ exports.uploadBackground = async (req, res) => {
         }
         
         // 构造背景图片URL
-        const backgroundUrl = `/userdata/backgrounds/${req.file.filename}`;
+        const backgroundUrl = `/userdata/background/${req.file.filename}`;
         
         // 更新用户背景图片URL
         const User = req.app.get('models').User;

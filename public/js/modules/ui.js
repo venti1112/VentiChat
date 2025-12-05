@@ -96,11 +96,24 @@ export function openProfilePopup() {
     const popupUid = document.getElementById('popupUid');
     const currentAvatar = document.getElementById('currentAvatar');
     const userAvatar = document.getElementById('userAvatar');
+    const themeColorPicker = document.getElementById('themeColor');
     
     if (popupNickname && userNickname) popupNickname.value = userNickname.textContent;
     if (popupUsername && userUsername) popupUsername.value = userUsername.textContent;
     if (popupUid) popupUid.value = localStorage.getItem('userId');
     if (currentAvatar && userAvatar) currentAvatar.src = userAvatar.src;
+    
+    // 填充主题色选择器的值
+    if (themeColorPicker) {
+        // 从本地存储中获取用户偏好设置
+        const userPreferences = JSON.parse(localStorage.getItem('userPreferences') || '{}');
+        if (userPreferences.themeColor) {
+            themeColorPicker.value = userPreferences.themeColor;
+        } else {
+            // 如果没有设置主题色，则使用默认值
+            themeColorPicker.value = '#4CD8B8';
+        }
+    }
 }
 
 // 关闭个人中心弹窗

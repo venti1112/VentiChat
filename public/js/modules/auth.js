@@ -294,6 +294,19 @@ export function bindFormEvents() {
                 document.body.style.backgroundImage = '';
                 document.body.style.backgroundColor = '#f8f9fa';
                 
+                // 重置所有按钮的主题色
+                const buttons = document.querySelectorAll('.btn');
+                buttons.forEach(button => {
+                    button.style.backgroundColor = '';
+                    button.style.borderColor = '';
+                });
+                
+                // 重置其他使用主题色的元素
+                const themeColorElements = document.querySelectorAll('.theme-color-element');
+                themeColorElements.forEach(element => {
+                    element.style.borderColor = '';
+                });
+                
                 // 切换到登录界面
                 const chatSection = document.getElementById('chatSection');
                 const authSection = document.getElementById('authSection');

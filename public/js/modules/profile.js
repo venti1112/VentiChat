@@ -40,9 +40,7 @@ export async function updateProfile(event) {
             const bgResponse = await fetch('/api/users/upload-background', {
                 method: 'POST',
                 body: bgFormData,
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
+                credentials: 'include'
             });
             
             if (!bgResponse.ok) {
@@ -58,11 +56,10 @@ export async function updateProfile(event) {
             method: 'PUT',
             body: avatarFile ? formData : JSON.stringify(profileData),
             headers: avatarFile ? {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
             } : {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include'
         });
         
         if (!profileResponse.ok) {
@@ -73,9 +70,9 @@ export async function updateProfile(event) {
         const preferencesResponse = await fetch('/api/users/preferences', {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Content-Type': 'application/json'
             },
+            credentials: 'include',
             body: JSON.stringify(preferencesData)
         });
         
@@ -115,6 +112,7 @@ export async function updateProfile(event) {
         // 关闭弹窗
         window.closeProfilePopup();
     } catch (error) {
+        console.error('更新个人资料失败:', error);
         window.showMessage(`更新失败: ${error.message}`, 'danger');
     } finally {
         // 恢复按钮状态
@@ -128,52 +126,6 @@ export async function updateProfile(event) {
 export function bindProfileForm() {
     const profileForm = document.getElementById('profileForm');
     if (profileForm) {
-        profileForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(this);
-            const token = localStorage.getItem('token');
-            
-            if (!token) {
-                window.showMessage('未登录，请重新登录', 'danger');
-                return;
-            }
-            
-            fetch('/api/users/profile', {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                body: formData
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('网络响应错误');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    window.showMessage('个人信息更新成功', 'success');
-                    
-                    // 更新用户信息显示
-                    const userNickname = document.getElementById('userNickname');
-                    const userAvatar = document.getElementById('userAvatar');
-                    const popupNickname = document.getElementById('popupNickname');
-                    
-                    if (userNickname) userNickname.textContent = data.user.nickname;
-                    if (userAvatar) userAvatar.src = data.user.avatarUrl || '/default-avatar.png';
-                    if (popupNickname) popupNickname.value = data.user.nickname;
-                    
-                    window.closeProfilePopup();
-                } else {
-                    window.showMessage(data.message || '更新失败', 'danger');
-                }
-            })
-            .catch(error => {
-                window.showMessage('网络错误，请稍后再试', 'danger');
-            });
-        });
-    } else {
+        profileForm.addEventListener('submit', updateProfile);
     }
 }
