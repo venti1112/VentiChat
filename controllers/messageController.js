@@ -51,6 +51,18 @@ exports.sendMessage = async (req, res) => {
             return res.status(400).json({ error: '无效的消息类型' });
         }
         
+        // 对于文字消息，检查内容长度
+        if (type === 'text') {
+            if (!content) {
+                return res.status(400).json({ error: '消息内容不能为空' });
+            }
+            
+            // 限制文字消息长度不超过2048字符
+            if (content.length > 4096) {
+                return res.status(400).json({ error: '消息内容不能超过4096个字符' });
+            }
+        }
+        
         // 检查文件权限（如果是文件消息）
         if (type === 'image' || type === 'video' || type === 'file') {
             const room = await Room.findByPk(roomId);
@@ -367,6 +379,10 @@ exports.getRoomMessages = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+
+
+
 
 
 

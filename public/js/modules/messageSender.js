@@ -22,6 +22,12 @@ export function sendMessage() {
         return;
     }
     
+    // 检查文字消息长度
+    if (content.length > 4096) {
+        window.showMessage('消息内容不能超过4096个字符', 'warning');
+        return;
+    }
+    
     // 获取当前用户信息
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
     
