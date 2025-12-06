@@ -40,11 +40,13 @@ export function uploadFile(file) {
     
     // 显示进度条模态框，设置 backdrop 为 static 防止点击外部关闭
     const progressModalElement = document.getElementById('uploadProgressModal');
-    const progressModal = new bootstrap.Modal(progressModalElement, {
-        backdrop: 'static',
-        keyboard: false
-    });
-    progressModal.show();
+    if (progressModalElement) {
+        const progressModal = new bootstrap.Modal(progressModalElement, {
+            backdrop: 'static',
+            keyboard: false
+        });
+        progressModal.show();
+    }
     
     const formData = new FormData();
     formData.append('file', file);
@@ -163,11 +165,13 @@ export async function uploadLargeFile(file) {
     
     // 显示进度条模态框，设置 backdrop 为 static 防止点击外部关闭
     const progressModalElement = document.getElementById('uploadProgressModal');
-    const progressModal = new bootstrap.Modal(progressModalElement, {
-        backdrop: 'static',
-        keyboard: false
-    });
-    progressModal.show();
+    if (progressModalElement) {
+        const progressModal = new bootstrap.Modal(progressModalElement, {
+            backdrop: 'static',
+            keyboard: false
+        });
+        progressModal.show();
+    }
     
     // 初始化上传速度计算变量
     let startTime = Date.now();

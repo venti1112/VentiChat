@@ -311,6 +311,19 @@ const addMember = async (roomId, userId, operatorId) => {
 // 踢出成员
 const kickMember = async (roomId, userId, operatorId) => {
     try {
+        // 参数验证
+        if (!roomId || roomId === 'undefined' || roomId === 'null') {
+            throw new Error('无效的房间ID');
+        }
+        
+        if (!userId || userId === 'undefined' || userId === 'null') {
+            throw new Error('无效的用户ID');
+        }
+        
+        if (!operatorId || operatorId === 'undefined' || operatorId === 'null') {
+            throw new Error('无效的操作者ID');
+        }
+
         // 检查操作者、目标用户和聊天室是否存在
         const operator = await models.User.findByPk(operatorId);
         const targetUser = await models.User.findByPk(userId);

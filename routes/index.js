@@ -112,6 +112,8 @@ router.get('/rooms/:id/pending-requests', authMiddleware, roomController.getPend
 router.post('/rooms/:id/approve-join-request', authMiddleware, roomController.approveJoinRequest);
 // 添加更新聊天室设置的路由
 router.put('/rooms/:id/settings', authMiddleware, roomController.updateRoomSettings);
+// 添加设置成员角色的路由
+router.put('/rooms/:roomId/members/:userId/role', authMiddleware, roomController.setMemberRole);
 
 // 消息相关路由
 const messageController = require('../controllers/messageController');

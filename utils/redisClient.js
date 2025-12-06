@@ -2,12 +2,19 @@ const redis = require('redis');
 const config = require('../config/config.json');
 const { log, LOG_LEVELS } = require('./logger');
 
-// 创建Redis客户端
-const redisClient = redis.createClient({
+// 创建Redis连接池配置
+const redisConfig = {
     host: config.redis.host,
     port: config.redis.port,
     password: config.redis.password || undefined,
-});
+    // 连接池配置
+    retryDelayOnFailover: 100,
+    maxRetriesPerRequest: 3,
+    enableAutoPipelining: true
+};
+
+// 创建Redis客户端实例
+const redisClient = redis.createClient(redisConfig);
 
 // Redis连接事件处理
 redisClient.on('connect', () => {
@@ -178,9 +185,12 @@ redisClient.addBannedIP = async function(ip, unbanTime, failedAttempts = 1) {
             failedAttempts: failedAttempts
         };
         
+        // 设置过期时间为解封时间之后一段时间，确保记录不会在封禁结束前被清除
+        const expireTime = Math.max(Math.ceil((unbanTime - Date.now()) / 1000), 60);
+        
         await this.setEx(
             `banned_ip:${ip}`, 
-            Math.ceil((unbanTime - Date.now()) / 1000), 
+            expireTime, 
             JSON.stringify(banData)
         );
     } catch (error) {
@@ -236,6 +246,19 @@ redisClient.removeBannedIP = async function(ip) {
 };
 
 /**
+ * 清除IP失败尝试次数记录
+ * @param {string} ip - IP地址
+ */
+redisClient.clearIPFailures = async function(ip) {
+    try {
+        await this.del(`banned_ip:${ip}`);
+    } catch (error) {
+        log(LOG_LEVELS.ERROR, `清除IP失败记录失败: ${error.message}`);
+        throw error;
+    }
+};
+
+/**
  * 增加IP失败尝试次数
  * @param {string} ip - IP地址
  * @param {number} maxAttempts - 最大尝试次数
@@ -251,6 +274,7 @@ redisClient.incrementIPFailures = async function(ip, maxAttempts, lockTimeMinute
             failedAttempts = banInfo.failedAttempts + 1;
         }
         
+        // 只有在达到最大尝试次数时才封禁IP
         if (failedAttempts >= maxAttempts) {
             // 达到最大尝试次数，封禁IP
             const unbanTime = new Date(Date.now() + lockTimeMinutes * 60 * 1000);
@@ -261,8 +285,9 @@ redisClient.incrementIPFailures = async function(ip, maxAttempts, lockTimeMinute
                 unbanTime: unbanTime
             };
         } else {
-            // 更新失败次数，但不解封时间（短暂记录）
-            const tempUnbanTime = new Date(Date.now() + 60 * 1000); // 1分钟后过期
+            // 更新失败次数，设置较长的过期时间（例如30分钟）
+            // 这样可以在一定时间后自动清除未达到封禁条件的记录
+            const tempUnbanTime = new Date(Date.now() + 30 * 60 * 1000); // 30分钟后过期
             await this.addBannedIP(ip, tempUnbanTime, failedAttempts);
             return {
                 banned: false,

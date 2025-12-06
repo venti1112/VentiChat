@@ -67,8 +67,10 @@ export function showVideoInModal(videoSrc) {
     }
     
     // 显示模态框
-    const bootstrapModal = new bootstrap.Modal(modal);
-    bootstrapModal.show();
+    if (modal) {
+        const bootstrapModal = new bootstrap.Modal(modal);
+        bootstrapModal.show();
+    }
 }
 
 // 全屏播放视频的功能
@@ -78,11 +80,15 @@ export function playVideoInFullscreen(videoUrl) {
     
     // 更新视频源
     const video = document.getElementById('fullscreenVideo');
-    video.src = videoUrl;
+    if (video) {
+        video.src = videoUrl;
+    }
     
     // 显示模态框
-    const bootstrapModal = new bootstrap.Modal(modal);
-    bootstrapModal.show();
+    if (modal) {
+        const bootstrapModal = new bootstrap.Modal(modal);
+        bootstrapModal.show();
+    }
     
     // 监听模态框隐藏事件，暂停视频
     modal.addEventListener('hidden.bs.modal', function() {

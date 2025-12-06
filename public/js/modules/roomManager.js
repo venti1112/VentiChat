@@ -335,15 +335,18 @@ export function displayPendingRequests(requests) {
     });
 }
 
-// 绑定聊天室相关按钮事件
+// 绑定各种按钮事件
 export function bindRoomButtons() {
     // 创建聊天室按钮
     const createRoomBtn = document.getElementById('createRoomBtn');
     if (createRoomBtn) {
         createRoomBtn.addEventListener('click', function() {
-            const createRoomModal = new bootstrap.Modal(document.getElementById('createRoomModal'));
-            if (createRoomModal) {
-                createRoomModal.show();
+            const createRoomModalEl = document.getElementById('createRoomModal');
+            if (createRoomModalEl) {
+                const createRoomModal = new bootstrap.Modal(createRoomModalEl);
+                if (createRoomModal) {
+                    createRoomModal.show();
+                }
             }
         });
     }
@@ -352,34 +355,56 @@ export function bindRoomButtons() {
     const searchRoomBtn = document.getElementById('searchRoomBtn');
     if (searchRoomBtn) {
         searchRoomBtn.addEventListener('click', function() {
-            const searchRoomModal = new bootstrap.Modal(document.getElementById('searchRoomModal'));
-            if (searchRoomModal) {
-                searchRoomModal.show();
+            const searchRoomModalEl = document.getElementById('searchRoomModal');
+            if (searchRoomModalEl) {
+                const searchRoomModal = new bootstrap.Modal(searchRoomModalEl);
+                if (searchRoomModal) {
+                    searchRoomModal.show();
+                    
+                    // 清空之前的搜索结果
+                    const searchResultsContainer = document.getElementById('searchResultsContainer');
+                    if (searchResultsContainer) {
+                        searchResultsContainer.innerHTML = '';
+                    }
+                    
+                    // 清空搜索框
+                    const searchKeywordInput = document.getElementById('searchKeywordInput');
+                    if (searchKeywordInput) {
+                        searchKeywordInput.value = '';
+                    }
+                }
             }
         });
     }
     
-    // 搜索聊天室按钮事件
-    const searchRoomButton = document.getElementById('searchRoomButton');
-    if (searchRoomButton) {
-        searchRoomButton.addEventListener('click', function() {
-            const searchInput = document.getElementById('searchRoomInput');
-            if (searchInput) {
-                searchRooms(searchInput.value);
+    // 实际执行搜索的按钮
+    const performSearchButton = document.getElementById('performSearchButton');
+    if (performSearchButton) {
+        performSearchButton.addEventListener('click', function() {
+            const searchKeywordInput = document.getElementById('searchKeywordInput');
+            if (searchKeywordInput) {
+                const keyword = searchKeywordInput.value.trim();
+                if (keyword) {
+                    searchRoomsAndUsers(keyword);
+                } else {
+                    window.showMessage('请输入搜索关键词', 'warning');
+                }
             }
         });
     }
     
-    // 成员按钮
+    // 成员列表按钮
     const membersBtn = document.getElementById('membersBtn');
     if (membersBtn) {
         membersBtn.addEventListener('click', function() {
-            // 获取当前聊天室的成员列表
             loadRoomMembers();
             
-            const membersModal = new bootstrap.Modal(document.getElementById('membersModal'));
-            if (membersModal) {
-                membersModal.show();
+            const membersModalEl = document.getElementById('membersModal');
+            if (membersModalEl) {
+                const membersModal = new bootstrap.Modal(membersModalEl);
+                if (membersModal) {
+                    membersModal.show();
+                }
             }
         });
     }
@@ -388,47 +413,16 @@ export function bindRoomButtons() {
     const settingsBtn = document.getElementById('settingsBtn');
     if (settingsBtn) {
         settingsBtn.addEventListener('click', function() {
-            const currentRoomId = localStorage.getItem('currentRoomId');
-            if (!currentRoomId) {
-                window.showMessage('请先选择一个聊天室', 'warning');
-                return;
-            }
-
-            const token = localStorage.getItem('token');
-            if (!token) {
-                window.showMessage('未登录，请先登录', 'danger');
-                return;
-            }
-
-            fetch(`/api/rooms/${currentRoomId}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('获取聊天室信息失败');
-                }
-                return response.json();
-            })
-            .then(room => {
-                // 塞入表单数据
-                document.getElementById('roomNameSetting').value = room.name;
-                document.getElementById('requireApprovalSetting').checked = room.requireApproval;
-                document.getElementById('allowImagesSetting').checked = room.allowImages;
-                document.getElementById('allowVideosSetting').checked = room.allowVideos;
-                document.getElementById('allowFilesSetting').checked = room.allowFiles;
-                
-                // 显示模态框
-                const settingsModal = new bootstrap.Modal(document.getElementById('settingsModal'));
+            const settingsModalEl = document.getElementById('settingsModal');
+            if (settingsModalEl) {
+                const settingsModal = new bootstrap.Modal(settingsModalEl);
                 if (settingsModal) {
                     settingsModal.show();
+                    
+                    // 加载房间设置
+                    loadRoomSettings();
                 }
-            })
-            .catch(error => {
-                console.error('获取聊天室信息失败:', error);
-                window.showMessage('获取聊天室信息失败: ' + error.message, 'danger');
-            });
+            }
         });
     }
     
@@ -447,127 +441,16 @@ export function bindRoomButtons() {
                 allowVideos: formData.get('allowVideos') === 'on',
                 allowFiles: formData.get('allowFiles') === 'on'
             };
-
-            const token = localStorage.getItem('token');
-            if (!token) {
-                window.showMessage('未登录，请先登录', 'danger');
-                return;
-            }
-
-            fetch('/api/rooms/create', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(roomData)
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(data => {
-                        throw new Error(data.error || '创建失败');
-                    });
-                }
-                return response.json();
-            })
-            .then(room => {
-                window.showMessage('聊天室创建成功', 'success');
-                
-                // 关闭模态框
-                const createRoomModalEl = document.getElementById('createRoomModal');
-                if (createRoomModalEl) {
-                    const createRoomModal = bootstrap.Modal.getInstance(createRoomModalEl);
-                    if (createRoomModal) {
-                        createRoomModal.hide();
-                    }
-                }
-                
-                // 重新加载聊天室列表
-                loadRooms();
-            })
-            .catch(error => {
-                console.error('创建聊天室失败:', error);
-                window.showMessage('创建聊天室失败: ' + error.message, 'danger');
-            });
-        });
-    }
-    
-    // 绑定设置表单提交事件
-    const settingsForm = document.getElementById('settingsForm');
-    if (settingsForm) {
-        settingsForm.addEventListener('submit', function(e) {
-            e.preventDefault();
             
-            const currentRoomId = localStorage.getItem('currentRoomId');
-            if (!currentRoomId) {
-                window.showMessage('请先选择一个聊天室', 'warning');
-                return;
-            }
-            
-            const formData = new FormData(settingsForm);
-            const roomData = {
-                name: formData.get('name'),
-                requireApproval: formData.get('requireApproval') === 'on',
-                allowImages: formData.get('allowImages') === 'on',
-                allowVideos: formData.get('allowVideos') === 'on',
-                allowFiles: formData.get('allowFiles') === 'on'
-            };
-
-            const token = localStorage.getItem('token');
-            if (!token) {
-                window.showMessage('未登录，请先登录', 'danger');
-                return;
-            }
-
-            fetch(`/api/rooms/${currentRoomId}/settings`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(roomData)
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(data => {
-                        throw new Error(data.error || '更新失败');
-                    });
-                }
-                return response.json();
-            })
-            .then(room => {
-                window.showMessage('设置已更新', 'success');
-                
-                // 关闭模态框
-                const settingsModalEl = document.getElementById('settingsModal');
-                if (settingsModalEl) {
-                    const settingsModal = bootstrap.Modal.getInstance(settingsModalEl);
-                    if (settingsModal) {
-                        settingsModal.hide();
-                    }
-                }
-                
-                // 更新聊天室名称显示
-                const currentRoomName = document.getElementById('currentRoomName');
-                if (currentRoomName) {
-                    currentRoomName.textContent = room.name;
-                }
-                
-                // 重新加载聊天室列表
-                loadRooms();
-            })
-            .catch(error => {
-                console.error('更新设置失败:', error);
-                window.showMessage('更新设置失败: ' + error.message, 'danger');
-            });
+            createRoom(roomData);
         });
     }
 }
 
-// 搜索聊天室
-function searchRooms(keyword) {
-    if (!keyword.trim()) {
-        loadRooms();
+// 搜索聊天室和用户功能
+function searchRoomsAndUsers(keyword) {
+    if (!keyword || !keyword.trim()) {
+        window.showMessage('请输入搜索关键词', 'warning');
         return;
     }
     
@@ -577,7 +460,14 @@ function searchRooms(keyword) {
         return;
     }
     
-    fetch(`/api/rooms/search?keyword=${encodeURIComponent(keyword)}`, {
+    const searchResultsContainer = document.getElementById('searchResultsContainer');
+    if (!searchResultsContainer) return;
+    
+    // 显示加载状态
+    searchResultsContainer.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">加载中...</span></div></div>';
+    
+    // 搜索聊天室和用户
+    fetch(`/api/rooms/search?q=${encodeURIComponent(keyword)}`, {
         headers: {
             'Authorization': `Bearer ${token}`
         }
@@ -588,12 +478,187 @@ function searchRooms(keyword) {
         }
         return response.json();
     })
-    .then(rooms => {
-        displayRooms(rooms);
+    .then(data => {
+        // 根据实际API格式处理数据
+        if (data.results && Array.isArray(data.results)) {
+            // 将统一的结果列表分离为房间和用户
+            const rooms = data.results.filter(item => item.type === 'room');
+            const users = data.results.filter(item => item.type === 'user');
+            displaySearchResults(rooms, users);
+        } else {
+            // 兼容旧格式
+            const rooms = data.rooms || [];
+            const users = data.users || [];
+            displaySearchResults(rooms, users);
+        }
     })
     .catch(error => {
-        console.error('搜索聊天室失败:', error);
-        window.showMessage('搜索聊天室失败: ' + error.message, 'danger');
+        console.error('搜索失败:', error);
+        searchResultsContainer.innerHTML = '<div class="alert alert-danger">搜索失败，请稍后再试</div>';
+    });
+}
+
+// 显示搜索结果
+function displaySearchResults(rooms, users) {
+    const searchResultsContainer = document.getElementById('searchResultsContainer');
+    if (!searchResultsContainer) return;
+    
+    // 如果没有结果
+    if ((!rooms || rooms.length === 0) && (!users || users.length === 0)) {
+        searchResultsContainer.innerHTML = '<div class="alert alert-info">未找到相关结果</div>';
+        return;
+    }
+    
+    let resultsHTML = '';
+    
+    // 添加聊天室结果
+    if (rooms && rooms.length > 0) {
+        resultsHTML += `
+            <div class="mb-4">
+                <h6>聊天室</h6>
+                <div class="list-group">
+        `;
+        
+        rooms.forEach(room => {
+            resultsHTML += `
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-1">${room.name}</h6>
+                        <small class="text-muted">ID: ${room.id} | 创建者: ${room.creatorNickname} | 成员: ${room.memberCount}人</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary join-room-btn" data-room-id="${room.id}">
+                        加入
+                    </button>
+                </div>
+            `;
+        });
+        
+        resultsHTML += `
+                </div>
+            </div>
+        `;
+    }
+    
+    // 添加用户结果
+    if (users && users.length > 0) {
+        resultsHTML += `
+            <div>
+                <h6>用户</h6>
+                <div class="list-group">
+        `;
+        
+        users.forEach(user => {
+            resultsHTML += `
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <img src="${user.avatarUrl || '/default-avatar.png'}" 
+                             alt="头像" 
+                             class="rounded-circle me-2" 
+                             width="32" 
+                             height="32"
+                             onerror="this.src='/default-avatar.png'">
+                        <div>
+                            <h6 class="mb-0">${user.nickname || user.username}</h6>
+                            <small class="text-muted">用户名: ${user.username} | UID: ${user.id}</small>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary start-private-chat-btn" data-user-id="${typeof user.id === 'object' ? user.id.id : user.id}">
+                        私聊
+                    </button>
+                </div>
+            `;
+        });
+        
+        resultsHTML += `
+                </div>
+            </div>
+        `;
+    }
+    
+    searchResultsContainer.innerHTML = resultsHTML;
+    
+    // 为加入房间按钮添加事件监听器
+    document.querySelectorAll('.join-room-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const roomId = this.getAttribute('data-room-id');
+            window.joinRoom(roomId);
+            
+            // 关闭搜索模态框
+            const searchModal = bootstrap.Modal.getInstance(document.getElementById('searchRoomModal'));
+            if (searchModal) {
+                searchModal.hide();
+            }
+        });
+    });
+    
+    // 为私聊按钮添加事件监听器
+    document.querySelectorAll('.start-private-chat-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const userId = this.getAttribute('data-user-id');
+            startPrivateChat(userId);
+            
+            // 关闭搜索模态框
+            const searchModal = bootstrap.Modal.getInstance(document.getElementById('searchRoomModal'));
+            if (searchModal) {
+                searchModal.hide();
+            }
+        });
+    });
+}
+
+// 开始私聊
+export function startPrivateChat(userId) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.showMessage('未登录，请先登录', 'danger');
+        return;
+    }
+
+    // 如果userId是对象，提取id属性
+    if (typeof userId === 'object' && userId !== null) {
+        userId = userId.id;
+    }
+
+    fetch('/api/rooms/private', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ targetUserId: parseInt(userId) })
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(err => {
+                throw new Error(err.error || '创建私聊失败');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        const room = data.room || data;
+        const roomId = room.roomId || room.id;
+        
+        if (roomId) {
+            // 加入房间 - 使用从websocket.js导入的joinRoom函数
+            import('./websocket.js').then(module => {
+                module.joinRoom(roomId);
+            });
+            
+            // 关闭搜索模态框
+            const searchModal = bootstrap.Modal.getInstance(document.getElementById('searchRoomModal'));
+            if (searchModal) {
+                searchModal.hide();
+            }
+            
+            window.showMessage(`已创建私聊`, 'success');
+        } else {
+            throw new Error('无法获取房间ID');
+        }
+    })
+    .catch(error => {
+        console.error('创建私聊失败:', error);
+        window.showMessage('创建私聊失败: ' + error.message, 'danger');
     });
 }
 
@@ -702,13 +767,18 @@ window.setMemberRole = function(userId, role) {
         return;
     }
     
+    // 修复角色值映射，前端传递的admin需要转换为后端期望的'member'或'admin'值
+    const mappedRole = role === 'admin' ? 'admin' : 
+                      role === 'member' ? 'member' : 
+                      'member'; // 默认设为普通成员
+    
     fetch(`/api/rooms/${currentRoomId}/members/${userId}/role`, {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ role })
+        body: JSON.stringify({ role: mappedRole })
     })
     .then(response => {
         if (!response.ok) {
@@ -733,6 +803,12 @@ window.kickMember = function(userId) {
     const currentRoomId = localStorage.getItem('currentRoomId');
     if (!currentRoomId) {
         window.showMessage('请先选择一个聊天室', 'warning');
+        return;
+    }
+    
+    // 添加参数验证
+    if (!userId || userId === 'undefined' || userId === 'null') {
+        window.showMessage('无效的用户ID', 'danger');
         return;
     }
     

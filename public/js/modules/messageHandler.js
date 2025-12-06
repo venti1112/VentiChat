@@ -321,9 +321,12 @@ export async function displayMessages(messages) {
         img.style.cursor = 'pointer';
         img.addEventListener('click', function() {
             const fullScreenImage = document.getElementById('fullScreenImage');
-            const imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
-            fullScreenImage.src = this.src;
-            imageModal.show();
+            const imageModalEl = document.getElementById('imageModal');
+            if (imageModalEl) {
+                const imageModal = new bootstrap.Modal(imageModalEl);
+                fullScreenImage.src = this.src;
+                imageModal.show();
+            }
         });
     });
     

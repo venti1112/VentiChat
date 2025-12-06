@@ -64,31 +64,47 @@ exports.createPrivateRoom = async (req, res) => {
         }
         
         // 检查是否已经存在与该用户的私聊房间
-        const existingPrivateRoom = await models.Room.findOne({
+        // 首先查找当前用户参与的所有私聊房间
+        const currentUserRoomMembers = await models.RoomMember.findAll({
             where: {
-                isPrivate: true,
-                [Op.and]: [
-                    {
-                        [Op.or]: [
-                            { creatorId: currentUser.userId },
-                            { creatorId: targetUserId }
-                        ]
-                    },
-                    {
-                        [Op.or]: [
-                            { creatorId: targetUserId },
-                            { creatorId: currentUser.userId }
-                        ]
-                    }
-                ]
+                userId: currentUser.userId
             }
         });
         
-        if (existingPrivateRoom) {
-            return res.status(400).json({ 
-                error: '与该用户的私聊房间已存在',
-                roomId: existingPrivateRoom.roomId
+        // 获取这些房间的ID
+        const currentUserRoomIds = currentUserRoomMembers.map(roomMember => roomMember.roomId);
+        
+        if (currentUserRoomIds.length > 0) {
+            // 查找这些房间中是否是私聊房间并且目标用户也参与
+            const privateRooms = await models.Room.findAll({
+                where: {
+                    roomId: {
+                        [Op.in]: currentUserRoomIds
+                    },
+                    isPrivate: true
+                }
             });
+            
+            const privateRoomIds = privateRooms.map(room => room.roomId);
+            
+            if (privateRoomIds.length > 0) {
+                // 查找这些私聊房间中是否有目标用户也参与的
+                const commonRooms = await models.RoomMember.findOne({
+                    where: {
+                        userId: targetUserId,
+                        roomId: {
+                            [Op.in]: privateRoomIds
+                        }
+                    }
+                });
+                
+                if (commonRooms) {
+                    return res.status(400).json({ 
+                        error: '与该用户的私聊房间已存在',
+                        roomId: commonRooms.roomId
+                    });
+                }
+            }
         }
         
         // 创建私聊房间
@@ -99,23 +115,21 @@ exports.createPrivateRoom = async (req, res) => {
             requireApproval: false,
             allowImages: true,
             allowVideos: true,
-            allowFiles: true,
-            members: [currentUser.userId, targetUserId]
+            allowFiles: true
         });
         
         // 将双方都加入房间
-        await models.RoomMember.bulkCreate([
-            {
-                userId: currentUser.userId,
-                roomId: privateRoom.roomId,
-                isModerator: true
-            },
-            {
-                userId: targetUser.id,
-                roomId: privateRoom.roomId,
-                isModerator: false
-            }
-        ]);
+        await models.RoomMember.create({
+            userId: currentUser.userId,
+            roomId: privateRoom.roomId,
+            isModerator: true
+        });
+        
+        await models.RoomMember.create({
+            userId: targetUser.userId,
+            roomId: privateRoom.roomId,
+            isModerator: false
+        });
         
         res.json({
             message: '私聊房间创建成功',
@@ -729,21 +743,53 @@ exports.getPendingRequests = async (req, res) => {
 // 搜索聊天室
 exports.searchRooms = async (req, res) => {
     try {
-        const { q } = req.query;
+        const { q: query } = req.query;
         
-        if (!q) {
+        if (!query) {
             return res.status(400).json({ error: '搜索关键字不能为空' });
         }
+        
+        const models = req.app.get('models');
         
         // 搜索公开房间
         const rooms = await models.Room.findAll({
             where: {
-                name: {
-                    [Op.like]: `%${q}%`
-                },
+                [Op.or]: [
+                    {
+                        name: {
+                            [Op.like]: `%${query}%`
+                        }
+                    },
+                    !isNaN(parseInt(query)) ? {
+                        roomId: parseInt(query)
+                    } : null
+                ].filter(Boolean),
                 isPrivate: false
             },
-            limit: 20
+            limit: 10
+        });
+        
+        // 搜索用户
+        const users = await models.User.findAll({
+            where: {
+                [Op.or]: [
+                    {
+                        username: {
+                            [Op.like]: `%${query}%`
+                        }
+                    },
+                    {
+                        nickname: {
+                            [Op.like]: `%${query}%`
+                        }
+                    },
+                    !isNaN(parseInt(query)) ? {
+                        userId: parseInt(query)
+                    } : null
+                ].filter(Boolean)
+            },
+            attributes: ['userId', 'username', 'nickname', 'avatarUrl'],
+            limit: 10
         });
         
         // 获取房间创建者信息
@@ -758,6 +804,7 @@ exports.searchRooms = async (req, res) => {
             });
             
             return {
+                type: 'room',
                 id: room.roomId,
                 name: room.name,
                 creatorNickname: creator ? creator.nickname : '未知用户',
@@ -765,11 +812,68 @@ exports.searchRooms = async (req, res) => {
             };
         }));
         
+        // 格式化用户数据
+        const formattedUsers = users.map(user => ({
+            type: 'user',
+            id: user.userId,
+            username: user.username,
+            nickname: user.nickname,
+            avatarUrl: user.avatarUrl || '/default-avatar.png'
+        }));
+        
         res.json({
-            rooms: roomWithCreators
+            results: [...roomWithCreators, ...formattedUsers]
         });
     } catch (error) {
-        log('ERROR', `搜索房间失败: ${error.message}`);
+        log('ERROR', `搜索失败: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 设置成员角色
+exports.setMemberRole = async (req, res) => {
+    try {
+        const { roomId, userId } = req.params;
+        const { role } = req.body;
+        
+        // 检查权限：必须是室主
+        const room = await models.Room.findByPk(roomId);
+        if (!room) {
+            return res.status(404).json({ error: '聊天室不存在' });
+        }
+        
+        if (room.creatorId !== req.user.userId) {
+            return res.status(403).json({ error: '只有室主可以设置成员角色' });
+        }
+        
+        // 验证角色值
+        if (!['member', 'admin'].includes(role)) {
+            return res.status(400).json({ error: '无效的角色值' });
+        }
+        
+        // 检查目标用户是否是聊天室成员
+        const targetMember = await models.RoomMember.findOne({
+            where: { 
+                userId: userId,
+                roomId: roomId
+            }
+        });
+        
+        if (!targetMember) {
+            return res.status(404).json({ error: '目标用户不是该聊天室成员' });
+        }
+        
+        // 检查不能修改室主的角色
+        if (room.creatorId == userId) {
+            return res.status(400).json({ error: '不能修改室主的角色' });
+        }
+        
+        // 更新成员角色
+        await targetMember.update({ isModerator: role === 'admin' });
+        
+        res.json({ success: true, message: '角色设置成功' });
+    } catch (error) {
+        log('ERROR', `设置成员角色失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };

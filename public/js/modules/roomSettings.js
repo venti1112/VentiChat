@@ -17,6 +17,24 @@ export function initializeRoomSettings() {
         settingsBtn.addEventListener('click', handleSettingsClick);
     }
     
+    // 为设置模态框添加隐藏事件监听器，确保清理工作
+    const settingsModalElement = document.getElementById('settingsModal');
+    if (settingsModalElement) {
+        const hideHandler = function() {
+            // 确保背景遮罩完全清除
+            document.body.classList.remove('modal-open');
+            const backdrop = document.querySelector('.modal-backdrop');
+            if (backdrop) {
+                backdrop.remove();
+            }
+        };
+        
+        // 移除之前的事件监听器（如果有的话）
+        settingsModalElement.removeEventListener('hidden.bs.modal', hideHandler);
+        // 添加新的事件监听器
+        settingsModalElement.addEventListener('hidden.bs.modal', hideHandler);
+    }
+    
     isInitialized = true;
 }
 
@@ -56,10 +74,12 @@ async function handleSettingsClick() {
         document.getElementById('allowVideosSetting').checked = room.allowVideos;
         document.getElementById('allowFilesSetting').checked = room.allowFiles;
 
-        // 显示设置模态框
-        const settingsModal = new bootstrap.Modal(document.getElementById('settingsModal'));
-        if (settingsModal) {
-            settingsModal.show();
+        // 使用Bootstrap内置方法显示设置模态框，而不是手动创建实例
+        const settingsModalElement = document.getElementById('settingsModal');
+        if (settingsModalElement) {
+            // 使用Bootstrap原生JS方法显示模态框
+            const modal = bootstrap.Modal.getOrCreateInstance(settingsModalElement);
+            modal.show();
             
             // 如果是房主，加载待处理请求
             const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
