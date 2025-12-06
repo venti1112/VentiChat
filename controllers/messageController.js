@@ -284,6 +284,7 @@ exports.markAsRead = async (req, res) => {
 exports.getMessageHistory = async (req, res) => {
     try {
         const { roomId } = req.params;
+        const { limit = 50, beforeId } = req.query;
         
         // 检查用户是否是聊天室成员
         const roomMember = await RoomMember.findOne({
@@ -297,11 +298,19 @@ exports.getMessageHistory = async (req, res) => {
             return res.status(403).json({ error: '您不是该聊天室的成员' });
         }
         
-        // 获取消息历史（最近50条）
+        // 构建查询条件
+        const whereClause = { roomId };
+        if (beforeId) {
+            whereClause.messageId = {
+                [Sequelize.Op.lt]: beforeId
+            };
+        }
+        
+        // 获取消息历史
         const messages = await Message.findAll({
-            where: { roomId },
+            where: whereClause,
             order: [['sentAt', 'DESC']],
-            limit: 50
+            limit: parseInt(limit)
         });
         
         // 获取涉及的用户ID列表
@@ -379,6 +388,8 @@ exports.getRoomMessages = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+
 
 
 

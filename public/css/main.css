@@ -21,14 +21,14 @@
   --scrollbar-thumb-hover: #3ab09e;
 }
 
-/* 用户自定义主题色 */
+/* 用户自定义主题色 - 通过JavaScript动态设置CSS变量来实现 */
 [data-theme-color] {
-  --primary-color: attr(data-theme-color color);
-  --primary-bg-color: color-mix(in srgb, attr(data-theme-color color) 80%, transparent);
-  --sent-message-bg: attr(data-theme-color color);
-  --sent-message-border: attr(data-theme-color color);
-  --scrollbar-thumb: attr(data-theme-color color);
-  --scrollbar-thumb-hover: color-mix(in srgb, attr(data-theme-color color), black 20%);
+  --primary-color: var(--user-theme-color, #4cd8b8);
+  --primary-bg-color: var(--user-primary-bg-color, rgba(76, 216, 184, 0.8));
+  --sent-message-bg: var(--user-theme-color, #4cd8b8);
+  --sent-message-border: var(--user-theme-color, #4cd8b8);
+  --scrollbar-thumb: var(--user-theme-color, #4cd8b8);
+  --scrollbar-thumb-hover: var(--user-scrollbar-thumb-hover, #3ab09e);
 }
 
 /* 自定义滚动条样式 */

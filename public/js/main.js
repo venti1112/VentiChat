@@ -3,7 +3,7 @@ import { showMessage, showConfirm, showRegisterForm, showLoginForm, openProfileP
 import { checkLoginStatus, bindFormEvents, getUserPreferences, applyUserPreferences } from './modules/auth.js';
 import { updateProfile, bindProfileForm } from './modules/profile.js';
 import { displayMessages, renderMessage, getUserInfoById, clearDisplayedMessages } from './modules/messageHandler.js';
-import { displayRooms, enterRoom, loadMessageHistory, loadRooms, bindRoomButtons, joinRoom } from './modules/roomManager.js';
+import { displayRooms, enterRoom, loadMessageHistory, loadRooms, bindRoomButtons } from './modules/roomManager.js';
 import { initializeWebSocket, updateUnreadCount, updateRoomUnreadCount } from './modules/websocket.js';
 import { handleFileSelect, uploadFile, uploadLargeFile, sendFileMessage } from './modules/fileUpload.js';
 import { sendMessage, bindSendMessageEvents } from './modules/messageSender.js';
@@ -27,7 +27,6 @@ window.displayRooms = displayRooms;
 window.enterRoom = enterRoom;
 window.loadMessageHistory = loadMessageHistory;
 window.loadRooms = loadRooms;
-window.joinRoom = joinRoom;
 window.initializeWebSocket = initializeWebSocket;
 window.updateUnreadCount = updateUnreadCount;
 window.updateRoomUnreadCount = updateRoomUnreadCount;

@@ -20,8 +20,9 @@ export async function updateProfile(event) {
         };
         
         // 构建偏好设置更新数据
+        const themeColor = formData.get('themeColor');
         const preferencesData = {
-            themeColor: formData.get('themeColor')
+            themeColor: themeColor || '#0d6efd' // 默认主题色，防止为空
         };
         
         // 检查是否有新的头像文件

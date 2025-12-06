@@ -136,6 +136,12 @@ export function bindFormEvents() {
             
             console.info('发送登录请求', { username, rememberMe });
             
+            // 禁用登录按钮并显示"登录中"
+            const loginButton = loginForm.querySelector('button[type="submit"]');
+            const originalLoginButtonText = loginButton.innerHTML;
+            loginButton.disabled = true;
+            loginButton.innerHTML = '<i class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></i>登录中...';
+
             fetch('/api/auth/login', {
                 method: 'POST',
                 headers: {
@@ -153,6 +159,10 @@ export function bindFormEvents() {
             })
             .then(({ data, status, ok }) => {
                 console.info('登录响应数据:', data);
+                
+                // 恢复登录按钮状态
+                loginButton.disabled = false;
+                loginButton.innerHTML = originalLoginButtonText;
                 
                 // 检查登录是否成功
                 if (ok && data.token && data.user) {
@@ -233,6 +243,12 @@ export function bindFormEvents() {
     document.getElementById('registerForm').addEventListener('submit', function(e) {
         e.preventDefault();
         
+        // 禁用注册按钮并显示"注册中"
+        const registerButton = this.querySelector('button[type="submit"]');
+        const originalRegisterButtonText = registerButton.innerHTML;
+        registerButton.disabled = true;
+        registerButton.innerHTML = '<i class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></i>注册中...';
+        
         const formData = new FormData(this);
         
         fetch('/api/auth/register', {
@@ -241,6 +257,10 @@ export function bindFormEvents() {
         })
         .then(response => response.json())
         .then(data => {
+            // 恢复注册按钮状态
+            registerButton.disabled = false;
+            registerButton.innerHTML = originalRegisterButtonText;
+            
             if (data.success) {
                 window.showMessage('注册成功，请登录');
                 window.showLoginForm();
@@ -249,6 +269,10 @@ export function bindFormEvents() {
             }
         })
         .catch(error => {
+            // 恢复注册按钮状态
+            registerButton.disabled = false;
+            registerButton.innerHTML = originalRegisterButtonText;
+            
             window.showMessage('网络错误，请稍后再试', 'danger', '注册失败');
         });
     });
@@ -465,21 +489,65 @@ export function applyUserPreferences(preferences) {
     
     // 应用自定义主题色
     if (preferences.themeColor) {
-        // 为body元素设置data-theme-color属性
-        document.body.setAttribute('data-theme-color', preferences.themeColor);
+        // 为body元素设置自定义CSS属性
+        document.body.style.setProperty('--user-theme-color', preferences.themeColor);
+        document.body.style.setProperty('--user-primary-bg-color', `rgba(${hexToRgb(preferences.themeColor)}, 0.8)`);
+        document.body.style.setProperty('--user-scrollbar-thumb-hover', darkenColor(preferences.themeColor, 20));
         
-        // 应用主题色到各种按钮元素
-        const buttons = document.querySelectorAll('.btn');
-        buttons.forEach(button => {
-            // 移除之前的主题色样式
-            button.style.backgroundColor = '';
-            button.style.borderColor = '';
-        });
+        // 保存主题色到localStorage
+        localStorage.setItem('userThemeColor', preferences.themeColor);
+    } else {
+        // 如果没有主题色，移除自定义属性
+        document.body.style.removeProperty('--user-theme-color');
+        document.body.style.removeProperty('--user-primary-bg-color');
+        document.body.style.removeProperty('--user-scrollbar-thumb-hover');
         
-        // 应用主题色到其他需要着色的元素
-        const themeColorElements = document.querySelectorAll('.theme-color-element');
-        themeColorElements.forEach(element => {
-            element.style.borderColor = '';
-        });
+        // 从localStorage中移除
+        localStorage.removeItem('userThemeColor');
     }
+}
+
+/**
+ * 将十六进制颜色转换为RGB值
+ * @param {string} hex - 十六进制颜色值
+ * @returns {string} RGB值字符串 "r, g, b"
+ */
+function hexToRgb(hex) {
+    // 移除#前缀
+    hex = hex.replace('#', '');
+    
+    // 解析r, g, b值
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    
+    return `${r}, ${g}, ${b}`;
+}
+
+/**
+ * 加深颜色
+ * @param {string} hex - 十六进制颜色值
+ * @param {number} percent - 加深百分比
+ * @returns {string} 加深后的十六进制颜色值
+ */
+function darkenColor(hex, percent) {
+    // 移除#前缀
+    hex = hex.replace('#', '');
+    
+    // 解析r, g, b值
+    let r = parseInt(hex.substring(0, 2), 16);
+    let g = parseInt(hex.substring(2, 4), 16);
+    let b = parseInt(hex.substring(4, 6), 16);
+    
+    // 计算加深后的值
+    r = Math.floor(r * (100 - percent) / 100);
+    g = Math.floor(g * (100 - percent) / 100);
+    b = Math.floor(b * (100 - percent) / 100);
+    
+    // 转换回十六进制并确保是两位数
+    r = ('0' + r.toString(16)).slice(-2);
+    g = ('0' + g.toString(16)).slice(-2);
+    b = ('0' + b.toString(16)).slice(-2);
+    
+    return `#${r}${g}${b}`;
 }

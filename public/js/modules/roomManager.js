@@ -1,5 +1,9 @@
 // 房间管理模块
 
+// 添加变量来跟踪历史消息加载状态
+let loadingHistory = false;
+let hasMoreHistory = true;
+
 // 显示聊天室列表
 export function displayRooms(rooms) {
     const roomList = document.getElementById('roomList');
@@ -61,6 +65,10 @@ export function enterRoom(room) {
         chatMessages.innerHTML = '';
     }
     
+    // 重置历史消息加载状态
+    hasMoreHistory = true;
+    loadingHistory = false;
+    
     // 更新当前聊天室显示
     const currentRoomNameElement = document.getElementById('currentRoomName');
     if (currentRoomNameElement) {
@@ -78,6 +86,113 @@ export function enterRoom(room) {
     
     // 加载消息历史
     loadMessageHistory(room.id);
+    
+    // 绑定滚动事件以加载更多历史消息
+    bindScrollEvent();
+}
+
+// 绑定滚动事件以加载更多历史消息
+function bindScrollEvent() {
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+    
+    // 清除之前的事件监听器，避免重复绑定
+    chatMessages.removeEventListener('scroll', handleScroll);
+    
+    // 添加新的滚动事件监听器
+    chatMessages.addEventListener('scroll', handleScroll);
+}
+
+// 处理滚动事件
+function handleScroll() {
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+    
+    // 当滚动到顶部附近且还有更多历史消息时加载历史消息
+    if (chatMessages.scrollTop <= 50 && hasMoreHistory && !loadingHistory) {
+        const currentRoomId = localStorage.getItem('currentRoomId');
+        if (!currentRoomId) return;
+        
+        loadMoreHistory(currentRoomId);
+    }
+}
+
+// 加载更多历史消息
+async function loadMoreHistory(roomId) {
+    if (loadingHistory || !hasMoreHistory) return;
+    
+    loadingHistory = true;
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.showMessage('未登录，请先登录', 'danger');
+        loadingHistory = false;
+        return;
+    }
+    
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) {
+        loadingHistory = false;
+        return;
+    }
+    
+    // 保存当前滚动位置
+    const scrollTop = chatMessages.scrollTop;
+    const firstChild = chatMessages.firstElementChild;
+    const initialHeight = chatMessages.scrollHeight;
+    
+    try {
+        // 获取第一条消息的ID（最早的那条）
+        const firstMessage = chatMessages.querySelector('.message-item:first-child');
+        const beforeId = firstMessage ? firstMessage.dataset.messageId : null;
+        
+        // 构造请求URL
+        let url = `/api/messages/history/${roomId}?limit=20`;
+        if (beforeId) {
+            url += `&beforeId=${beforeId}`;
+        }
+        
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('加载历史消息失败');
+        }
+        
+        const messages = await response.json();
+        
+        if (messages && messages.length > 0) {
+            // 使用 DocumentFragment 提高性能
+            const fragment = document.createDocumentFragment();
+            
+            // 反向遍历消息数组，确保消息顺序正确
+            for (let i = messages.length - 1; i >= 0; i--) {
+                const message = messages[i];
+                const messageElement = document.createElement('div');
+                messageElement.className = 'message-item mb-3';
+                messageElement.setAttribute('data-message-id', message.messageId);
+                messageElement.innerHTML = await window.renderMessage(message);
+                fragment.insertBefore(messageElement, fragment.firstChild);
+            }
+            
+            // 插入到现有消息之前
+            chatMessages.insertBefore(fragment, chatMessages.firstChild);
+            
+            // 调整滚动位置以保持用户视角不变
+            const finalHeight = chatMessages.scrollHeight;
+            chatMessages.scrollTop = scrollTop + (finalHeight - initialHeight);
+        } else {
+            // 没有更多消息了
+            hasMoreHistory = false;
+        }
+    } catch (error) {
+        console.error('加载历史消息失败:', error);
+        window.showMessage('加载历史消息失败: ' + error.message, 'danger');
+    } finally {
+        loadingHistory = false;
+    }
 }
 
 // 加载消息历史
@@ -99,6 +214,10 @@ export function loadMessageHistory(roomId) {
     if (!chatMessages) {
         return;
     }
+    
+    // 重置历史消息状态
+    hasMoreHistory = true;
+    loadingHistory = false;
     
     // 显示加载中提示
     chatMessages.innerHTML = '<div class="text-center text-muted my-3"><p>加载消息中...</p></div>';
@@ -150,6 +269,69 @@ export function loadRooms() {
     .catch(error => {
         console.error('加载聊天室列表错误:', error);
         window.showMessage('加载聊天室列表失败: ' + error.message, 'danger');
+    });
+}
+
+// 加载待处理请求
+export async function loadPendingRequests(roomId, token) {
+    try {
+        const response = await fetch(`/api/rooms/${roomId}/pending-requests`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const requests = await response.json();
+        displayPendingRequests(requests);
+    } catch (error) {
+        console.error('加载待处理请求失败:', error);
+        window.showMessage('加载待处理请求失败: ' + error.message, 'danger');
+    }
+}
+
+// 显示待处理请求
+export function displayPendingRequests(requests) {
+    const pendingRequestsList = document.getElementById('pendingRequestsList');
+    if (!pendingRequestsList) return;
+
+    if (!requests || requests.length === 0) {
+        pendingRequestsList.innerHTML = '<li class="list-group-item text-center text-muted">暂无待处理请求</li>';
+        return;
+    }
+
+    pendingRequestsList.innerHTML = '';
+    requests.forEach(request => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex justify-content-between align-items-center';
+        li.innerHTML = `
+            <div class="d-flex align-items-center">
+                <img src="${request.user.avatarUrl || '/default-avatar.png'}" 
+                     alt="头像" 
+                     class="rounded-circle me-2" 
+                     width="32" 
+                     height="32"
+                     onerror="this.src='/default-avatar.png'">
+                <div>
+                    <div>${request.user.nickname || request.user.username}</div>
+                    <small class="text-muted">申请时间: ${new Date(request.requestedAt).toLocaleString()}</small>
+                </div>
+            </div>
+            <div>
+                <button class="btn btn-sm btn-success me-1" 
+                        onclick="handleJoinRequest('${request.roomId}', '${request.userId}', 'approve')">
+                    允许
+                </button>
+                <button class="btn btn-sm btn-danger" 
+                        onclick="handleJoinRequest('${request.roomId}', '${request.userId}', 'reject')">
+                    拒绝
+                </button>
+            </div>
+        `;
+        pendingRequestsList.appendChild(li);
     });
 }
 
@@ -259,19 +441,20 @@ export function bindRoomButtons() {
             const formData = new FormData(createRoomForm);
             const roomData = {
                 name: formData.get('name'),
+                note: formData.get('note') || '',
                 requireApproval: formData.get('requireApproval') === 'on',
                 allowImages: formData.get('allowImages') === 'on',
                 allowVideos: formData.get('allowVideos') === 'on',
                 allowFiles: formData.get('allowFiles') === 'on'
             };
-            
+
             const token = localStorage.getItem('token');
             if (!token) {
                 window.showMessage('未登录，请先登录', 'danger');
                 return;
             }
-            
-            fetch('/api/rooms', {
+
+            fetch('/api/rooms/create', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -282,34 +465,37 @@ export function bindRoomButtons() {
             .then(response => {
                 if (!response.ok) {
                     return response.json().then(data => {
-                        throw new Error(data.error || '创建聊天室失败');
+                        throw new Error(data.error || '创建失败');
                     });
                 }
                 return response.json();
             })
             .then(room => {
                 window.showMessage('聊天室创建成功', 'success');
-                // 隐藏模态框
-                const modal = bootstrap.Modal.getInstance(document.getElementById('createRoomModal'));
-                if (modal) {
-                    modal.hide();
+                
+                // 关闭模态框
+                const createRoomModalEl = document.getElementById('createRoomModal');
+                if (createRoomModalEl) {
+                    const createRoomModal = bootstrap.Modal.getInstance(createRoomModalEl);
+                    if (createRoomModal) {
+                        createRoomModal.hide();
+                    }
                 }
+                
                 // 重新加载聊天室列表
-                if (typeof window.loadRooms === 'function') {
-                    window.loadRooms();
-                }
+                loadRooms();
             })
             .catch(error => {
                 console.error('创建聊天室失败:', error);
-                window.showMessage(error.message || '创建聊天室失败', 'danger');
+                window.showMessage('创建聊天室失败: ' + error.message, 'danger');
             });
         });
     }
     
-    // 绑定聊天室设置表单提交事件
-    const roomSettingsForm = document.getElementById('roomSettingsForm');
-    if (roomSettingsForm) {
-        roomSettingsForm.addEventListener('submit', function(e) {
+    // 绑定设置表单提交事件
+    const settingsForm = document.getElementById('settingsForm');
+    if (settingsForm) {
+        settingsForm.addEventListener('submit', function(e) {
             e.preventDefault();
             
             const currentRoomId = localStorage.getItem('currentRoomId');
@@ -318,7 +504,7 @@ export function bindRoomButtons() {
                 return;
             }
             
-            const formData = new FormData(roomSettingsForm);
+            const formData = new FormData(settingsForm);
             const roomData = {
                 name: formData.get('name'),
                 requireApproval: formData.get('requireApproval') === 'on',
@@ -326,13 +512,13 @@ export function bindRoomButtons() {
                 allowVideos: formData.get('allowVideos') === 'on',
                 allowFiles: formData.get('allowFiles') === 'on'
             };
-            
+
             const token = localStorage.getItem('token');
             if (!token) {
                 window.showMessage('未登录，请先登录', 'danger');
                 return;
             }
-            
+
             fetch(`/api/rooms/${currentRoomId}/settings`, {
                 method: 'PUT',
                 headers: {
@@ -344,42 +530,77 @@ export function bindRoomButtons() {
             .then(response => {
                 if (!response.ok) {
                     return response.json().then(data => {
-                        throw new Error(data.error || '更新聊天室设置失败');
+                        throw new Error(data.error || '更新失败');
                     });
                 }
                 return response.json();
             })
             .then(room => {
-                window.showMessage('聊天室设置已更新', 'success');
-                // 隐藏模态框
-                const modal = bootstrap.Modal.getInstance(document.getElementById('settingsModal'));
-                if (modal) {
-                    modal.hide();
+                window.showMessage('设置已更新', 'success');
+                
+                // 关闭模态框
+                const settingsModalEl = document.getElementById('settingsModal');
+                if (settingsModalEl) {
+                    const settingsModal = bootstrap.Modal.getInstance(settingsModalEl);
+                    if (settingsModal) {
+                        settingsModal.hide();
+                    }
                 }
-                // 更新当前聊天室名称显示
-                const currentRoomNameElement = document.getElementById('currentRoomName');
-                if (currentRoomNameElement) {
-                    currentRoomNameElement.textContent = room.name;
+                
+                // 更新聊天室名称显示
+                const currentRoomName = document.getElementById('currentRoomName');
+                if (currentRoomName) {
+                    currentRoomName.textContent = room.name;
                 }
+                
                 // 重新加载聊天室列表
-                if (typeof window.loadRooms === 'function') {
-                    window.loadRooms();
-                }
+                loadRooms();
             })
             .catch(error => {
-                console.error('更新聊天室设置失败:', error);
-                window.showMessage(error.message || '更新聊天室设置失败', 'danger');
+                console.error('更新设置失败:', error);
+                window.showMessage('更新设置失败: ' + error.message, 'danger');
             });
         });
     }
 }
 
+// 搜索聊天室
+function searchRooms(keyword) {
+    if (!keyword.trim()) {
+        loadRooms();
+        return;
+    }
+    
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.showMessage('未登录，请先登录', 'danger');
+        return;
+    }
+    
+    fetch(`/api/rooms/search?keyword=${encodeURIComponent(keyword)}`, {
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('搜索失败');
+        }
+        return response.json();
+    })
+    .then(rooms => {
+        displayRooms(rooms);
+    })
+    .catch(error => {
+        console.error('搜索聊天室失败:', error);
+        window.showMessage('搜索聊天室失败: ' + error.message, 'danger');
+    });
+}
+
 // 加载聊天室成员列表
-export function loadRoomMembers() {
-    // 获取当前聊天室RID
+function loadRoomMembers() {
     const currentRoomId = localStorage.getItem('currentRoomId');
-    // 检查roomId的有效性
-    if (!currentRoomId || currentRoomId === 'undefined' || currentRoomId === 'null') {
+    if (!currentRoomId) {
         window.showMessage('请先选择一个聊天室', 'warning');
         return;
     }
@@ -405,47 +626,73 @@ export function loadRoomMembers() {
         displayRoomMembers(members);
     })
     .catch(error => {
-        console.error('获取聊天室成员列表错误:', error);
-        window.showMessage('获取成员列表失败: ' + error.message, 'danger');
+        console.error('加载成员列表失败:', error);
+        window.showMessage('加载成员列表失败: ' + error.message, 'danger');
     });
 }
 
 // 显示聊天室成员列表
-export function displayRoomMembers(members) {
+function displayRoomMembers(members) {
     const membersList = document.getElementById('membersList');
-    if (!membersList) {
-        console.warn('未找到成员列表容器');
-        return;
-    }
+    if (!membersList) return;
     
     if (!members || members.length === 0) {
         membersList.innerHTML = '<li class="list-group-item text-center text-muted">暂无成员</li>';
         return;
     }
     
-    membersList.innerHTML = members.map(member => `
-        <li class="list-group-item d-flex align-items-center">
-            <img src="${member.avatarUrl || '/default-avatar.png'}" 
-                 alt="头像" 
-                 class="rounded-circle me-3" 
-                 width="40" 
-                 height="40"
-                 onerror="this.src='/default-avatar.png'">
-            <div class="flex-grow-1">
-                <div class="fw-bold">${member.nickname || member.username}</div>
-                <div class="text-muted small">@${member.username}</div>
-                <div class="text-muted small">UID: ${member.uid || member.id}</div>
+    membersList.innerHTML = '';
+    members.forEach(member => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex justify-content-between align-items-center';
+        li.innerHTML = `
+            <div class="d-flex align-items-center">
+                <img src="${member.avatarUrl || '/default-avatar.png'}" 
+                     alt="头像" 
+                     class="rounded-circle me-2" 
+                     width="32" 
+                     height="32"
+                     onerror="this.src='/default-avatar.png'">
+                <div>
+                    <div>${member.nickname || member.username}</div>
+                    ${member.role ? `<small class="text-muted">${getRoleDisplayName(member.role)}</small>` : ''}
+                </div>
             </div>
-            ${member.isCreator ? '<span class="badge bg-success">群主</span>' : ''}
-            ${member.isModerator ? '<span class="badge bg-warning">管理员</span>' : ''}
-        </li>
-    `).join('');
+            ${member.role !== 'creator' ? `
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" 
+                            type="button" 
+                            data-bs-toggle="dropdown">
+                        管理
+                    </button>
+                    <ul class="dropdown-menu">
+                        ${member.role !== 'admin' ? `<li><a class="dropdown-item" href="#" onclick="setMemberRole('${member.id}', 'admin')">设为管理员</a></li>` : ''}
+                        ${member.role === 'admin' ? `<li><a class="dropdown-item" href="#" onclick="setMemberRole('${member.id}', 'member')">取消管理员</a></li>` : ''}
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="#" onclick="kickMember('${member.id}')">踢出聊天室</a></li>
+                    </ul>
+                </div>
+            ` : ''}
+        `;
+        membersList.appendChild(li);
+    });
 }
 
-// 搜索聊天室功能
-export function searchRooms(query) {
-    if (!query) {
-        window.showMessage('请输入搜索关键词', 'warning');
+// 获取角色显示名称
+function getRoleDisplayName(role) {
+    switch (role) {
+        case 'creator': return '创建者';
+        case 'admin': return '管理员';
+        case 'member': return '成员';
+        default: return role;
+    }
+}
+
+// 设置成员角色
+window.setMemberRole = function(userId, role) {
+    const currentRoomId = localStorage.getItem('currentRoomId');
+    if (!currentRoomId) {
+        window.showMessage('请先选择一个聊天室', 'warning');
         return;
     }
     
@@ -455,228 +702,66 @@ export function searchRooms(query) {
         return;
     }
     
-    fetch(`/api/rooms/search?q=${encodeURIComponent(query)}`, {
+    fetch(`/api/rooms/${currentRoomId}/members/${userId}/role`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ role })
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || '操作失败');
+            });
+        }
+        return response.json();
+    })
+    .then(result => {
+        window.showMessage('操作成功', 'success');
+        loadRoomMembers(); // 重新加载成员列表
+    })
+    .catch(error => {
+        console.error('设置成员角色失败:', error);
+        window.showMessage('设置成员角色失败: ' + error.message, 'danger');
+    });
+};
+
+// 踢出成员
+window.kickMember = function(userId) {
+    const currentRoomId = localStorage.getItem('currentRoomId');
+    if (!currentRoomId) {
+        window.showMessage('请先选择一个聊天室', 'warning');
+        return;
+    }
+    
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.showMessage('未登录，请先登录', 'danger');
+        return;
+    }
+    
+    fetch(`/api/rooms/${currentRoomId}/members/${userId}`, {
+        method: 'DELETE',
         headers: {
             'Authorization': `Bearer ${token}`
         }
     })
     .then(response => {
         if (!response.ok) {
-            throw new Error('搜索失败');
-        }
-        return response.json();
-    })
-    .then(data => {
-        displaySearchResults(data.rooms);
-    })
-    .catch(error => {
-        console.error('搜索聊天室失败:', error);
-        window.showMessage('搜索失败，请稍后再试', 'danger');
-    });
-}
-
-// 显示搜索结果
-export function displaySearchResults(rooms) {
-    const resultsContainer = document.getElementById('searchRoomResults');
-    if (!resultsContainer) return;
-    
-    if (!rooms || rooms.length === 0) {
-        resultsContainer.innerHTML = '<li class="list-group-item">未找到相关聊天室</li>';
-        return;
-    }
-    
-    resultsContainer.innerHTML = rooms.map(room => `
-        <li class="list-group-item">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h6 class="mb-1">${room.name}</h6>
-                    <small class="text-muted">ID: ${room.id} | 创建者: ${room.creatorNickname} | 成员: ${room.memberCount}人</small>
-                </div>
-                <button class="btn btn-sm btn-outline-primary" onclick="joinRoom(${room.id})">
-                    加入
-                </button>
-            </div>
-        </li>
-    `).join('');
-}
-
-// 加入房间功能
-export function joinRoom(roomId) {
-    const token = localStorage.getItem('token');
-    if (!token) {
-        window.showMessage('未登录，请先登录', 'danger');
-        return;
-    }
-    
-    // 发送加入请求
-    fetch(`/api/rooms/${roomId}/join-request`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({})
-    })
-    .then(response => {
-        return response.json().then(data => {
-            if (!response.ok) {
-                throw new Error(data.error || '加入聊天室失败');
-            }
-            return data;
-        });
-    })
-    .then(result => {
-        if (result.success) {
-            window.showMessage(result.message || '加入请求已发送，等待房主审批', 'success');
-        }
-        // 重新加载聊天室列表
-        if (typeof window.loadRooms === 'function') {
-            window.loadRooms();
-        }
-        // 隐藏搜索模态框
-        const modal = bootstrap.Modal.getInstance(document.getElementById('searchRoomModal'));
-        if (modal) {
-            modal.hide();
-        }
-    })
-    .catch(error => {
-        console.error('加入聊天室失败:', error);
-        window.showMessage(error.message || '加入聊天室失败', 'danger');
-    });
-}
-
-/**
- * 加载待审批请求
- */
-export async function loadPendingRequests(roomId, token) {
-    try {
-        const response = await fetch(`/api/rooms/${roomId}/pending-requests`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error('获取待处理请求失败');
-        }
-
-        const requests = await response.json();
-        displayPendingRequests(requests);
-    } catch (error) {
-        console.error('加载待审批请求失败:', error);
-        showMessage('加载待审批请求失败: ' + error.message, 'danger');
-    }
-}
-
-/**
- * 显示待审批请求
- */
-export function displayPendingRequests(requests) {
-    const container = document.getElementById('pendingRequestsContainer');
-    const noRequestsMessage = document.getElementById('noRequestsMessage');
-    const joinRequestsSection = document.getElementById('joinRequestsSection');
-    
-    if (!container) return;
-
-    // 如果没有请求，显示"暂无请求"消息
-    if (!requests || requests.length === 0) {
-        if (noRequestsMessage) {
-            noRequestsMessage.style.display = 'block';
-        }
-        container.innerHTML = '';
-        if (joinRequestsSection) {
-            joinRequestsSection.style.display = 'block';
-        }
-        return;
-    }
-
-    // 隐藏"暂无请求"消息
-    if (noRequestsMessage) {
-        noRequestsMessage.style.display = 'none';
-    }
-
-    let html = '';
-    requests.forEach(request => {
-        // 获取用户信息
-        const user = request.User || {};
-        
-        html += `
-            <div class="card mb-2">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="d-flex align-items-center">
-                            <img src="${user.avatarUrl || '/default-avatar.png'}" 
-                                 alt="头像" 
-                                 class="rounded-circle me-3" 
-                                 width="40" 
-                                 height="40"
-                                 onerror="this.src='/default-avatar.png'">
-                            <div>
-                                <h6 class="mb-1">${user.nickname || user.username || '未知用户'}</h6>
-                                <p class="mb-1 text-muted small">@${user.username || 'unknown'}</p>
-                                ${request.message ? `<p class="mb-1">${request.message}</p>` : ''}
-                                <small class="text-muted">申请时间: ${new Date(request.requestTime).toLocaleString('zh-CN')}</small>
-                            </div>
-                        </div>
-                        <div>
-                            <button class="btn btn-sm btn-success approve-request-btn me-1" 
-                                    data-user-id="${user.userId}"
-                                    data-room-id="${request.roomId}">
-                                <i class="bi bi-check"></i> 允许
-                            </button>
-                            <button class="btn btn-sm btn-danger reject-request-btn" 
-                                    data-user-id="${user.userId}"
-                                    data-room-id="${request.roomId}">
-                                <i class="bi bi-x"></i> 拒绝
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-
-    container.innerHTML = html;
-    
-    // 显示审批区域
-    if (joinRequestsSection) {
-        joinRequestsSection.style.display = 'block';
-    }
-
-    // 绑定批准和拒绝按钮事件
-    document.querySelectorAll('.approve-request-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const userId = this.getAttribute('data-user-id');
-            const roomId = this.getAttribute('data-room-id');
-            handleJoinRequest(roomId, userId, 'approve');
-        });
-    });
-
-    document.querySelectorAll('.reject-request-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const userId = this.getAttribute('data-user-id');
-            const roomId = this.getAttribute('data-room-id');
-            handleJoinRequest(roomId, userId, 'reject');
-        });
-    });
-}
-
-// 直接加入房间（无需审批）
-function directJoinRoom(roomId, token) {
-    return fetch(`/api/rooms/${roomId}/join-request`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({})
-    })
-    .then(response => {
-        if (!response.ok) {
             return response.json().then(data => {
-                throw new Error(data.error || '加入聊天室失败');
+                throw new Error(data.error || '操作失败');
             });
         }
         return response.json();
+    })
+    .then(result => {
+        window.showMessage('操作成功', 'success');
+        loadRoomMembers(); // 重新加载成员列表
+    })
+    .catch(error => {
+        console.error('踢出成员失败:', error);
+        window.showMessage('踢出成员失败: ' + error.message, 'danger');
     });
-}
+};
