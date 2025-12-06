@@ -295,44 +295,122 @@ export async function loadPendingRequests(roomId, token) {
 
 // 显示待处理请求
 export function displayPendingRequests(requests) {
-    const pendingRequestsList = document.getElementById('pendingRequestsList');
-    if (!pendingRequestsList) return;
+    const container = document.getElementById('pendingRequestsContainer');
+    const noRequestsMessage = document.getElementById('noRequestsMessage');
+    const joinRequestsSection = document.getElementById('joinRequestsSection');
+    
+    if (!container) return;
 
+    // 确保审批区域可见（无论是否有请求）
+    if (joinRequestsSection) {
+        joinRequestsSection.style.display = 'block';
+    }
+
+    // 如果没有请求，显示"暂无请求"消息
     if (!requests || requests.length === 0) {
-        pendingRequestsList.innerHTML = '<li class="list-group-item text-center text-muted">暂无待处理请求</li>';
+        if (noRequestsMessage) {
+            noRequestsMessage.style.display = 'block';
+        }
+        container.innerHTML = '';
         return;
     }
 
-    pendingRequestsList.innerHTML = '';
+    // 隐藏"暂无请求"消息
+    if (noRequestsMessage) {
+        noRequestsMessage.style.display = 'none';
+    }
+
+    let html = '';
     requests.forEach(request => {
-        const li = document.createElement('li');
-        li.className = 'list-group-item d-flex justify-content-between align-items-center';
-        li.innerHTML = `
-            <div class="d-flex align-items-center">
-                <img src="${request.user.avatarUrl || '/default-avatar.png'}" 
-                     alt="头像" 
-                     class="rounded-circle me-2" 
-                     width="32" 
-                     height="32"
-                     onerror="this.src='/default-avatar.png'">
-                <div>
-                    <div>${request.user.nickname || request.user.username}</div>
-                    <small class="text-muted">申请时间: ${new Date(request.requestedAt).toLocaleString()}</small>
+        html += `
+            <div class="card mb-2">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <img src="${request.user.avatarUrl || '/default-avatar.png'}" 
+                                 alt="头像" 
+                                 class="rounded-circle me-3" 
+                                 width="40" 
+                                 height="40"
+                                 onerror="this.src='/default-avatar.png'">
+                            <div>
+                                <h6 class="mb-1">${request.user.nickname || request.user.username || '未知用户'}</h6>
+                                <small class="text-muted">申请时间: ${new Date(request.requestedAt).toLocaleString()}</small>
+                            </div>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-success approve-request-btn me-1" 
+                                    data-room-id="${request.roomId}"
+                                    data-user-id="${request.userId}">
+                                <i class="bi bi-check"></i> 允许
+                            </button>
+                            <button class="btn btn-sm btn-danger reject-request-btn" 
+                                    data-room-id="${request.roomId}"
+                                    data-user-id="${request.userId}">
+                                <i class="bi bi-x"></i> 拒绝
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div>
-                <button class="btn btn-sm btn-success me-1" 
-                        onclick="handleJoinRequest('${request.roomId}', '${request.userId}', 'approve')">
-                    允许
-                </button>
-                <button class="btn btn-sm btn-danger" 
-                        onclick="handleJoinRequest('${request.roomId}', '${request.userId}', 'reject')">
-                    拒绝
-                </button>
-            </div>
         `;
-        pendingRequestsList.appendChild(li);
     });
+    
+    container.innerHTML = html;
+    
+    // 为批准和拒绝按钮添加事件监听器
+    document.querySelectorAll('.approve-request-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const roomId = this.getAttribute('data-room-id');
+            const userId = this.getAttribute('data-user-id');
+            handleJoinRequest(roomId, userId, 'approve');
+        });
+    });
+    
+    document.querySelectorAll('.reject-request-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const roomId = this.getAttribute('data-room-id');
+            const userId = this.getAttribute('data-user-id');
+            handleJoinRequest(roomId, userId, 'reject');
+        });
+    });
+}
+
+// 处理加入请求（批准或拒绝）
+export async function handleJoinRequest(roomId, userId, action) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.showMessage('未登录', 'danger');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/rooms/${roomId}/approve-join-request`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                userId: parseInt(userId),
+                action: action
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+
+        // 显示成功消息
+        window.showMessage(action === 'approve' ? '已允许用户加入' : '已拒绝用户加入请求', 'success');
+
+        // 重新加载待处理请求
+        await loadPendingRequests(roomId, token);
+    } catch (error) {
+        console.error('处理加入请求失败:', error);
+        window.showMessage('处理失败: ' + error.message, 'danger');
+    }
 }
 
 // 绑定各种按钮事件
@@ -348,6 +426,28 @@ export function bindRoomButtons() {
                     createRoomModal.show();
                 }
             }
+        });
+    }
+    
+    // 刷新聊天室列表按钮
+    const refreshRoomListBtn = document.getElementById('refreshRoomListBtn');
+    if (refreshRoomListBtn) {
+        refreshRoomListBtn.addEventListener('click', function() {
+            // 添加旋转动画类
+            const icon = refreshRoomListBtn.querySelector('i');
+            if (icon) {
+                icon.classList.add('fa-spin');
+            }
+            
+            // 刷新聊天室列表
+            loadRooms();
+            
+            // 延迟移除动画类，给用户视觉反馈
+            setTimeout(() => {
+                if (icon) {
+                    icon.classList.remove('fa-spin');
+                }
+            }, 1000);
         });
     }
     
@@ -418,9 +518,6 @@ export function bindRoomButtons() {
                 const settingsModal = new bootstrap.Modal(settingsModalEl);
                 if (settingsModal) {
                     settingsModal.show();
-                    
-                    // 加载房间设置
-                    loadRoomSettings();
                 }
             }
         });
@@ -581,7 +678,8 @@ function displaySearchResults(rooms, users) {
     document.querySelectorAll('.join-room-btn').forEach(button => {
         button.addEventListener('click', function() {
             const roomId = this.getAttribute('data-room-id');
-            window.joinRoom(roomId);
+            // 调用申请加入房间函数而不是直接加入
+            requestToJoinRoom(roomId);
             
             // 关闭搜索模态框
             const searchModal = bootstrap.Modal.getInstance(document.getElementById('searchRoomModal'));
@@ -623,7 +721,7 @@ export function startPrivateChat(userId) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${token}` // 注意：根据规范，这里应该使用cookie传输，但前端代码中仍使用Authorization header
         },
         body: JSON.stringify({ targetUserId: parseInt(userId) })
     })
@@ -644,6 +742,11 @@ export function startPrivateChat(userId) {
             import('./websocket.js').then(module => {
                 module.joinRoom(roomId);
             });
+            
+            // 通过WebSocket通知对方用户刷新聊天室列表
+            if (window.socket && window.socket.connected) {
+                window.socket.emit('refreshRoomList', { targetUserId: parseInt(userId) });
+            }
             
             // 关闭搜索模态框
             const searchModal = bootstrap.Modal.getInstance(document.getElementById('searchRoomModal'));
@@ -841,3 +944,83 @@ window.kickMember = function(userId) {
         window.showMessage('踢出成员失败: ' + error.message, 'danger');
     });
 };
+
+// 添加申请加入房间的函数
+async function requestToJoinRoom(roomId) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.showMessage('未登录，请先登录', 'danger');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/rooms/${roomId}/join-request`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+            // 检查响应内容判断是否需要审核
+            if (data.requiresApproval) {
+                // 需要审核
+                window.showMessage('加入请求已发送，等待房主审批', 'success');
+            } else {
+                // 不需要审核，直接加入成功
+                window.showMessage('成功加入聊天室', 'success');
+                // 刷新聊天室列表以显示新加入的房间
+                loadRooms();
+            }
+        } else {
+            window.showMessage(data.error || '发送加入请求失败', 'danger');
+        }
+    } catch (error) {
+        console.error('申请加入房间失败:', error);
+        window.showMessage('申请加入房间失败: ' + error.message, 'danger');
+    }
+}
+
+// 将requestToJoinRoom函数暴露到全局作用域
+window.requestToJoinRoom = requestToJoinRoom;
+
+// 创建聊天室
+export async function createRoom(roomData) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.showMessage('未登录，请先登录', 'danger');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/rooms', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(roomData)
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+            window.showMessage('聊天室创建成功', 'success');
+            
+            // 重新加载聊天室列表
+            await loadRooms();
+            
+            // 关闭创建聊天室模态框
+            const modal = bootstrap.Modal.getInstance(document.getElementById('createRoomModal'));
+            if (modal) modal.hide();
+        } else {
+            window.showMessage(data.error || '聊天室创建失败', 'danger');
+        }
+    } catch (error) {
+        console.error('创建聊天室错误:', error);
+        window.showMessage('网络错误，请稍后再试', 'danger');
+    }
+}

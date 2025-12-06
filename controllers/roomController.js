@@ -687,6 +687,11 @@ exports.getPendingRequests = async (req, res) => {
             return res.status(404).json({ error: '聊天室不存在' });
         }
         
+        // 如果聊天室不需要审批，则不显示审批区域
+        if (!room.requireApproval) {
+            return res.json([]);
+        }
+        
         // 检查当前用户是否是聊天室创建者或管理员
         const roomMember = await models.RoomMember.findOne({
             where: { 
@@ -730,7 +735,7 @@ exports.getPendingRequests = async (req, res) => {
         const requestsWithUsers = pendingRequests.map(request => {
             return {
                 ...request.toJSON(),
-                User: userMap[request.userId] || null
+                user: userMap[request.userId] || null
             };
         });
         

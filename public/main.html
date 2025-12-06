@@ -67,6 +67,16 @@
             color: #333;
             font-weight: bold;
         }
+        
+        /* 刷新按钮旋转动画 */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .fa-spin {
+            animation: spin 1s linear infinite;
+        }
     </style>
 </head>
 <body>
@@ -302,7 +312,7 @@
                                     <div class="mb-3">
                                         <label for="avatar" class="form-label">头像（可选）</label>
                                         <input type="file" class="form-control" id="regAvatar" name="avatar" accept="image/*">
-                                        <small class="text-muted">支持 JPG、PNG 格式，最大 5MB</small>
+                                        <small class="text-muted">最大 5MB</small>
                                     </div>
                                     <div class="mb-3">
                                         <label for="password" class="form-label">密码</label>
@@ -310,7 +320,7 @@
                                             <span class="input-group-text"><i class="bi bi-lock"></i></span>
                                             <input type="password" class="form-control" id="regPassword" name="password" required minlength="6">
                                         </div>
-                                        <small class="text-muted">至少6位字符</small>
+                                        <small class="text-muted">至少8位字符</small>
                                     </div>
                                     <div class="mb-3">
                                         <label for="confirmPassword" class="form-label">确认密码</label>
@@ -357,6 +367,9 @@
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">聊天室</h5>
                         <div>
+                            <button class="btn btn-sm btn-primary me-1" id="refreshRoomListBtn" title="刷新聊天室列表">
+                                <i class="bi bi-arrow-repeat"></i>
+                            </button>
                             <button class="btn btn-sm btn-primary me-1" id="createRoomBtn"><i class="bi bi-plus-circle"></i></button>
                             <button class="btn btn-sm btn-primary" id="searchRoomBtn"><i class="bi bi-search"></i></button>
                         </div>

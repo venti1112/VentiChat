@@ -9,7 +9,8 @@ import { handleFileSelect, uploadFile, uploadLargeFile, sendFileMessage } from '
 import { sendMessage, bindSendMessageEvents } from './modules/messageSender.js';
 import { playVideoInFullscreen } from './modules/videoPlayer.js';
 import { imageViewerInstance } from './modules/imageViewer.js';
-import { initializeRoomSettings, handleJoinRequest } from './modules/roomSettings.js';
+import { initializeRoomSettings } from './modules/roomSettings.js';
+import { handleJoinRequest } from './modules/roomManager.js';
 
 // 将函数暴露到全局作用域，以便HTML可以直接调用
 window.showMessage = showMessage;
