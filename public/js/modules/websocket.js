@@ -16,7 +16,7 @@ function updateWebSocketIndicator(connected) {
             icon.title = '已与服务器建立实时通信连接';
         } else {
             icon.className = 'bi bi-plug-fill text-danger';
-            icon.title = '与服务器建立实时通信连接失败';
+            icon.title = '与服务器建立实时通信连接失败，消息接收可能会产生较大延迟！';
         }
     }
 }
