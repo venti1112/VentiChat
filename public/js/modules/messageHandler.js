@@ -1,5 +1,8 @@
 // 消息处理模块
 
+// 用于跟踪已显示消息的集合，防止重复显示
+const displayedMessages = new Set();
+
 // 用户信息缓存
 const userCache = new Map();
 const userCacheExpiry = new Map();
@@ -215,7 +218,7 @@ export async function renderMessage(message) {
     }
     
     // 检查是否为待发送消息（临时消息）
-    if (message.id && message.id.startsWith('temp_')) {
+    if (message.id && String(message.id).startsWith('temp_')) {
         content = `
             <div style="opacity: 0.7;">
                 ${content}
@@ -257,8 +260,19 @@ export async function displayMessages(messages) {
     // 如果只有一条消息，将其添加到现有消息列表中
     if (messages.length === 1) {
         const message = messages[0];
+        const messageId = message.messageId || message.id;
+        
+        // 检查消息是否已显示过，防止重复显示
+        if (displayedMessages.has(String(messageId))) {
+            console.log('消息已显示过，跳过:', messageId);
+            return;
+        }
+        
+        // 将消息ID添加到已显示集合中
+        displayedMessages.add(String(messageId));
+        
         // 检查消息是否已存在
-        const existingMessage = chatMessages.querySelector(`.message-item[data-message-id="${message.id}"]`);
+        const existingMessage = chatMessages.querySelector(`.message-item[data-message-id="${messageId}"]`);
         if (existingMessage) {
             // 如果消息已存在，更新内容（可能是撤回的消息）
             existingMessage.innerHTML = await renderMessage(message);
@@ -268,7 +282,7 @@ export async function displayMessages(messages) {
         // 添加新消息
         const messageElement = document.createElement('div');
         messageElement.className = 'message-item mb-3';
-        messageElement.setAttribute('data-message-id', message.messageId || message.id);
+        messageElement.setAttribute('data-message-id', messageId);
         messageElement.innerHTML = await renderMessage(message);
         chatMessages.appendChild(messageElement);
     } else {
@@ -278,11 +292,21 @@ export async function displayMessages(messages) {
             return;
         }
         
+        // 清空已显示消息集合，因为我们要重新加载历史消息
+        displayedMessages.clear();
+        
+        // 将所有消息ID添加到已显示集合中
+        messages.forEach(msg => {
+            const messageId = msg.messageId || msg.id;
+            displayedMessages.add(String(messageId));
+        });
+        
         // 使用 Promise.all 并行处理所有消息的渲染
         const renderedMessages = await Promise.all(messages.map(async (message) => {
             const rendered = await renderMessage(message);
+            const messageId = message.messageId || message.id;
             return `
-                <div class="message-item mb-3" data-message-id="${message.messageId || message.id}">
+                <div class="message-item mb-3" data-message-id="${messageId}">
                     ${rendered}
                 </div>
             `;
@@ -305,4 +329,9 @@ export async function displayMessages(messages) {
     
     // 滚动到底部
     chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// 清除消息记录（用于切换房间等场景）
+export function clearDisplayedMessages() {
+    displayedMessages.clear();
 }

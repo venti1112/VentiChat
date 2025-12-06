@@ -206,6 +206,13 @@ export function bindFormEvents() {
                         
                         // 建立WebSocket连接
                         window.initializeWebSocket(data.token);
+                        
+                        // 更新连接状态指示器
+                        const connectionStatus = document.getElementById('connectionStatus');
+                        if (connectionStatus) {
+                            connectionStatus.className = 'status-indicator status-connecting';
+                            connectionStatus.title = '连接中...';
+                        }
                     }
                 } else {
                     // 登录失败，显示服务器返回的错误信息
@@ -439,6 +446,15 @@ export function getUserPreferences() {
 
 // 应用用户个性化设置
 export function applyUserPreferences(preferences) {
+    // 添加参数检查，防止preferences为undefined
+    if (!preferences) {
+        console.warn('用户个性化设置未定义，使用默认设置');
+        preferences = {
+            backgroundUrl: '/wp.jpg',
+            themeColor: '#4cd8b8'
+        };
+    }
+    
     // 应用自定义背景
     if (preferences.backgroundUrl) {
         document.body.style.backgroundImage = `url('${preferences.backgroundUrl}')`;
@@ -455,19 +471,15 @@ export function applyUserPreferences(preferences) {
         // 应用主题色到各种按钮元素
         const buttons = document.querySelectorAll('.btn');
         buttons.forEach(button => {
-            button.style.backgroundColor = preferences.themeColor;
+            // 移除之前的主题色样式
+            button.style.backgroundColor = '';
+            button.style.borderColor = '';
         });
         
         // 应用主题色到其他需要着色的元素
         const themeColorElements = document.querySelectorAll('.theme-color-element');
         themeColorElements.forEach(element => {
-            element.style.borderColor = preferences.themeColor;
+            element.style.borderColor = '';
         });
-    } else {
-        // 如果没有自定义主题色，移除data-theme-color属性
-        document.body.removeAttribute('data-theme-color');
     }
-    
-    // 将个性化设置保存到localStorage中
-    localStorage.setItem('userPreferences', JSON.stringify(preferences));
 }

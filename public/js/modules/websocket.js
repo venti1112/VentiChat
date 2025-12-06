@@ -1,163 +1,166 @@
 // WebSocket管理模块
 
+// 当前房间ID
+let currentRoomId = null;
+
+// 存储已发送消息的ID，避免重复显示自己发送的消息
+const sentMessageIds = new Set();
+
+// 更新WebSocket连接状态指示器
+function updateWebSocketIndicator(connected) {
+    const indicator = document.getElementById('websocketIndicator');
+    if (indicator) {
+        const icon = indicator.querySelector('i');
+        if (connected) {
+            icon.className = 'bi bi-plug-fill text-success';
+            icon.title = '已与服务器建立实时通信连接';
+        } else {
+            icon.className = 'bi bi-plug-fill text-danger';
+            icon.title = '与服务器建立实时通信连接失败';
+        }
+    }
+}
+
 // 初始化WebSocket连接
 export function initializeWebSocket(token) {
+    // 初始状态下设置为未连接
+    updateWebSocketIndicator(false);
+    
     if (!token) {
-        return;
+        console.error('Missing token for WebSocket connection');
+        return null;
+    }
+    
+    // 如果已经有socket连接，先断开
+    if (window.socket) {
+        window.socket.disconnect();
     }
     
     // 创建WebSocket连接
     const socket = io({
         auth: {
             token: token
-        }
+        },
+        transports: ['websocket', 'polling'], // 先尝试websocket，再尝试轮询
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        timeout: 20000
     });
     
     window.socket = socket;
     
     // 监听连接事件
     socket.on('connect', () => {
+        console.log('WebSocket connected successfully, socket id:', socket.id);
+        updateWebSocketIndicator(true);
         
         // 如果有当前聊天室，加入该聊天室
-        const currentRoomId = localStorage.getItem('currentRoomId');
-        if (currentRoomId) {
-            socket.emit('joinRoom', {roomId: currentRoomId});
+        const storedRoomId = localStorage.getItem('currentRoomId');
+        if (storedRoomId) {
+            joinRoom(storedRoomId);
         }
     });
 
-    // 添加自动刷新机制
-    let refreshInterval = null;
-    
-    // 开始自动刷新
-    function startAutoRefresh() {
-        // 清除现有的定时器（如果有的话）
-        if (refreshInterval) {
-            clearInterval(refreshInterval);
-        }
-        
-        // 每5秒检查一次新消息
-        refreshInterval = setInterval(async () => {
-            const currentRoomId = localStorage.getItem('currentRoomId');
-            if (currentRoomId && token) {
-                try {
-                    const response = await fetch(`/api/messages/${currentRoomId}/history?limit=10`, {
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        }
-                    });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        const messages = data.messages || data;
-                        
-                        // 检查是否有新消息
-                        const chatMessages = document.getElementById('chatMessages');
-                        if (chatMessages && messages.length > 0) {
-                            // 获取当前显示的消息ID列表
-                            const displayedMessageIds = Array.from(
-                                chatMessages.querySelectorAll('.message-item')
-                            ).map(el => el.dataset.messageId);
-                            
-                            // 找出新消息
-                            const newMessages = messages.filter(msg => 
-                                !displayedMessageIds.includes(String(msg.messageId || msg.id))
-                            );
-                            
-                            // 如果有新消息，添加到聊天界面
-                            if (newMessages.length > 0) {
-                                await window.displayMessages(newMessages);
-                                
-                                // 滚动到底部
-                                chatMessages.scrollTop = chatMessages.scrollHeight;
-                            }
-                        }
-                    }
-                } catch (error) {
-                }
-            }
-        }, 5000); // 每5秒刷新一次
-    }
-    
-    // 停止自动刷新
-    function stopAutoRefresh() {
-        if (refreshInterval) {
-            clearInterval(refreshInterval);
-            refreshInterval = null;
-        }
-    }
-    
-    // 当加入房间时启动自动刷新
-    socket.on('joinRoom', () => {
-        startAutoRefresh();
+    // 监听连接错误
+    socket.on('connect_error', (error) => {
+        console.error('WebSocket connection error:', error);
+        updateWebSocketIndicator(false);
     });
-    
-    // 页面隐藏时停止刷新，显示时恢复刷新
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-            stopAutoRefresh();
-        } else {
-            startAutoRefresh();
+
+    // 监听断开连接
+    socket.on('disconnect', (reason) => {
+        console.log('WebSocket disconnected, reason:', reason);
+        updateWebSocketIndicator(false);
+        // 尝试重新连接
+        if (reason === 'io server disconnect') {
+            // 服务器主动断开，尝试重连
+            socket.connect();
         }
     });
-    
+
+    // 监听认证错误
+    socket.on('unauthorized', (error) => {
+        console.error('WebSocket authentication failed:', error);
+        updateWebSocketIndicator(false);
+        window.showMessage('认证失败，请重新登录', 'danger');
+        // 清除本地存储并跳转到登录页面
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('userId');
+        window.location.reload();
+    });
+
     // 监听新消息事件
     socket.on('newMessage', async (message) => {
-        // 检查是否是当前聊天室的消息
-        const currentRoomId = localStorage.getItem('currentRoomId');
-        if (currentRoomId && currentRoomId == message.roomId) {
-            // 显示新消息（等待异步渲染完成）
-            await window.displayMessages([message]);
-            
-            // 滚动到底部
-            const chatMessages = document.getElementById('chatMessages');
-            if (chatMessages) {
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+        console.log('Received new message:', message);
+        
+        try {
+            // 检查是否是当前聊天室的消息
+            const currentRoomId = localStorage.getItem('currentRoomId');
+            if (currentRoomId && String(currentRoomId) === String(message.roomId)) {
+                // 显示新消息（等待异步渲染完成）
+                await window.displayMessages([message]);
+                
+                // 滚动到底部
+                const chatMessages = document.getElementById('chatMessages');
+                if (chatMessages) {
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+            } else {
+                // 不是当前聊天室的消息，更新房间列表中的未读数
+                updateRoomUnreadCount(message.roomId);
             }
-        } else {
-            // 不是当前聊天室的消息，更新房间列表中的未读数
-            updateRoomUnreadCount(message.roomId);
+        } catch (error) {
+            console.error('Error processing new message:', error);
         }
     });
     
+    // 监听消息发送确认事件
+    socket.on('messageSent', (data) => {
+        console.log('Message sent confirmed:', data);
+        // 触发自定义事件，让messageSender.js处理临时消息替换
+        window.dispatchEvent(new CustomEvent('messageSentSuccess', { detail: data }));
+    });
+
     // 监听消息撤回事件
     socket.on('messageRecalled', (data) => {
-        const messageElements = document.querySelectorAll(`.message-item[data-message-id="${data.messageId}"]`);
-        messageElements.forEach(element => {
-            window.renderMessage({
-                id: data.messageId,
-                type: 'recall',
-                content: '[已撤回]'
-            }).then(renderedMessage => {
-                element.innerHTML = renderedMessage;
+        console.log('Received message recall notification:', data);
+        try {
+            const messageElements = document.querySelectorAll(`.message-item[data-message-id="${data.messageId}"]`);
+            messageElements.forEach(element => {
+                window.renderMessage({
+                    id: data.messageId,
+                    type: 'recall',
+                    content: '[已撤回]'
+                }).then(renderedMessage => {
+                    element.innerHTML = renderedMessage;
+                });
             });
-        });
+        } catch (error) {
+            console.error('处理消息撤回时出错:', error);
+        }
     });
     
-    // 监听未读计数更新事件
-    socket.on('unreadCountUpdate', (data) => {
-        // 更新未读计数显示
-        updateUnreadCount(data.count);
-    });
-    
-    // 监听连接错误事件
-    socket.on('connect_error', (error) => {
-        console.error('WebSocket连接错误:', error);
-    });
-    
-    // 监听断开连接事件
-    socket.on('disconnect', () => {
-        console.log('WebSocket连接断开');
+    // 监听错误消息
+    socket.on('errorMessage', (error) => {
+        console.error('WebSocket error:', error);
+        window.showMessage('错误: ' + (error.message || '未知错误'), 'danger');
     });
     
     return socket;
 }
 
-// 更新未读计数显示
-export function updateUnreadCount(count) {
-    // 这里可以更新UI上的未读计数显示
+// 加入房间
+export function joinRoom(roomId) {
+    if (window.socket && window.socket.connected) {
+        window.socket.emit('joinRoom', { rid: parseInt(roomId) });
+        currentRoomId = roomId;
+        console.log('Joined room:', roomId);
+    }
 }
 
-// 更新房间未读数显示
+// 更新房间未读计数显示
 export function updateRoomUnreadCount(roomId) {
     // 获取房间列表中对应的房间项
     const roomItem = document.querySelector(`#room-${roomId}`);
@@ -179,5 +182,18 @@ export function updateRoomUnreadCount(roomId) {
             const currentCount = parseInt(unreadBadge.textContent) || 0;
             unreadBadge.textContent = currentCount + 1;
         }
+    }
+}
+
+// 更新未读计数显示
+export function updateUnreadCount(count) {
+    try {
+        const unreadCountElement = document.getElementById('unreadCount');
+        if (unreadCountElement) {
+            unreadCountElement.textContent = count > 0 ? count : '';
+            unreadCountElement.style.display = count > 0 ? 'inline' : 'none';
+        }
+    } catch (error) {
+        console.error('Error updating unread count:', error);
     }
 }

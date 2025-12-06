@@ -55,6 +55,12 @@ export function enterRoom(room) {
         return;
     }
     
+    // 清除已显示消息记录
+    const chatMessages = document.getElementById('chatMessages');
+    if (chatMessages) {
+        chatMessages.innerHTML = '';
+    }
+    
     // 更新当前聊天室显示
     const currentRoomNameElement = document.getElementById('currentRoomName');
     if (currentRoomNameElement) {

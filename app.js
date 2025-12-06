@@ -486,5 +486,63 @@ if (require.main === module) {
         socket.on('error', (error) => {
             log(LOG_LEVELS.ERROR, `Socket错误 [用户: ${username}(${userId})]: ${error.message}`);
         });
+        
+        // 处理发送消息事件
+        socket.on('sendMessage', async (data) => {
+            try {
+                const { rid, content, type } = data;
+                
+                // 检查必要参数
+                if (!rid || !content) {
+                    socket.emit('errorMessage', { message: '缺少必要参数' });
+                    return;
+                }
+                
+                // 验证用户是否是聊天室成员（使用正确导入的模型）
+                const roomMember = await models.RoomMember.findOne({
+                    where: {
+                        userId: userId,
+                        roomId: rid
+                    }
+                });
+                
+                if (!roomMember) {
+                    socket.emit('errorMessage', { message: '您不是该聊天室的成员' });
+                    return;
+                }
+                
+                // 创建消息
+                const message = await models.Message.create({
+                    userId: userId,
+                    roomId: rid,
+                    content: content,
+                    type: type || 'text'
+                });
+                
+                // 获取发送者信息
+                const sender = await models.User.findByPk(userId, {
+                    attributes: ['userId', 'username', 'nickname', 'avatarUrl']
+                });
+                
+                // 组装完整消息对象
+                const messageData = {
+                    ...message.toJSON(),
+                    Sender: sender
+                };
+                
+                // 广播消息到房间（排除发送者自己）
+                socket.to(`room_${rid}`).emit('newMessage', messageData);
+                
+                // 向发送者确认消息已发送
+                socket.emit('messageSent', { 
+                    messageId: message.messageId,
+                    ...messageData
+                });
+                
+            } catch (error) {
+                log(LOG_LEVELS.ERROR, `发送消息失败: ${error.message}`);
+                socket.emit('errorMessage', { message: '发送消息失败: ' + error.message });
+            }
+        });
     });
 }
