@@ -290,30 +290,21 @@ export function bindFormEvents() {
                 
                 console.info('退出按钮点击事件触发');
                 
-                // 获取token用于请求退出登录接口
-                const token = localStorage.getItem('token');
-                
                 // 调用后端退出登录接口
-                if (token) {
-                    fetch('/api/auth/logout', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        }
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            console.warn('退出登录接口调用失败:', response.status);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.info('退出登录接口响应:', data);
-                    })
-                    .catch(error => {
-                        console.error('退出登录接口调用错误:', error);
-                    });
-                }
+                fetch('/api/auth/logout')
+                .then(response => {
+                    if (!response.ok) {
+                        console.warn('退出登录接口调用失败:', response.status);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.info('退出登录接口响应:', data);
+                })
+                .catch(error => {
+                    console.error('退出登录接口调用错误:', error);
+                });
+        
                 
                 // 清除本地存储
                 localStorage.removeItem('token');

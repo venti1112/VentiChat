@@ -85,22 +85,12 @@ export async function showRoomSettings(roomId) {
             const modal = bootstrap.Modal.getOrCreateInstance(settingsModalElement);
             modal.show();
             
-            // 如果是房主且房间需要审批，加载待处理请求并显示审批区域
+            // 加载待处理请求并显示审批区域
             const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-            if (room.creatorId === currentUser.userId && room.requireApproval) {
-                await loadPendingRequests(currentRoomId, token);
-                // 确保审批区域可见（即使没有请求也显示）
-                const joinRequestsSection = document.getElementById('joinRequestsSection');
-                if (joinRequestsSection) {
-                    joinRequestsSection.style.display = 'block';
-                }
-            } else {
-                // 隐藏审批区域
-                const joinRequestsSection = document.getElementById('joinRequestsSection');
-                if (joinRequestsSection) {
-                    joinRequestsSection.style.display = 'none';
-                }
-            }
+            await loadPendingRequests(currentRoomId, token);
+            // 确保审批区域可见（即使没有请求也显示）
+            const joinRequestsSection = document.getElementById('joinRequestsSection');
+            joinRequestsSection.style.display = 'block';
         }
     } catch (error) {
         console.error('显示房间设置失败:', error);

@@ -1,4 +1,3 @@
-
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -252,18 +251,27 @@ process.on('SIGTERM', () => {
 
 // 启动服务器函数
 async function startServer(httpServer) {
+    // 从环境变量获取端口号，如果没有则使用配置文件中的端口
+    const port = process.env.WORKER_PORT ? parseInt(process.env.WORKER_PORT) : parseInt(config.port);
+    
     // 先尝试连接数据库
     const connected = await connectToDatabase();
     
     if (connected) {
         // 启动服务器
-        httpServer.listen(config.port);
+        httpServer.listen(port, () => {
+            const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
+            log(LOG_LEVELS.INFO, `工作进程 ${workerId} 启动完成，监听端口 ${port}`);
+        });
     } else {
         // 如果初始连接失败，启动重试机制
         retryDatabaseConnection();
         
         // 即使数据库未连接也启动服务器，但会返回500错误
-        httpServer.listen(config.port);
+        httpServer.listen(port, () => {
+            const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
+            log(LOG_LEVELS.INFO, `工作进程 ${workerId} 启动完成，监听端口 ${port} (数据库连接失败)`);
+        });
     }
 
 }
@@ -410,7 +418,8 @@ if (require.main === module) {
         const cluster = require('cluster');
         const { processIds } = require('./utils/logger');
         const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
-        log(LOG_LEVELS.INFO, `工作进程 ${workerId} 启动完成`);
+        const port = process.env.WORKER_PORT || config.port;
+        log(LOG_LEVELS.INFO, `工作进程 ${workerId} 启动完成，监听端口 ${port}`);
     });
     
     io.on('connection', async (socket) => {

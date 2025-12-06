@@ -61,7 +61,9 @@ async function checkAndInitialize() {
             
             // 衍生工作进程，并立即分配内部编号
             for (let i = 0; i < numCPUs; i++) {
-                const worker = cluster.fork();
+                const worker = cluster.fork({
+                    WORKER_PORT: parseInt(config.port) + i + 1  // 每个工作进程使用独立端口
+                });
                 // 立即为工作进程分配内部编号
                 const workerId = getNextWorkerId();
                 workers[workerId] = worker;
@@ -70,6 +72,13 @@ async function checkAndInitialize() {
                 // 向工作进程发送其ID
                 worker.send({ type: 'assignId', workerId: workerId });
             }
+            
+            // 启动负载均衡代理进程
+            const proxyProcess = spawn('node', ['proxy.js'], { stdio: 'inherit' });
+            
+            proxyProcess.on('error', (err) => {
+                console.error('代理进程启动失败:', err);
+            });
             
             // 处理工作进程间的消息转发
             Object.values(workers).forEach(worker => {
@@ -88,7 +97,9 @@ async function checkAndInitialize() {
                 const workerId = processIds.get(worker.process.pid);
                 log(LOG_LEVELS.INFO, `工作进程 ${workerId} 已退出 (代码: ${code}, 信号: ${signal})`);
                 log(LOG_LEVELS.INFO, '正在启动新的工作进程...');
-                const newWorker = cluster.fork();
+                const newWorker = cluster.fork({
+                    WORKER_PORT: parseInt(config.port) + Object.keys(workers).length + 1
+                });
                 const newWorkerId = getNextWorkerId();
                 workers[newWorkerId] = newWorker;
                 processIds.set(newWorker.process.pid, newWorkerId);

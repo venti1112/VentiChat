@@ -335,7 +335,7 @@ export function displayPendingRequests(requests) {
                                  onerror="this.src='/default-avatar.png'">
                             <div>
                                 <h6 class="mb-1">${request.user.nickname || request.user.username || '未知用户'}</h6>
-                                <small class="text-muted">申请时间: ${new Date(request.requestedAt).toLocaleString()}</small>
+                                <small class="text-muted">申请时间: ${new Date(request.requestTime).toLocaleString()}</small>
                             </div>
                         </div>
                         <div>
@@ -564,11 +564,7 @@ function searchRoomsAndUsers(keyword) {
     searchResultsContainer.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">加载中...</span></div></div>';
     
     // 搜索聊天室和用户
-    fetch(`/api/rooms/search?q=${encodeURIComponent(keyword)}`, {
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
-    })
+    fetch(`/api/search?q=${encodeURIComponent(keyword)}`)
     .then(response => {
         if (!response.ok) {
             throw new Error('搜索失败');

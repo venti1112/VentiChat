@@ -477,18 +477,6 @@ exports.kickMember = async (req, res) => {
     try {
         const { roomId, userId } = req.params;
         
-        // 检查操作者是否是房间管理员
-        const operatorMembership = await models.RoomMember.findOne({
-            where: {
-                userId: req.user.userId,
-                roomId: roomId
-            }
-        });
-        
-        if (!operatorMembership || !operatorMembership.isModerator) {
-            return res.status(403).json({ error: '您没有权限踢出成员' });
-        }
-        
         // 检查目标用户是否是房间创建者
         const room = await models.Room.findByPk(roomId);
         if (room && room.creatorId == userId) {
@@ -522,13 +510,9 @@ exports.updateRoomSettings = async (req, res) => {
         const { id } = req.params;
         const { name, requireApproval, allowImages, allowVideos, allowFiles } = req.body;
         
-        // 检查权限：必须是室主
+        // 检查权限：必须是室主（已在中间件中验证）
         const room = await models.Room.findByPk(id);
         if (!room) return res.status(404).json({ error: '聊天室不存在' });
-        
-        if (room.creatorId !== req.user.userId) {
-            return res.status(403).json({ error: '只有室主可以修改设置' });
-        }
         
         // 更新设置
         await room.update({
@@ -581,15 +565,7 @@ exports.sendJoinRequest = async (req, res) => {
                 await room.update({ members: currentMembers });
             }
 
-            return res.json({ success: true, message: '已成功加入聊天室' });
-        }
-        
-        // 检查用户是否已在聊天室中
-        const existingMember = await models.RoomMember.findOne({
-            where: { userId: req.user.userId, roomId: id }
-        });
-        if (existingMember) {
-            return res.status(400).json({ error: '您已经是该聊天室的成员' });
+            return res.json({ success: true, message: '已成功加入聊天室', joined: true });
         }
         
         // 检查是否已有待处理的请求
@@ -607,8 +583,9 @@ exports.sendJoinRequest = async (req, res) => {
             message: message || null
         });
         
-        res.json({ success: true, message: '加入请求已发送' });
+        res.json({ success: true, message: '加入请求已发送', joined: false });
     } catch (error) {
+        log('ERROR', `发送加入请求失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };
@@ -687,21 +664,20 @@ exports.getPendingRequests = async (req, res) => {
             return res.status(404).json({ error: '聊天室不存在' });
         }
         
-        // 如果聊天室不需要审批，则不显示审批区域
-        if (!room.requireApproval) {
-            return res.json([]);
-        }
-        
-        // 检查当前用户是否是聊天室创建者或管理员
-        const roomMember = await models.RoomMember.findOne({
-            where: { 
-                roomId: id, 
-                userId: req.user.userId 
+        // 检查用户是否是该房间的成员
+        const membership = await models.RoomMember.findOne({
+            where: {
+                userId: req.user.userId,
+                roomId: id
             }
         });
         
-        if (!roomMember || (!roomMember.isModerator && room.creatorId !== req.user.userId)) {
-            return res.status(403).json({ error: '只有聊天室创建者或管理员可以查看加入请求' });
+        if (!membership) {
+            return res.status(403).json({ error: '您不是该聊天室的成员' });
+        }
+        // 如果聊天室不需要审批，则不显示审批区域
+        if (!room.requireApproval) {
+            return res.json([]);
         }
         
         // 获取所有待处理的加入请求
@@ -713,7 +689,7 @@ exports.getPendingRequests = async (req, res) => {
             order: [['requestTime', 'ASC']]
         });
         
-        // 手动获取用户信息（因为模型关联已被移除）
+        // 手动获取用户信息
         const userIds = pendingRequests.map(request => request.userId);
         let users = [];
         if (userIds.length > 0) {
@@ -742,6 +718,7 @@ exports.getPendingRequests = async (req, res) => {
         res.json(requestsWithUsers);
     } catch (error) {
         res.status(500).json({ error: error.message });
+        log('ERROR', `获取待处理的加入请求失败: ${error.message}`);
     }
 };
 
@@ -841,14 +818,10 @@ exports.setMemberRole = async (req, res) => {
         const { roomId, userId } = req.params;
         const { role } = req.body;
         
-        // 检查权限：必须是室主
+        // 检查聊天室是否存在
         const room = await models.Room.findByPk(roomId);
         if (!room) {
             return res.status(404).json({ error: '聊天室不存在' });
-        }
-        
-        if (room.creatorId !== req.user.userId) {
-            return res.status(403).json({ error: '只有室主可以设置成员角色' });
         }
         
         // 验证角色值

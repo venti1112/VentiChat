@@ -246,8 +246,8 @@ exports.register = async (req, res) => {
 // 退出登录
 exports.logout = async (req, res) => {
     try {
-        // 支持GET和POST方法，但推荐使用POST
-        const token = req.headers.authorization?.split(' ')[1] || req.cookies.token;
+        // 获得token
+        const token = req.cookies.token;
 
         if (token) {
             // 从Redis中删除token
@@ -270,15 +270,7 @@ exports.logout = async (req, res) => {
         }
         
         logUserLogout(req.ip, username, true);
-
-        // 根据请求方法返回合适的响应
-        if (req.method === 'GET') {
-            // GET请求重定向到登录页
-            res.redirect('/login');
-        } else {
-            // POST请求返回JSON响应
-            res.json({ message: '退出登录成功' });
-        }
+        res.json({ message: '退出登录成功' });
     } catch (error) {
         log('ERROR', '退出登录错误: ' + error);
         res.status(500).json({ message: '服务器内部错误' });

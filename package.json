@@ -21,6 +21,7 @@
     "cookie-parser": "^1.4.7",
     "express": "^5.2.1",
     "express-rate-limit": "^8.2.1",
+    "http-proxy-middleware": "^3.0.5",
     "inquirer": "^13.0.2",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.2",
