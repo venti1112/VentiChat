@@ -326,7 +326,7 @@ export async function uploadLargeFile(file) {
         }
         
         // 3. 完成上传
-        const finalizeResponse = await fetch('/api/upload/finalize', {
+        const finalizeResponse = await fetch('/api/upload/complete', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -458,6 +458,27 @@ export function sendFileMessage(fileUrl, fileName, fileType) {
         messageType = 'video';
     }
     
+    // 获取当前用户信息
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    
+    // 创建临时消息对象用于立即显示
+    const tempMessage = {
+        id: 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        content: fileName,
+        fileUrl: fileUrl,
+        type: messageType,
+        sentAt: new Date().toISOString(),
+        Sender: {
+            id: currentUser.id,
+            nickname: currentUser.nickname || currentUser.username,
+            username: currentUser.username,
+            avatarUrl: currentUser.avatarUrl || '/default-avatar.png'
+        }
+    };
+    
+    // 立即显示消息
+    window.displayMessages([tempMessage]);
+    
     // 发送文件消息到服务器
     fetch('/api/messages', {
         method: 'POST',
@@ -484,10 +505,38 @@ export function sendFileMessage(fileUrl, fileName, fileType) {
         // 清空输入框
         const messageInput = document.getElementById('messageInput');
         if (messageInput) messageInput.value = '';
+        
+        // 用服务器返回的真实消息替换临时消息
+        const chatMessages = document.getElementById('chatMessages');
+        if (chatMessages) {
+            const tempMessageElement = chatMessages.querySelector(`.message-item[data-message-id="${tempMessage.id}"]`);
+            if (tempMessageElement) {
+                window.renderMessage(data).then(renderedMessage => {
+                    const newElement = document.createElement('div');
+                    newElement.innerHTML = renderedMessage;
+                    const newMessageElement = newElement.firstElementChild;
+                    newMessageElement.className = 'message-item mb-3';
+                    newMessageElement.setAttribute('data-message-id', data.id);
+                    tempMessageElement.parentNode.replaceChild(newMessageElement, tempMessageElement);
+                    
+                    // 滚动到底部
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                });
+            }
+        }
     })
     .catch(error => {
         console.error('发送文件消息失败:', error);
         window.showMessage('发送文件消息失败: ' + error.message, 'danger');
+        
+        // 移除临时消息
+        const chatMessages = document.getElementById('chatMessages');
+        if (chatMessages) {
+            const tempMessageElement = chatMessages.querySelector(`.message-item[data-message-id="${tempMessage.id}"]`);
+            if (tempMessageElement) {
+                tempMessageElement.remove();
+            }
+        }
     });
 }
 

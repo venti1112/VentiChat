@@ -56,19 +56,13 @@ server.on('upgrade', (req, socket, head) => {
     // 创建目标URL
     const targetUrl = 'http://localhost:' + targetPort;
     
-    log(LOG_LEVELS.INFO, `代理WebSocket升级请求到端口 ${targetPort}`);
-    
     // 将WebSocket升级请求代理到选定的工作进程
     proxyMiddleware.upgrade(req, socket, head, {
         target: targetUrl,
         changeOrigin: true
     }, (err) => {
-        if (err) {
-            log(LOG_LEVELS.ERROR, 'WebSocket代理错误: ' + err.message);
-            socket.destroy();
-        } else {
-            log(LOG_LEVELS.INFO, `WebSocket连接已建立到端口 ${targetPort}`);
-        }
+        log(LOG_LEVELS.ERROR, 'WebSocket代理错误: ' + err.message);
+        socket.destroy();
     });
 });
 

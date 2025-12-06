@@ -1,7 +1,77 @@
 const RoomMember = require('../models/roomMember');
 const fs = require('fs');
 const path = require('path');
-const { getFileType, getFileUrl } = require('../utils/fileUpload');
+const { getFileType } = require('../utils/fileUpload');
+
+// 根据文件扩展名获取MIME类型
+function getMimeTypeFromFileExt(ext) {
+    const mimeTypes = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.bmp': 'image/bmp',
+        '.svg': 'image/svg+xml',
+        '.mp4': 'video/mp4',
+        '.avi': 'video/avi',
+        '.mov': 'video/mov',
+        '.wmv': 'video/wmv',
+        '.flv': 'video/flv',
+        '.webm': 'video/webm',
+        '.mpeg': 'video/mpeg'
+    };
+    
+    return mimeTypes[ext.toLowerCase()] || 'application/octet-stream';
+}
+
+// 根据文件类型确定存储目录（复制自utils/fileUpload.js）
+function getDestination(fileType) {
+    // 确保userdata目录及子目录存在
+    const userdataDir = path.join(__dirname, '..', 'public', 'userdata');
+    const avatarDir = path.join(userdataDir, 'avatar');
+    const pictureDir = path.join(userdataDir, 'picture');
+    const videoDir = path.join(userdataDir, 'video');
+    const fileDir = path.join(userdataDir, 'file');
+    
+    [userdataDir, avatarDir, pictureDir, videoDir, fileDir].forEach(dir => {
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+    });
+    
+    switch (fileType) {
+        case 'avatar':
+            return avatarDir;
+        case 'image':
+            return pictureDir;
+        case 'video':
+            return videoDir;
+        default:
+            return fileDir;
+    }
+}
+
+// 获取文件的URL路径（复制自utils/fileUpload.js）
+function getFileUrl(filename, fileType) {
+    // 根据文件类型确定URL前缀
+    let prefix;
+    switch (fileType) {
+        case 'avatar':
+            prefix = '/userdata/avatar';
+            break;
+        case 'image':
+            prefix = '/userdata/picture';
+            break;
+        case 'video':
+            prefix = '/userdata/video';
+            break;
+        default:
+            prefix = '/userdata/file';
+    }
+    
+    return `${prefix}/${filename}`;
+}
 
 // 处理文件上传
 exports.handleUpload = async (req, res) => {
@@ -30,8 +100,20 @@ exports.handleUpload = async (req, res) => {
         // 获取文件类型
         const fileType = getFileType(req.file.mimetype);
         
-        // 构建文件URL（修复参数传递）
-        const fileUrl = getFileUrl(req.file.filename, fileType);
+        // 生成新的文件名
+        const fileExt = path.extname(req.file.originalname);
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const newFileName = fileType + '-' + uniqueSuffix + fileExt;
+        
+        // 确定目标目录并构建新路径
+        const destinationDir = getDestination(fileType);
+        const newPath = path.join(destinationDir, newFileName);
+        
+        // 重命名文件
+        fs.renameSync(req.file.path, newPath);
+        
+        // 构建文件URL
+        const fileUrl = getFileUrl(newFileName, fileType);
         
         // 返回文件信息
         res.json({
@@ -155,9 +237,16 @@ exports.completeChunkedUpload = async (req, res) => {
             return res.status(403).json({ error: '您不是该聊天室的成员' });
         }
 
-        // 组装分片
-        const tempDir = path.join('public', 'temp', uploadId);
-        const finalPath = path.join('public', 'userdata', 'files', fileName);
+        // 确定文件类型和目标目录
+        const fileExt = path.extname(fileName);
+        const mimeType = getMimeTypeFromFileExt(fileExt);
+        const fileType = getFileType(mimeType);
+        const destinationDir = getDestination(fileType);
+        
+        // 生成唯一文件名
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const newFileName = fileType + '-' + uniqueSuffix + fileExt;
+        const finalPath = path.join(destinationDir, newFileName);
 
         // 确保目标目录存在
         const targetDir = path.dirname(finalPath);
@@ -167,6 +256,9 @@ exports.completeChunkedUpload = async (req, res) => {
 
         // 创建写入流
         const writeStream = fs.createWriteStream(finalPath);
+
+        // 组装分片目录路径
+        const tempDir = path.join('public', 'temp', uploadId);
 
         // 按顺序合并分片
         for (let i = 0; i < totalChunks; i++) {
@@ -184,12 +276,13 @@ exports.completeChunkedUpload = async (req, res) => {
             writeStream.on('error', reject);
         });
 
-        // 清理临时目录
-        fs.rmdirSync(tempDir);
+        // 清理临时目录，使用递归删除确保删除所有文件和子目录
+        if (fs.existsSync(tempDir)) {
+            fs.rmSync(tempDir, { recursive: true });
+        }
 
-        // 获取文件类型和URL
-        const fileType = path.extname(fileName).toLowerCase().substring(1);
-        const fileUrl = `/userdata/files/${fileName}`;
+        // 获取文件URL
+        const fileUrl = getFileUrl(newFileName, fileType);
 
         res.json({
             fileUrl: fileUrl,

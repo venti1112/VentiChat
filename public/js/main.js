@@ -5,7 +5,7 @@ import { updateProfile, bindProfileForm } from './modules/profile.js';
 import { displayMessages, renderMessage, getUserInfoById, clearDisplayedMessages } from './modules/messageHandler.js';
 import { displayRooms, enterRoom, loadMessageHistory, loadRooms, bindRoomButtons } from './modules/roomManager.js';
 import { initializeWebSocket, updateUnreadCount, updateRoomUnreadCount } from './modules/websocket.js';
-import { handleFileSelect, uploadFile, uploadLargeFile, sendFileMessage } from './modules/fileUpload.js';
+import { handleFileSelect, uploadFile, uploadLargeFile, sendFileMessage, bindFileUploadEvents } from './modules/fileUpload.js';
 import { sendMessage, bindSendMessageEvents } from './modules/messageSender.js';
 import { playVideoInFullscreen } from './modules/videoPlayer.js';
 import { imageViewerInstance } from './modules/imageViewer.js';
@@ -92,6 +92,9 @@ function bindInitialEvents() {
     
     // 绑定发送消息事件
     bindSendMessageEvents();
+    
+    // 绑定文件上传事件
+    bindFileUploadEvents();
 }
 
 // 页面加载完成后初始化应用
