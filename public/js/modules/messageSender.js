@@ -68,22 +68,38 @@ export function sendMessage() {
     
     // 优先通过WebSocket发送消息
     if (window.socket && window.socket.connected) {
+        console.log('通过WebSocket发送消息');
+        
         // 监听一次messageSent事件来替换临时消息
-        window.socket.once('messageSent', (data) => {
+        const messageSentHandler = (data) => {
+            console.log('收到消息发送确认:', data);
             // 用服务器返回的真实消息替换临时消息
             replaceTempMessage(tempMessageId, data);
             
             // 清空输入框
             if (messageInput) messageInput.value = '';
-        });
+            
+            // 清理事件监听器
+            window.socket.off('messageSent', messageSentHandler);
+            window.socket.off('errorMessage', errorHandler);
+        };
         
         // 监听一次errorMessage事件来处理错误
-        window.socket.once('errorMessage', (error) => {
+        const errorHandler = (error) => {
+            console.error('发送消息失败:', error);
             window.showMessage(error.message || '发送消息失败', 'danger');
             
             // 移除临时消息
             removeTempMessage(tempMessageId);
-        });
+            
+            // 清理事件监听器
+            window.socket.off('messageSent', messageSentHandler);
+            window.socket.off('errorMessage', errorHandler);
+        };
+        
+        // 注册事件监听器
+        window.socket.once('messageSent', messageSentHandler);
+        window.socket.once('errorMessage', errorHandler);
         
         // 发送消息到服务器
         window.socket.emit('sendMessage', {
@@ -101,24 +117,21 @@ export function sendMessage() {
     fetch('/api/messages', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            roomId: parseInt(currentRoomId),
+            rid: parseInt(currentRoomId),
             content: content,
             type: 'text'
         })
     })
-    .then(response => {
-        if (!response.ok) {
-            return response.json().then(data => {
-                throw new Error(data.error || '发送失败');
-            });
-        }
-        return response.json();
-    })
+    .then(response => response.json())
     .then(data => {
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
         // 用服务器返回的真实消息替换临时消息
         replaceTempMessage(tempMessageId, data);
         
@@ -126,72 +139,89 @@ export function sendMessage() {
         if (messageInput) messageInput.value = '';
     })
     .catch(error => {
-        window.showMessage(error.message || '发送消息失败', 'danger');
+        console.error('发送消息失败:', error);
+        window.showMessage('发送消息失败: ' + error.message, 'danger');
         
         // 移除临时消息
         removeTempMessage(tempMessageId);
     });
 }
 
-// 用真实消息替换临时消息
+// 替换临时消息为真实消息
 function replaceTempMessage(tempMessageId, realMessage) {
-    const chatMessages = document.getElementById('chatMessages');
-    if (chatMessages) {
-        const tempMessageElement = chatMessages.querySelector(`.message-item[data-message-id="${tempMessageId}"]`);
-        if (tempMessageElement) {
-            window.renderMessage(realMessage).then(renderedMessage => {
-                tempMessageElement.outerHTML = `
-                    <div class="message-item mb-3" data-message-id="${realMessage.id}">
-                        ${renderedMessage}
-                    </div>
-                `;
-            });
-        }
-    }
+    console.log('替换临时消息:', tempMessageId, '为真实消息:', realMessage);
     
     // 从映射中移除
     tempMessageMap.delete(tempMessageId);
+    
+    // 查找临时消息元素
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+    
+    const tempMessageElement = chatMessages.querySelector(`.message-item[data-message-id="${tempMessageId}"]`);
+    if (!tempMessageElement) {
+        console.warn('未找到临时消息元素:', tempMessageId);
+        return;
+    }
+    
+    // 渲染真实消息
+    window.renderMessage(realMessage).then(renderedMessage => {
+        const newElement = document.createElement('div');
+        newElement.innerHTML = renderedMessage;
+        const newMessageElement = newElement.firstElementChild;
+        
+        // 替换临时消息元素
+        tempMessageElement.parentNode.replaceChild(newMessageElement, tempMessageElement);
+        
+        // 滚动到底部
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }).catch(error => {
+        console.error('渲染真实消息失败:', error);
+    });
 }
 
 // 移除临时消息
 function removeTempMessage(tempMessageId) {
-    const chatMessages = document.getElementById('chatMessages');
-    if (chatMessages) {
-        const tempMessageElement = chatMessages.querySelector(`.message-item[data-message-id="${tempMessageId}"]`);
-        if (tempMessageElement) {
-            tempMessageElement.remove();
-        }
-    }
-    
     // 从映射中移除
     tempMessageMap.delete(tempMessageId);
+    
+    // 查找并移除临时消息元素
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+    
+    const tempMessageElement = chatMessages.querySelector(`.message-item[data-message-id="${tempMessageId}"]`);
+    if (tempMessageElement) {
+        tempMessageElement.remove();
+    }
 }
 
-// 绑定发送消息相关事件
+// 绑定发送消息事件
 export function bindSendMessageEvents() {
+    const messageForm = document.getElementById('messageForm');
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
     
-    // 发送按钮点击事件
-    if (sendBtn) {
-        sendBtn.addEventListener('click', sendMessage);
-    }
-    
-    // 消息输入框回车事件
-    if (messageInput) {
-        messageInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
+    if (messageForm) {
+        messageForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            sendMessage();
         });
     }
     
-    // 文件上传按钮事件
-    const attachFileBtn = document.getElementById('attachFileBtn');
-    if (attachFileBtn) {
-        attachFileBtn.addEventListener('click', () => {
-            document.getElementById('fileInput').click();
+    if (sendBtn) {
+        sendBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            sendMessage();
+        });
+    }
+    
+    if (messageInput) {
+        messageInput.addEventListener('keydown', (e) => {
+            // Ctrl+Enter 或 Cmd+Enter 发送消息
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                sendMessage();
+            }
         });
     }
 }

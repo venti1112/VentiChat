@@ -68,6 +68,7 @@ class WebSocketManager {
                 });
             }
             
+            log(LOG_LEVELS.DEBUG, `获取用户Socket信息: 用户=${userId}, Sockets数量=${sockets.length}`);
             return sockets;
         } catch (error) {
             log(LOG_LEVELS.ERROR, `获取用户Socket信息失败: ${error.message}`);
@@ -85,15 +86,23 @@ class WebSocketManager {
     static async sendToUser(userId, event, data, io) {
         try {
             const sockets = await this.getUserSockets(userId);
+            log(LOG_LEVELS.DEBUG, `准备向用户发送消息: 用户=${userId}, 事件=${event}, 目标Socket数量=${sockets.length}`);
+            
+            if (sockets.length === 0) {
+                log(LOG_LEVELS.DEBUG, `用户 ${userId} 没有活跃的连接`);
+                return;
+            }
             
             for (const socketInfo of sockets) {
                 // 如果Socket在同一工作进程中，直接发送
                 const socket = io.sockets.sockets.get(socketInfo.socketId);
                 if (socket) {
                     socket.emit(event, data);
+                    log(LOG_LEVELS.DEBUG, `向同进程Socket发送消息: Socket=${socketInfo.socketId}, 事件=${event}`);
                 } else {
                     // 如果Socket在不同工作进程中，通过主进程转发消息
                     if (cluster.isWorker) {
+                        log(LOG_LEVELS.DEBUG, `准备跨进程转发消息: 目标进程=${socketInfo.workerId}, Socket=${socketInfo.socketId}, 事件=${event}`);
                         process.send({
                             type: 'forwardToWorker',
                             targetWorkerId: socketInfo.workerId,
@@ -102,6 +111,9 @@ class WebSocketManager {
                             event,
                             data
                         });
+                        log(LOG_LEVELS.DEBUG, `向其他进程转发消息: 目标进程=${socketInfo.workerId}, Socket=${socketInfo.socketId}, 事件=${event}`);
+                    } else {
+                        log(LOG_LEVELS.WARN, `不在工作进程中，无法转发消息: Socket=${socketInfo.socketId}, 事件=${event}`);
                     }
                 }
             }
@@ -118,6 +130,7 @@ class WebSocketManager {
     static async getUserIdBySocket(socketId) {
         try {
             const userId = await redisClient.get(`socket:${socketId}`);
+            log(LOG_LEVELS.DEBUG, `获取Socket关联用户: Socket=${socketId}, 用户=${userId}`);
             return userId;
         } catch (error) {
             log(LOG_LEVELS.ERROR, `获取Socket关联用户失败: ${error.message}`);
@@ -137,6 +150,9 @@ class WebSocketManager {
             const socket = io.sockets.sockets.get(socketId);
             if (socket) {
                 socket.emit(event, data);
+                log(LOG_LEVELS.DEBUG, `向指定Socket发送消息: Socket=${socketId}, 事件=${event}`);
+            } else {
+                log(LOG_LEVELS.DEBUG, `Socket不存在，无法发送消息: Socket=${socketId}, 事件=${event}`);
             }
         } catch (error) {
             log(LOG_LEVELS.ERROR, `向Socket发送消息失败: ${error.message}`);

@@ -1,8 +1,9 @@
+// 导入依赖
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
-const { Sequelize } = require('sequelize');
+const { Sequelize } = require('sequelize'); // 只导入Sequelize类
 const multer = require('multer');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
@@ -14,6 +15,7 @@ const { log, logHttpError, logDatabaseQuery, logDatabaseRetry, logBrowserDevTool
 // 处理来自主进程的转发消息
 if (cluster.isWorker) {
     process.on('message', (msg) => {
+        log(LOG_LEVELS.DEBUG, `工作进程收到主进程消息: ${JSON.stringify(msg)}`);
         if (msg.type === 'emitToSocket') {
             const io = app.get('io');
             const WebSocketManager = require('./utils/websocketManager');
@@ -31,7 +33,7 @@ app.set('trust proxy', true);
 // 初始化Sequelize，配置连接池
 const sequelize = new Sequelize(config.db.database, config.db.user, config.db.password, {
     host: config.db.host,
-    port: config.db.port,
+    port: parseInt(config.db.port), // 确保端口是数字类型
     dialect: 'mysql',
     logging: logDatabaseQuery, // 使用自定义日志函数记录数据库查询
     dialectOptions: {
@@ -109,180 +111,8 @@ const upload = multer({ storage });
 // 将upload实例挂载到app上
 app.set('upload', upload);
 
-// 使用Redis存储用户Socket映射，替代原来的本地Map
-const userSocketMap = new Map();
-// 将userSocketMap挂载到app上
-app.set('userSocketMap', userSocketMap);
-
-// 数据库连接状态
-let isDatabaseConnected = false;
-
-// 中间件：检查数据库连接状态
-app.use(async (req, res, next) => {
-    if (!isDatabaseConnected) {
-        // 记录500错误访问日志
-        const clientIP = req.realIP || req.ip || req.connection.remoteAddress || 
-                        (req.headers['x-forwarded-for'] || '').split(',')[0] || '未知用户';
-        const method = req.method;
-        const url = req.url;
-        // 获取用户名
-        let username = '未知用户';
-        const token = req.cookies.token;
-        if (token) {
-            try {
-                const decoded = jwt.verify(token, config.encryptionKey);
-                username = decoded.username || '未知用户';
-            } catch (error) {
-                // token无效，保持"未知用户"状态
-            }
-        }
-        
-        logHttpError(clientIP, username, method, url, 500, '数据库连接失败');
-        
-        return res.status(500).json({ 
-            error: '数据库连接失败，请稍后再试' 
-        });
-    }
-    next();
-});
-
 // 路由
 app.use('/api', require('./routes/index'));
-
-
-// 404错误处理中间件
-app.use(async (req, res, next) => {
-    // 记录404错误访问日志
-    const clientIP = req.realIP || req.ip || req.connection.remoteAddress || 
-                    (req.headers['x-forwarded-for'] || '').split(',')[0] || '未知用户';
-    const method = req.method;
-    const url = req.url;
-    
-    // 获取用户名
-    let username = '未认证用户';
-    const token = req.cookies.token;
-    if (token) {
-        try {
-            const decoded = jwt.verify(token, config.encryptionKey);
-            username = decoded.username || '未知用户';
-        } catch (error) {
-            // token无效，保持"未认证用户"状态
-        }
-    }
-    
-    // 特殊处理浏览器开发者工具的请求
-    if (url === '/.well-known/appspecific/com.chrome.devtools.json') {
-        logBrowserDevToolsWarning(clientIP, username);
-    } else {
-        logHttpError(clientIP, username, method, url, 404, '页面未找到');
-    }
-    
-    res.status(404).json({ 
-        error: '页面未找到' 
-    });
-});
-
-// 500错误处理中间件
-app.use(async (err, req, res, next) => {
-    // 记录500错误访问日志
-    const clientIP = req.realIP || req.ip || req.connection.remoteAddress || 
-                    (req.headers['x-forwarded-for'] || '').split(',')[0] || '未知用户';
-    const method = req.method;
-    const url = req.url;
-    
-    // 获取用户名
-    let username = '未认证用户';
-    const token = req.cookies.token;
-    if (token) {
-        try {
-            const decoded = jwt.verify(token, config.encryptionKey);
-            username = decoded.username || '未知用户';
-        } catch (error) {
-            // token无效，保持"未认证用户"状态
-        }
-    }
-    
-    logHttpError(clientIP, username, method, url, 500, `服务器内部错误: ${err.message}`);
-    
-    res.status(500).json({ 
-        error: '服务器内部错误' 
-    });
-});
-
-// 数据库连接函数
-async function connectToDatabase() {
-    try {
-        await sequelize.authenticate();
-        isDatabaseConnected = true;
-        return true;
-    } catch (err) {
-        isDatabaseConnected = false;
-        return false;
-    }
-}
-
-// 数据库连接重试函数
-async function retryDatabaseConnection() {
-    const retryInterval = 3 * 60 * 1000; // 3分钟
-    
-    while (!isDatabaseConnected) {
-        const connected = await connectToDatabase();
-        
-        if (!connected) {
-            await new Promise(resolve => setTimeout(resolve, retryInterval));
-        }
-    }
-}
-
-// 错误处理
-process.on('unhandledRejection', (err) => {
-});
-
-// 优雅关闭
-process.on('SIGINT', () => {
-    logServerShutdown();
-    process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-    logServerShutdown();
-    process.exit(0);
-});
-
-// 启动服务器函数
-async function startServer(httpServer) {
-    // 从环境变量获取端口号，如果没有则使用配置文件中的端口
-    const port = process.env.WORKER_PORT ? parseInt(process.env.WORKER_PORT) : parseInt(config.port);
-    
-    // 先尝试连接数据库
-    const connected = await connectToDatabase();
-    
-    if (connected) {
-        // 启动服务器
-        httpServer.listen(port, () => {
-            const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
-            log(LOG_LEVELS.INFO, `工作进程 ${workerId} 启动完成，监听端口 ${port}`);
-        });
-    } else {
-        // 如果初始连接失败，启动重试机制
-        retryDatabaseConnection();
-        
-        // 即使数据库未连接也启动服务器，但会返回500错误
-        httpServer.listen(port, () => {
-            const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
-            log(LOG_LEVELS.INFO, `工作进程 ${workerId} 启动完成，监听端口 ${port} (数据库连接失败)`);
-        });
-    }
-
-}
-
-// 导出应用实例和模型
-module.exports = { 
-    app, 
-    sequelize, 
-    models,
-    startServer
-};
 
 // 只有在直接运行此文件时才启动Socket.IO服务器
 if (require.main === module) {
@@ -332,6 +162,8 @@ if (require.main === module) {
         let userId = '未知用户';
         let username = '未知用户';
         
+        log(LOG_LEVELS.INFO, `收到WebSocket连接请求 [客户端IP: ${clientIP}] [Token: ${token ? '提供' : '缺失'}]`);
+        
         // 验证token并获取用户信息
         if (token) {
             try {
@@ -340,17 +172,21 @@ if (require.main === module) {
                 if (user) {
                     userId = user.userId;
                     username = user.username;
+                    log(LOG_LEVELS.INFO, `用户认证成功 [用户: ${username}(${userId})]`);
                 } else {
+                    log(LOG_LEVELS.WARN, `用户不存在 [用户ID: ${decoded.id || decoded.userId}]`);
                     socket.emit('unauthorized', { message: '用户不存在' });
                     socket.disconnect(true);
                     return;
                 }
             } catch (error) {
+                log(LOG_LEVELS.WARN, `令牌验证失败: ${error.message}`);
                 socket.emit('unauthorized', { message: '令牌无效' });
                 socket.disconnect(true);
                 return;
             }
         } else {
+            log(LOG_LEVELS.WARN, '缺少访问令牌');
             socket.emit('unauthorized', { message: '缺少访问令牌' });
             socket.disconnect(true);
             return;
@@ -361,9 +197,17 @@ if (require.main === module) {
         const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
         await WebSocketManager.storeUserSocket(userId, socket.id, workerId);
         
+        // 输出WebSocket连接建立日志
+        log(LOG_LEVELS.INFO, `WebSocket连接已建立 [工作进程: ${workerId}] [用户: ${username}(${userId})] [Socket ID: ${socket.id}] [客户端IP: ${clientIP}]`);
+        
+        // 发送连接成功的事件给客户端
+        socket.emit('connected', { message: '连接成功', userId: userId });
+        
         // 断开连接时清除映射
-        socket.on('disconnect', async () => {
+        socket.on('disconnect', async (reason) => {
             await WebSocketManager.removeUserSocket(userId, socket.id, workerId);
+            // 输出WebSocket连接断开日志
+            log(LOG_LEVELS.INFO, `WebSocket连接已断开 [工作进程: ${workerId}] [用户: ${username}(${userId})] [Socket ID: ${socket.id}] [原因: ${reason}]`);
         });
 
         // 加入聊天室
@@ -372,6 +216,9 @@ if (require.main === module) {
             const roomId = typeof data === 'object' ? data.rid || data.roomId : data;
             if (roomId) {
                 socket.join(`room_${roomId}`);
+                socket.emit('joinedRoom', { roomId: roomId }); // 确认加入房间
+                // 输出加入聊天室日志
+                log(LOG_LEVELS.INFO, `用户加入聊天室 [工作进程: ${workerId}] [用户: ${username}(${userId})] [房间ID: ${roomId}]`);
             }
         });
         
@@ -381,6 +228,97 @@ if (require.main === module) {
             const roomId = typeof data === 'object' ? data.rid || data.roomId : data;
             if (roomId) {
                 socket.leave(`room_${roomId}`);
+                socket.emit('leftRoom', { roomId: roomId }); // 确认离开房间
+                // 输出离开聊天室日志
+                log(LOG_LEVELS.INFO, `用户离开聊天室 [工作进程: ${workerId}] [用户: ${username}(${userId})] [房间ID: ${roomId}]`);
+            }
+        });
+        
+        // 处理错误
+        socket.on('error', (error) => {
+            log(LOG_LEVELS.ERROR, `Socket错误 [用户: ${username}(${userId})]: ${error.message}`);
+        });
+        
+        // 处理发送消息事件
+        socket.on('sendMessage', async (data) => {
+            try {
+                log(LOG_LEVELS.DEBUG, `收到发送消息请求 [用户: ${username}(${userId})] [数据: ${JSON.stringify(data)}]`);
+                
+                const { rid, content, type } = data;
+                
+                // 检查必要参数
+                if (!rid || !content) {
+                    log(LOG_LEVELS.WARN, `缺少必要参数 [用户: ${username}(${userId})] [rid: ${rid}, content: ${content}]`);
+                    socket.emit('errorMessage', { message: '缺少必要参数' });
+                    return;
+                }
+                
+                // 验证用户是否是聊天室成员（使用正确导入的模型）
+                const roomMember = await models.RoomMember.findOne({
+                    where: {
+                        userId: userId,
+                        roomId: rid
+                    }
+                });
+                
+                if (!roomMember) {
+                    log(LOG_LEVELS.WARN, `用户不是聊天室成员 [用户: ${username}(${userId})] [房间ID: ${rid}]`);
+                    socket.emit('errorMessage', { message: '您不是该聊天室的成员' });
+                    return;
+                }
+                
+                // 创建消息
+                const message = await models.Message.create({
+                    userId: userId,
+                    roomId: rid,
+                    content: content,
+                    type: type || 'text'
+                });
+                
+                log(LOG_LEVELS.DEBUG, `消息创建成功 [消息ID: ${message.messageId}] [用户: ${username}(${userId})] [房间ID: ${rid}]`);
+                
+                // 获取发送者信息
+                const sender = await models.User.findByPk(userId, {
+                    attributes: ['userId', 'username', 'nickname', 'avatarUrl']
+                });
+                
+                // 组装完整消息对象
+                const messageData = {
+                    ...message.toJSON(),
+                    Sender: sender
+                };
+                
+                // 广播消息到房间（使用WebSocketManager实现跨进程广播）
+                const io = app.get('io');
+                const WebSocketManager = require('./utils/websocketManager');
+                
+                // 获取房间内的所有用户
+                const roomMembers = await models.RoomMember.findAll({
+                    where: {
+                        roomId: rid
+                    },
+                    attributes: ['userId']
+                });
+                
+                // 向房间内除发送者外的所有用户广播消息
+                for (const member of roomMembers) {
+                    if (member.userId !== userId) {
+                        await WebSocketManager.sendToUser(member.userId, 'newMessage', messageData, io);
+                    }
+                }
+                
+                log(LOG_LEVELS.INFO, `消息已广播到房间 [消息ID: ${message.messageId}] [用户: ${username}(${userId})] [房间ID: ${rid}]`);
+                
+                // 向发送者确认消息已发送
+                socket.emit('messageSent', { 
+                    messageId: message.messageId,
+                    ...messageData
+                });
+                
+                log(LOG_LEVELS.INFO, `用户发送消息 [工作进程: ${workerId}] [用户: ${username}(${userId})] [房间ID: ${rid}] [消息ID: ${message.messageId}]`);
+            } catch (error) {
+                log(LOG_LEVELS.ERROR, `发送消息失败: ${error.message}`);
+                socket.emit('errorMessage', { message: '发送消息失败: ' + error.message });
             }
         });
     });
@@ -419,7 +357,7 @@ if (require.main === module) {
         const { processIds } = require('./utils/logger');
         const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
         const port = process.env.WORKER_PORT || config.port;
-        log(LOG_LEVELS.INFO, `工作进程 ${workerId} 启动完成，监听端口 ${port}`);
+        log(LOG_LEVELS.INFO, `工作进程 ${workerId} 启动完成，监听端口 ${parseInt(port) + 1}`);
     });
     
     io.on('connection', async (socket) => {
@@ -434,6 +372,8 @@ if (require.main === module) {
         let userId = '未知用户';
         let username = '未知用户';
         
+        log(LOG_LEVELS.INFO, `收到WebSocket连接请求 [客户端IP: ${clientIP}] [Token: ${token ? '提供' : '缺失'}]`);
+        
         // 验证token并获取用户信息
         if (token) {
             try {
@@ -442,17 +382,21 @@ if (require.main === module) {
                 if (user) {
                     userId = user.userId;
                     username = user.username;
+                    log(LOG_LEVELS.INFO, `用户认证成功 [用户: ${username}(${userId})]`);
                 } else {
+                    log(LOG_LEVELS.WARN, `用户不存在 [用户ID: ${decoded.id || decoded.userId}]`);
                     socket.emit('unauthorized', { message: '用户不存在' });
                     socket.disconnect(true);
                     return;
                 }
             } catch (error) {
+                log(LOG_LEVELS.WARN, `令牌验证失败: ${error.message}`);
                 socket.emit('unauthorized', { message: '令牌无效' });
                 socket.disconnect(true);
                 return;
             }
         } else {
+            log(LOG_LEVELS.WARN, '缺少访问令牌');
             socket.emit('unauthorized', { message: '缺少访问令牌' });
             socket.disconnect(true);
             return;
@@ -463,12 +407,17 @@ if (require.main === module) {
         const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
         await WebSocketManager.storeUserSocket(userId, socket.id, workerId);
         
+        // 输出WebSocket连接建立日志
+        log(LOG_LEVELS.INFO, `WebSocket连接已建立 [工作进程: ${workerId}] [用户: ${username}(${userId})] [Socket ID: ${socket.id}] [客户端IP: ${clientIP}]`);
+        
         // 发送连接成功的事件给客户端
         socket.emit('connected', { message: '连接成功', userId: userId });
         
         // 断开连接时清除映射
         socket.on('disconnect', async (reason) => {
             await WebSocketManager.removeUserSocket(userId, socket.id, workerId);
+            // 输出WebSocket连接断开日志
+            log(LOG_LEVELS.INFO, `WebSocket连接已断开 [工作进程: ${workerId}] [用户: ${username}(${userId})] [Socket ID: ${socket.id}] [原因: ${reason}]`);
         });
 
         // 加入聊天室
@@ -478,6 +427,8 @@ if (require.main === module) {
             if (roomId) {
                 socket.join(`room_${roomId}`);
                 socket.emit('joinedRoom', { roomId: roomId }); // 确认加入房间
+                // 输出加入聊天室日志
+                log(LOG_LEVELS.INFO, `用户加入聊天室 [工作进程: ${workerId}] [用户: ${username}(${userId})] [房间ID: ${roomId}]`);
             }
         });
         
@@ -488,6 +439,8 @@ if (require.main === module) {
             if (roomId) {
                 socket.leave(`room_${roomId}`);
                 socket.emit('leftRoom', { roomId: roomId }); // 确认离开房间
+                // 输出离开聊天室日志
+                log(LOG_LEVELS.INFO, `用户离开聊天室 [工作进程: ${workerId}] [用户: ${username}(${userId})] [房间ID: ${roomId}]`);
             }
         });
         
@@ -499,10 +452,13 @@ if (require.main === module) {
         // 处理发送消息事件
         socket.on('sendMessage', async (data) => {
             try {
+                log(LOG_LEVELS.DEBUG, `收到发送消息请求 [用户: ${username}(${userId})] [数据: ${JSON.stringify(data)}]`);
+                
                 const { rid, content, type } = data;
                 
                 // 检查必要参数
                 if (!rid || !content) {
+                    log(LOG_LEVELS.WARN, `缺少必要参数 [用户: ${username}(${userId})] [rid: ${rid}, content: ${content}]`);
                     socket.emit('errorMessage', { message: '缺少必要参数' });
                     return;
                 }
@@ -516,6 +472,7 @@ if (require.main === module) {
                 });
                 
                 if (!roomMember) {
+                    log(LOG_LEVELS.WARN, `用户不是聊天室成员 [用户: ${username}(${userId})] [房间ID: ${rid}]`);
                     socket.emit('errorMessage', { message: '您不是该聊天室的成员' });
                     return;
                 }
@@ -528,6 +485,8 @@ if (require.main === module) {
                     type: type || 'text'
                 });
                 
+                log(LOG_LEVELS.DEBUG, `消息创建成功 [消息ID: ${message.messageId}] [用户: ${username}(${userId})] [房间ID: ${rid}]`);
+                
                 // 获取发送者信息
                 const sender = await models.User.findByPk(userId, {
                     attributes: ['userId', 'username', 'nickname', 'avatarUrl']
@@ -539,8 +498,26 @@ if (require.main === module) {
                     Sender: sender
                 };
                 
-                // 广播消息到房间（排除发送者自己）
-                socket.to(`room_${rid}`).emit('newMessage', messageData);
+                // 广播消息到房间（使用WebSocketManager实现跨进程广播）
+                const io = app.get('io');
+                const WebSocketManager = require('./utils/websocketManager');
+                
+                // 获取房间内的所有用户
+                const roomMembers = await models.RoomMember.findAll({
+                    where: {
+                        roomId: rid
+                    },
+                    attributes: ['userId']
+                });
+                
+                // 向房间内除发送者外的所有用户广播消息
+                for (const member of roomMembers) {
+                    if (member.userId !== userId) {
+                        await WebSocketManager.sendToUser(member.userId, 'newMessage', messageData, io);
+                    }
+                }
+                
+                log(LOG_LEVELS.INFO, `消息已广播到房间 [消息ID: ${message.messageId}] [用户: ${username}(${userId})] [房间ID: ${rid}]`);
                 
                 // 向发送者确认消息已发送
                 socket.emit('messageSent', { 
@@ -548,6 +525,7 @@ if (require.main === module) {
                     ...messageData
                 });
                 
+                log(LOG_LEVELS.INFO, `用户发送消息 [工作进程: ${workerId}] [用户: ${username}(${userId})] [房间ID: ${rid}] [消息ID: ${message.messageId}]`);
             } catch (error) {
                 log(LOG_LEVELS.ERROR, `发送消息失败: ${error.message}`);
                 socket.emit('errorMessage', { message: '发送消息失败: ' + error.message });
@@ -555,3 +533,96 @@ if (require.main === module) {
         });
     });
 }
+
+// 数据库连接和重试逻辑
+let connectionRetryCount = 0;
+const maxRetries = 5;
+const retryDelay = 5000; // 5秒
+
+async function connectToDatabase() {
+    try {
+        await sequelize.authenticate();
+        log(LOG_LEVELS.INFO, '数据库连接成功');
+        connectionRetryCount = 0; // 重置重试计数
+        return true;
+    } catch (error) {
+        connectionRetryCount++;
+        log(LOG_LEVELS.ERROR, `数据库连接失败 (尝试 ${connectionRetryCount}/${maxRetries}): ${error.message}`);
+        
+        if (connectionRetryCount < maxRetries) {
+            log(LOG_LEVELS.INFO, `将在 ${retryDelay/1000} 秒后重试...`);
+            return false;
+        } else {
+            log(LOG_LEVELS.ERROR, '达到最大重试次数，数据库连接失败');
+            return false;
+        }
+    }
+}
+
+// 重试数据库连接
+async function retryDatabaseConnection() {
+    const interval = setInterval(async () => {
+        const connected = await connectToDatabase();
+        if (connected) {
+            clearInterval(interval);
+            log(LOG_LEVELS.INFO, '数据库连接已恢复');
+        } else if (connectionRetryCount >= maxRetries) {
+            clearInterval(interval);
+        }
+    }, retryDelay);
+}
+
+// 处理未捕获的异常
+process.on('uncaughtException', (err) => {
+    log(LOG_LEVELS.ERROR, `未捕获的异常: ${err.message}\n${err.stack}`);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    log(LOG_LEVELS.ERROR, `未处理的Promise拒绝: ${reason}\n${reason instanceof Error ? reason.stack : ''}`);
+    process.exit(1);
+});
+
+process.on('SIGINT', () => {
+    logServerShutdown();
+    process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+    logServerShutdown();
+    process.exit(0);
+});
+
+// 启动服务器函数
+async function startServer(httpServer) {
+    // 从环境变量获取端口号，如果没有则使用配置文件中的端口
+    const port = process.env.WORKER_PORT ? parseInt(process.env.WORKER_PORT) : parseInt(config.port) + 1;
+    
+    // 先尝试连接数据库
+    const connected = await connectToDatabase();
+    
+    if (connected) {
+        // 启动服务器
+        httpServer.listen(port, () => {
+            const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
+            log(LOG_LEVELS.INFO, `工作进程 ${workerId} 监听端口 ${port}`);
+        });
+    } else {
+        // 如果初始连接失败，启动重试机制
+        retryDatabaseConnection();
+        
+        // 即使数据库未连接也启动服务器，但会返回500错误
+        httpServer.listen(port, () => {
+            const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
+            log(LOG_LEVELS.INFO, `工作进程 ${workerId} 监听端口 ${port} (数据库连接失败)`);
+        });
+    }
+}
+
+// 导出应用实例和模型
+module.exports = { 
+    app, 
+    sequelize, 
+    models,
+    startServer
+};

@@ -63,9 +63,6 @@ async function initializeModules() {
     // 绑定个人资料表单
     bindProfileForm();
     
-    // 绑定发送消息事件
-    bindSendMessageEvents();
-    
     // 绑定表单事件
     bindFormEvents();
     
@@ -92,6 +89,9 @@ async function initializeModules() {
 function bindInitialEvents() {
     // 检查登录状态
     checkLoginStatus();
+    
+    // 绑定发送消息事件
+    bindSendMessageEvents();
 }
 
 // 页面加载完成后初始化应用

@@ -148,52 +148,52 @@ export function initializeWebSocket(token) {
         window.showMessage('错误: ' + (error.message || '未知错误'), 'danger');
     });
     
+    // 监听连接成功事件
+    socket.on('connected', (data) => {
+        console.log('WebSocket连接成功:', data);
+    });
+    
     return socket;
 }
 
 // 加入房间
 export function joinRoom(roomId) {
     if (window.socket && window.socket.connected) {
-        window.socket.emit('joinRoom', { rid: parseInt(roomId) });
-        currentRoomId = roomId;
-        console.log('Joined room:', roomId);
+        window.socket.emit('joinRoom', { roomId: parseInt(roomId) });
+        console.log('尝试加入房间:', roomId);
+    } else {
+        console.warn('WebSocket未连接，无法加入房间');
     }
 }
 
-// 更新房间未读计数显示
+// 离开房间
+export function leaveRoom(roomId) {
+    if (window.socket && window.socket.connected) {
+        window.socket.emit('leaveRoom', { roomId: parseInt(roomId) });
+        console.log('尝试离开房间:', roomId);
+    } else {
+        console.warn('WebSocket未连接，无法离开房间');
+    }
+}
+
+// 更新房间未读数
 export function updateRoomUnreadCount(roomId) {
-    // 获取房间列表中对应的房间项
-    const roomItem = document.querySelector(`#room-${roomId}`);
+    const roomItem = document.querySelector(`.room-item[data-room-id="${roomId}"]`);
     if (roomItem) {
-        // 查找未读数标记元素
-        let unreadBadge = roomItem.querySelector('.unread-badge');
-        if (!unreadBadge) {
-            // 如果不存在未读数标记，则创建一个
-            unreadBadge = document.createElement('span');
-            unreadBadge.className = 'unread-badge badge bg-danger ms-2';
-            unreadBadge.textContent = '1';
-            // 将未读数标记添加到房间项中
-            const roomNameSpan = roomItem.querySelector('.room-name');
-            if (roomNameSpan) {
-                roomNameSpan.appendChild(unreadBadge);
-            }
-        } else {
-            // 如果存在未读数标记，则增加计数
+        const unreadBadge = roomItem.querySelector('.unread-badge');
+        if (unreadBadge) {
             const currentCount = parseInt(unreadBadge.textContent) || 0;
             unreadBadge.textContent = currentCount + 1;
+            unreadBadge.style.display = 'inline-block';
         }
     }
 }
 
-// 更新未读计数显示
+// 更新全局未读数
 export function updateUnreadCount(count) {
-    try {
-        const unreadCountElement = document.getElementById('unreadCount');
-        if (unreadCountElement) {
-            unreadCountElement.textContent = count > 0 ? count : '';
-            unreadCountElement.style.display = count > 0 ? 'inline' : 'none';
-        }
-    } catch (error) {
-        console.error('Error updating unread count:', error);
+    const unreadCountElement = document.getElementById('unreadCount');
+    if (unreadCountElement) {
+        unreadCountElement.textContent = count;
+        unreadCountElement.style.display = count > 0 ? 'inline-block' : 'none';
     }
 }

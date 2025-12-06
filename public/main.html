@@ -403,16 +403,18 @@
                     
                     <!-- 输入区域 -->
                     <div class="card-footer input-area">
-                        <div class="input-group">
-                            <input type="file" id="fileInput" style="display: none;">
-                            <button class="btn btn-primary" id="attachFileBtn">
-                                <i class="bi bi-paperclip"></i>
-                            </button>
-                            <input type="text" class="form-control" placeholder="输入消息..." id="messageInput">
-                            <button class="btn btn-primary" id="sendBtn">
-                                <i class="bi bi-send"></i>
-                            </button>
-                        </div>
+                        <form id="messageForm">
+                            <div class="input-group">
+                                <input type="file" id="fileInput" style="display: none;">
+                                <button class="btn btn-primary" id="attachFileBtn" type="button">
+                                    <i class="bi bi-paperclip"></i>
+                                </button>
+                                <input type="text" class="form-control" placeholder="输入消息..." id="messageInput">
+                                <button class="btn btn-primary" id="sendBtn" type="submit">
+                                    <i class="bi bi-send"></i>
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
