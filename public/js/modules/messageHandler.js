@@ -39,7 +39,7 @@ export async function getUserInfoById(userId) {
             id: currentUser.id,
             username: currentUser.username,
             nickname: currentUser.nickname || currentUser.username,
-            avatarUrl: currentUser.avatarUrl || '/assets/default-avatar.png'
+            avatarUrl: currentUser.avatarUrl || '/default-avatar.png'
         };
     }
     
@@ -92,7 +92,7 @@ export async function renderMessage(message) {
                 id: message.User.userId,
                 username: message.User.username,
                 nickname: message.User.nickname || message.User.username,
-                avatarUrl: message.User.avatarUrl || '/assets/default-avatar.png'
+                avatarUrl: message.User.avatarUrl || '/default-avatar.png'
             };
         } else if (message.Sender && typeof message.Sender === 'object') {
             // 兼容旧的Sender字段
@@ -100,7 +100,7 @@ export async function renderMessage(message) {
                 id: message.Sender.userId || message.Sender.id,
                 username: message.Sender.username,
                 nickname: message.Sender.nickname || message.Sender.username,
-                avatarUrl: message.Sender.avatarUrl || '/assets/default-avatar.png'
+                avatarUrl: message.Sender.avatarUrl || '/default-avatar.png'
             };
         } else {
             // 如果没有现成的用户信息，则获取用户信息
@@ -130,7 +130,7 @@ export async function renderMessage(message) {
             id: message.User?.userId || message.Sender?.userId || message.Sender?.id || message.userId || 'unknown',
             username: message.User?.username || message.Sender?.username || `用户${message.User?.userId || message.Sender?.userId || message.userId || '未知'}`,
             nickname: message.User?.nickname || message.Sender?.nickname || message.Sender?.username || `用户${message.User?.userId || message.Sender?.userId || message.userId || '未知'}`,
-            avatarUrl: message.User?.avatarUrl || message.Sender?.avatarUrl || '/assets/default-avatar.png'
+            avatarUrl: message.User?.avatarUrl || message.Sender?.avatarUrl || '/default-avatar.png'
         };
     }
     
@@ -275,7 +275,7 @@ export async function renderMessage(message) {
                 <img src="${senderInfo.avatarUrl}" 
                      alt="头像" 
                      class="avatar" 
-                     onerror="this.src='/assets/default-avatar.png'">
+                     onerror="this.src='/default-avatar.png'">
                 <div class="message-content">
                     <div class="message-sender">${senderInfo.nickname || senderInfo.username}</div>
                     <div class="message-bubble">

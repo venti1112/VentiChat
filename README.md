@@ -95,8 +95,8 @@
 | username | VARCHAR(50) | UNIQUE, NOT NULL | 用户登录名，全系统唯一不可重复 |
 | nickname | VARCHAR(50) | NOT NULL | 用户在系统中显示的昵称 |
 | password_hash | VARCHAR(255) | NOT NULL | 使用BCrypt算法加密后的密码 |
-| avatar_url | VARCHAR(255) | DEFAULT '/assets/default-avatar.png' | 用户头像图片的存储路径，默认使用系统默认头像 |
-| background_url | VARCHAR(255) | DEFAULT '/assets/wp.jpg' | 用户自定义背景图片的存储路径，默认使用系统默认背景 |
+| avatar_url | VARCHAR(255) | DEFAULT '/default-avatar.png' | 用户头像图片的存储路径，默认使用系统默认头像 |
+| background_url | VARCHAR(255) | DEFAULT '/wp.jpg' | 用户自定义背景图片的存储路径，默认使用系统默认背景 |
 | theme_color | VARCHAR(7) | DEFAULT '#4cd8b8' | 用户自定义主题色的十六进制颜色代码，默认使用青绿色 |
 | is_admin | BOOLEAN | DEFAULT false | 用户是否为系统管理员：true-是管理员，false-普通用户 |
 | status | ENUM('active','banned') | DEFAULT 'active' | 用户账号状态：active-正常，banned-封禁 |

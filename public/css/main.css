@@ -68,7 +68,7 @@
 
 body {
     min-height: 100vh;
-    background: url('/assets/wp.jpg') no-repeat center center fixed;
+    background: url('/wp.jpg') no-repeat center center fixed;
     background-size: cover;
     padding-top: 56px;
 }

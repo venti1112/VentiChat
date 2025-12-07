@@ -50,7 +50,7 @@ export function sendMessage() {
             id: currentUser.id,
             nickname: currentUser.nickname || currentUser.username,
             username: currentUser.username,
-            avatarUrl: currentUser.avatarUrl || '/assets/default-avatar.png'
+            avatarUrl: currentUser.avatarUrl || '/default-avatar.png'
         }
     };
     

@@ -27,12 +27,12 @@ module.exports = (sequelize) => {
         },
         avatarUrl: { 
             type: DataTypes.STRING(255), 
-            defaultValue: '/assets/default-avatar.png',
+            defaultValue: '/default-avatar.png',
             field: 'avatar_url' 
         },
         backgroundUrl: {
             type: DataTypes.STRING(255),
-            defaultValue: '/assets/wp.jpg',
+            defaultValue: '/wp.jpg',
             field: 'background_url'
         },
         themeColor: {
