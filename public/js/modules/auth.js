@@ -243,40 +243,93 @@ export function bindFormEvents() {
     document.getElementById('registerForm').addEventListener('submit', function(e) {
         e.preventDefault();
         
-        // 禁用注册按钮并显示"注册中"
-        const registerButton = this.querySelector('button[type="submit"]');
-        const originalRegisterButtonText = registerButton.innerHTML;
-        registerButton.disabled = true;
-        registerButton.innerHTML = '<i class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></i>注册中...';
-        
+        // 收集表单数据
         const formData = new FormData(this);
+        const userData = {
+            username: formData.get('username'),
+            nickname: formData.get('nickname'),
+            password: formData.get('password'),
+            confirmPassword: formData.get('confirmPassword')
+        };
         
-        fetch('/api/auth/register', {
+        // 前端验证
+        if (!userData.username || !userData.nickname || !userData.password || !userData.confirmPassword) {
+            window.showMessage('所有字段都必须填写', 'danger');
+            return;
+        }
+        
+        if (userData.password !== userData.confirmPassword) {
+            window.showMessage('两次输入的密码不一致', 'danger');
+            return;
+        }
+        
+        if (userData.password.length < 8) {
+            window.showMessage('密码至少需要8位字符', 'danger');
+            return;
+        }
+        
+        // 检查密码强度（至少包含字母和数字）
+        const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*#?&]/;
+        if (!passwordRegex.test(userData.password)) {
+            window.showMessage('密码必须包含字母和数字，可选择包含特殊字符', 'danger');
+            return;
+        }
+        
+        // 检查用户名是否已存在
+        fetch('/api/auth/check-username', {
             method: 'POST',
-            body: formData
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username: userData.username })
         })
         .then(response => response.json())
         .then(data => {
-            // 恢复注册按钮状态
-            registerButton.disabled = false;
-            registerButton.innerHTML = originalRegisterButtonText;
-            
-            if (data.success) {
-                window.showMessage('注册成功，请登录');
-                window.showLoginForm();
-            } else {
-                window.showMessage(data.message || '注册失败');
+            if (data.exists) {
+                window.showMessage('用户名已存在，请选择其他用户名', 'danger');
+                return;
             }
+            
+            // 用户名可用，继续注册流程
+            // 禁用注册按钮并显示"注册中"
+            const registerButton = this.querySelector('button[type="submit"]');
+            const originalRegisterButtonText = registerButton.innerHTML;
+            registerButton.disabled = true;
+            registerButton.innerHTML = '<i class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></i>注册中...';
+
+            fetch('/api/auth/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(userData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                // 恢复注册按钮状态
+                registerButton.disabled = false;
+                registerButton.innerHTML = originalRegisterButtonText;
+                
+                if (data.message && !data.error) {
+                    window.showMessage('注册成功，请登录');
+                    window.showLoginForm();
+                } else {
+                    window.showMessage(data.message || data.error || '注册失败');
+                }
+            })
+            .catch(error => {
+                // 恢复注册按钮状态
+                registerButton.disabled = false;
+                registerButton.innerHTML = originalRegisterButtonText;
+                
+                window.showMessage('网络错误，请稍后再试', 'danger', '注册失败');
+            });
         })
         .catch(error => {
-            // 恢复注册按钮状态
-            registerButton.disabled = false;
-            registerButton.innerHTML = originalRegisterButtonText;
-            
-            window.showMessage('网络错误，请稍后再试', 'danger', '注册失败');
+            window.showMessage('检查用户名时发生错误，请稍后再试', 'danger');
         });
     });
-    
+
     // 退出登录
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {

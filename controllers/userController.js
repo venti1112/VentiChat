@@ -1,5 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const path = require('path');
+const fs = require('fs');
 const { generateToken, removeToken, removeAllUserTokens } = require('../utils/auth');
 const { logUserLogin, logUserLogout, LOG_LEVELS, log } = require('../utils/logger');
 const redisClient = require('../utils/redisClient');
@@ -257,19 +259,14 @@ exports.register = async (req, res) => {
         });
         
         // 加入默认大聊天室
+        const Room = req.app.get('models').Room;
+        const RoomMember = req.app.get('models').RoomMember;
         const defaultRoom = await Room.findOne({ where: { name: 'VentiChat大厅' } });
         if (defaultRoom) {
             await RoomMember.create({
                 userId: user.userId,
                 roomId: defaultRoom.roomId
             });
-            
-            // 更新房间的成员列表
-            const currentMembers = defaultRoom.members || [];
-            if (!currentMembers.includes(user.userId)) {
-                currentMembers.push(user.userId);
-                await defaultRoom.update({ members: currentMembers });
-            }
         }
         
         res.status(201).json({ message: '注册成功' });
@@ -428,11 +425,17 @@ exports.uploadBackground = async (req, res) => {
             return res.status(400).json({ error: '没有上传文件' });
         }
         
-        // 构造背景图片URL
-        const backgroundUrl = `/userdata/background/${req.file.filename}`;
+        // 获取用户当前的背景图片URL
+        const User = req.app.get('models').User;
+        const user = await User.findByPk(req.user.userId, {
+            attributes: ['backgroundUrl']
+        });
+        const oldBackgroundUrl = user?.backgroundUrl;
+
+        // 构造新的背景图片URL
+        const backgroundUrl = `/api/userdata/background/${req.file.filename}`;
         
         // 更新用户背景图片URL
-        const User = req.app.get('models').User;
         const [updatedRowsCount] = await User.update(
             { backgroundUrl },
             {
@@ -442,6 +445,14 @@ exports.uploadBackground = async (req, res) => {
         
         if (updatedRowsCount === 0) {
             return res.status(404).json({ error: '用户不存在' });
+        }
+
+        // 删除旧的背景图片文件（如果存在且不是默认背景）
+        if (oldBackgroundUrl && !oldBackgroundUrl.includes('wp.jpg')) {
+            const oldBackgroundPath = path.join(__dirname, '..', 'public', oldBackgroundUrl);
+            if (fs.existsSync(oldBackgroundPath)) {
+                fs.unlinkSync(oldBackgroundPath);
+            }
         }
         
         res.json({
@@ -462,10 +473,16 @@ exports.resetBackground = async (req, res) => {
             return res.status(401).json({ error: '用户未认证' });
         }
         
-        // 更新用户背景图片URL为默认值
+        // 获取用户当前的背景图片URL
         const User = req.app.get('models').User;
+        const user = await User.findByPk(req.user.userId, {
+            attributes: ['backgroundUrl']
+        });
+        const oldBackgroundUrl = user?.backgroundUrl;
+
+        // 更新用户背景图片URL为默认值
         const [updatedRowsCount] = await User.update(
-            { backgroundUrl: '/wp.jpg' },
+            { backgroundUrl: '/api/userdata/background/wp.jpg' },
             {
                 where: { userId: req.user.userId }
             }
@@ -475,20 +492,15 @@ exports.resetBackground = async (req, res) => {
             return res.status(404).json({ error: '用户不存在' });
         }
         
-        // 获取更新后的用户偏好设置
-        const updatedUser = await User.findByPk(req.user.userId, {
-            attributes: ['backgroundUrl', 'themeColor']
-        });
-        
-        res.json({
-            message: '背景图片重置成功',
-            preferences: {
-                backgroundUrl: updatedUser.backgroundUrl || '/wp.jpg',
-                themeColor: updatedUser.themeColor || '#4cd8b8'
+        // 删除旧的背景图片文件（如果存在且不是默认背景）
+        if (oldBackgroundUrl && !oldBackgroundUrl.includes('wp.jpg')) {
+            const oldBackgroundPath = path.join(__dirname, '..', 'public', oldBackgroundUrl);
+            if (fs.existsSync(oldBackgroundPath)) {
+                fs.unlinkSync(oldBackgroundPath);
             }
-        });
+        }
     } catch (error) {
-        console.error('重置背景图片失败:', error);
-        res.status(500).json({ error: '内部服务器错误' });
+        console.error('重置背景图片错误:', error);
+        res.status(500).json({ error: '重置背景图片失败' });
     }
 };

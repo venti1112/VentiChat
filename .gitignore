@@ -3,6 +3,5 @@ Desktop.ini
 .vscode/
 node_modules/
 config/
-public/userdata/
-public/temp/
+userdata/
 logs/

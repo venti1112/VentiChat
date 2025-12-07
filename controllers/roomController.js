@@ -723,7 +723,7 @@ exports.getPendingRequests = async (req, res) => {
 };
 
 // 搜索聊天室
-exports.searchRooms = async (req, res) => {
+exports.search = async (req, res) => {
     try {
         const { q: query } = req.query;
         

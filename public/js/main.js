@@ -62,8 +62,8 @@ async function initializeModules() {
     // 绑定个人资料表单
     bindProfileForm();
     
-    // 绑定表单事件
-    bindFormEvents();
+    // 注意：不在这里调用bindFormEvents，避免重复绑定
+    // bindFormEvents(); 
     
     // 绑定聊天室相关按钮事件
     bindRoomButtons();
@@ -98,7 +98,7 @@ function bindInitialEvents() {
 
 // 页面加载完成后初始化应用
 document.addEventListener('DOMContentLoaded', async function() {
-    console.log('DOM loaded, initializing application...');
+    console.log('应用加载完成！正在初始化');
     
     try {
         // 初始化所有模块
@@ -109,14 +109,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         const savedUser = localStorage.getItem('user');
         
         if (token && savedUser) {
-            console.log('User logged in, initializing with token');
+            console.log('用户已登录');
             // 用户已登录，初始化WebSocket连接
             window.initializeWebSocket(token);
             
             // 加载聊天室列表
             await loadRooms();
         } else {
-            console.log('User not logged in, showing login modal');
+            console.log('用户未登录');
             // 用户未登录，显示登录模态框
             showLoginModal();
         }
@@ -124,9 +124,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         // 绑定初始事件
         bindInitialEvents();
         
-        console.log('Application initialized successfully');
+        console.log('应用初始化成功！');
     } catch (error) {
-        console.error('Failed to initialize application:', error);
+        console.error('应用初始化失败:', error);
         window.showMessage('应用初始化失败: ' + error.message, 'danger');
     } finally {
         // 隐藏初始加载动画
@@ -134,50 +134,50 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 });
 
-    // 申请加入房间函数
-    async function requestToJoinRoom(roomId, message = '') {
-        console.log('申请加入房间:', roomId); // 添加调试日志
-        const token = localStorage.getItem('token');
-        if (!token) {
-            showMessage('请先登录', 'danger');
-            showLoginModal();
-            return;
-        }
-
-        try {
-            console.log('发送请求到: ', `/api/rooms/${roomId}/join-request`); // 添加调试日志
-            const requestData = {};
-            if (message) {
-                requestData.message = message;
-            }
-            
-            const response = await fetch(`/api/rooms/${roomId}/join-request`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestData)
-            });
-            
-            console.log('收到响应:', response); // 添加调试日志
-            const data = await response.json();
-            console.log('响应数据:', data); // 添加调试日志
-            
-            if (response.ok) {
-                // 直接显示服务器返回的消息
-                showMessage(data.message, 'success');
-                
-                // 如果是直接加入房间的情况，刷新房间列表
-                if (data.joined === true) {
-                    loadRooms();
-                }
-            } else {
-                showMessage(data.error || '发送加入请求失败', 'danger');
-            }
-        } catch (error) {
-            console.error('发送加入请求失败:', error); // 添加调试日志
-            logger.logError('发送加入请求失败:', error);
-            showMessage('发送加入请求失败: ' + error.message, 'danger');
-        }
+// 申请加入房间函数
+async function requestToJoinRoom(roomId, message = '') {
+    console.log('申请加入房间:', roomId); // 添加调试日志
+    const token = localStorage.getItem('token');
+    if (!token) {
+        showMessage('请先登录', 'danger');
+        showLoginModal();
+        return;
     }
+
+    try {
+        console.log('发送请求到: ', `/api/rooms/${roomId}/join-request`); // 添加调试日志
+        const requestData = {};
+        if (message) {
+            requestData.message = message;
+        }
+        
+        const response = await fetch(`/api/rooms/${roomId}/join-request`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        console.log('收到响应:', response); // 添加调试日志
+        const data = await response.json();
+        console.log('响应数据:', data); // 添加调试日志
+        
+        if (response.ok) {
+            // 直接显示服务器返回的消息
+            showMessage(data.message, 'success');
+            
+            // 如果是直接加入房间的情况，刷新房间列表
+            if (data.joined === true) {
+                loadRooms();
+            }
+        } else {
+            showMessage(data.error || '发送加入请求失败', 'danger');
+        }
+    } catch (error) {
+        console.error('发送加入请求失败:', error); // 添加调试日志
+        console.error('发送加入请求失败:', error);
+        showMessage('发送加入请求失败: ' + error.message, 'danger');
+    }
+}

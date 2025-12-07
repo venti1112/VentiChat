@@ -4,8 +4,9 @@ const fs = require('fs');
 const mime = require('mime-types');
 
 // 确保userdata目录及子目录存在
-const userdataDir = path.join(__dirname, '..', 'public', 'userdata');
+const userdataDir = path.join(__dirname, '..', 'userdata');
 const avatarDir = path.join(userdataDir, 'avatar');
+const backgroundDir = path.join(userdataDir, 'background');
 const pictureDir = path.join(userdataDir, 'picture');
 const videoDir = path.join(userdataDir, 'video');
 const audioDir = path.join(userdataDir, 'audio');
@@ -13,17 +14,23 @@ const fileDir = path.join(userdataDir, 'file');
 const tempDir = path.join(userdataDir, 'temp');
 
 // 创建所有需要的目录
-[userdataDir, avatarDir, pictureDir, videoDir, audioDir, fileDir, tempDir].forEach(dir => {
+[userdataDir, avatarDir, backgroundDir, pictureDir, videoDir, audioDir, fileDir, tempDir].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 });
 
 // 根据文件类型确定存储目录
-const getDestination = (fileType) => {
+const getDestination = (fileType, purpose) => {
+  // 根据purpose确定特定目录
+  if (purpose === 'avatar') {
+    return avatarDir;
+  } else if (purpose === 'background') {
+    return backgroundDir;
+  }
+  
+  // 根据文件类型确定存储目录
   switch (fileType) {
-    case 'avatar':
-      return avatarDir;
     case 'image':
       return pictureDir;
     case 'video':
@@ -36,35 +43,46 @@ const getDestination = (fileType) => {
 };
 
 // 根据文件类型确定URL前缀
-const getUrlPrefix = (fileType) => {
+const getUrlPrefix = (fileType, purpose) => {
+  // 根据purpose确定特定URL前缀
+  if (purpose === 'avatar') {
+    return '/api/userdata/avatar';
+  } else if (purpose === 'background') {
+    return '/api/userdata/background';
+  }
+  
+  // 根据文件类型确定URL前缀
   switch (fileType) {
-    case 'avatar':
-      return '/userdata/avatar';
     case 'image':
-      return '/userdata/picture';
+      return '/api/userdata/picture';
     case 'video':
-      return '/userdata/video';
+      return '/api/userdata/video';
     case 'audio':
-      return '/userdata/audio';
+      return '/api/userdata/audio';
     default:
-      return '/userdata/file';
+      return '/api/userdata/file';
   }
 };
 
 // 通用存储配置
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // 从请求中获取文件类型，默认为'file'
+    // 从请求中获取文件类型和目的，默认为'file'和'message'
     const fileType = req.fileType || 'file';
-    const destDir = getDestination(fileType);
+    const purpose = req.body.purpose || 'message';
+    const destDir = getDestination(fileType, purpose);
     cb(null, destDir);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
-    // 为头像文件使用特殊命名规则
-    if (req.fileType === 'avatar') {
+    
+    // 根据purpose使用特殊命名规则
+    const purpose = req.body.purpose || 'message';
+    if (purpose === 'avatar') {
       cb(null, 'avatar-' + req.user.id + '-' + uniqueSuffix + ext);
+    } else if (purpose === 'background') {
+      cb(null, 'background-' + req.user.id + '-' + uniqueSuffix + ext);
     } else {
       cb(null, req.fileType + '-' + uniqueSuffix + ext);
     }
@@ -132,7 +150,7 @@ const uploadSingle = (fieldName = 'file', type = 'file') => {
   };
 };
 
-// 导出多个文件上传中间件
+// 导出多个文件上传中间件（按字段名）
 const uploadArray = (fieldName = 'files', type = 'file', maxCount = 10) => {
   return (req, res, next) => {
     req.fileType = type;

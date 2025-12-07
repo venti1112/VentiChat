@@ -392,7 +392,6 @@ async function startServer(httpServer) {
         // 启动服务器
         httpServer.listen(port, () => {
             const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
-            log(LOG_LEVELS.INFO, `工作进程 ${workerId} 监听端口 ${port}`);
         });
     } else {
         // 如果初始连接失败，启动重试机制
@@ -401,7 +400,6 @@ async function startServer(httpServer) {
         // 即使数据库未连接也启动服务器，但会返回500错误
         httpServer.listen(port, () => {
             const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
-            log(LOG_LEVELS.INFO, `工作进程 ${workerId} 监听端口 ${port} (数据库连接失败)`);
         });
     }
 }

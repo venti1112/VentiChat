@@ -200,45 +200,53 @@ exports.register = async (req, res) => {
             return res.status(409).json({ message: '用户名已存在' });
         }
         
-        // 如果有上传头像文件，则使用上传的头像
-        if (req.file) {
-            avatarUrl = `/userdata/avatar/${req.file.filename}`;
-        }
+        // 哈希密码
+        const passwordHash = await hashPassword(password);
         
-        // 创建新用户
-        const hashedPassword = await hashPassword(password);
-        const newUser = await User.create({
+        // 创建用户
+        const user = await User.create({
             username,
-            nickname: nickname || username,
-            passwordHash: hashedPassword,
-            avatarUrl: avatarUrl
+            nickname,
+            passwordHash,
+            avatarUrl
         });
-
-        // 记录注册日志
-        log('INFO', `新用户注册: ${username}(ID: ${newUser.userId})`);
-
-        // 获取大厅房间（VentiChat大厅）
-        const Room = require('../models/index').Room;
-        const RoomMember = require('../models/index').RoomMember;
-        const hallRoom = await Room.findOne({
-            where: {
-                name: 'VentiChat大厅'
+        
+        log('INFO', `新用户注册: ${username} (${user.userId})`);
+        
+        res.status(201).json({ 
+            message: '注册成功',
+            user: {
+                id: user.userId,
+                username: user.username,
+                nickname: user.nickname,
+                avatarUrl: user.avatarUrl
             }
         });
-
-        // 如果大厅房间存在，将新用户加入其中
-        if (hallRoom) {
-            await RoomMember.create({
-                userId: newUser.userId,
-                roomId: hallRoom.roomId,
-                isModerator: false
-            });
-        }
-
-        // 注册成功后，不自动登录，仅返回成功消息
-        res.json({ message: '注册成功' });
     } catch (error) {
         log('ERROR', '注册错误: ' + error);
+        res.status(500).json({ message: '服务器内部错误' });
+    }
+};
+
+// 检查用户名是否存在
+exports.checkUsername = async (req, res) => {
+    try {
+        const { username } = req.body;
+        
+        // 验证输入
+        if (!username) {
+            return res.status(400).json({ message: '用户名不能为空' });
+        }
+        
+        // 检查用户名是否已存在
+        const existingUser = await User.findOne({ where: { username } });
+        
+        res.json({ 
+            exists: !!existingUser,
+            message: existingUser ? '用户名已存在' : '用户名可用'
+        });
+    } catch (error) {
+        log('ERROR', '检查用户名错误: ' + error);
         res.status(500).json({ message: '服务器内部错误' });
     }
 };

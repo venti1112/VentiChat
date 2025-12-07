@@ -224,4 +224,15 @@ export function bindSendMessageEvents() {
             }
         });
     }
+    
+    // 文件上传按钮事件
+    const attachFileBtn = document.getElementById('attachFileBtn');
+    if (attachFileBtn) {
+        attachFileBtn.addEventListener('click', function() {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.onchange = window.handleFileSelect;
+            fileInput.click();
+        });
+    }
 }

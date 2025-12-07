@@ -1,26 +1,88 @@
 // 文件上传模块
-
-// 用于存储当前的XMLHttpRequest对象，以便可以取消请求
-let currentXHR = null;
 let currentUploadId = null;
-let currentFileSize = 0; // 用于存储当前文件大小
+let currentChunkXHR = null;
 
-// 处理文件选择
-export function handleFileSelect(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+// 显示上传进度模态框
+function showUploadProgress() {
+    const modal = new bootstrap.Modal(document.getElementById('uploadProgressModal'));
+    modal.show();
     
-    // 显示文件名和文件大小
-    document.getElementById('uploadFileName').textContent = file.name;
-    currentFileSize = file.size;
-    document.getElementById('fileSizeText').textContent = formatFileSize(file.size);
+    // 重置进度条和相关信息
+    updateProgress(0);
+    updateUploadedSize(0);
+    updateUploadSpeed(0);
+    updateFileName('');
+}
+
+// 更新进度条
+function updateProgress(percent) {
+    const progressBar = document.getElementById('uploadProgressBar');
+    const progressText = document.getElementById('uploadProgressText');
     
-    // 所有文件都使用分片上传
-    uploadFile(file);
+    if (progressBar && progressText) {
+        progressBar.style.width = percent + '%';
+        progressBar.setAttribute('aria-valuenow', percent);
+        progressText.textContent = percent + '%';
+    }
+}
+
+// 更新已上传大小显示
+function updateUploadedSize(loadedBytes, totalBytes) {
+    const uploadedSizeText = document.getElementById('uploadedSizeText');
+    const fileSizeText = document.getElementById('fileSizeText');
+    
+    if (uploadedSizeText) {
+        uploadedSizeText.textContent = formatFileSize(loadedBytes);
+    }
+    
+    if (fileSizeText && totalBytes) {
+        fileSizeText.textContent = formatFileSize(totalBytes);
+    }
+}
+
+// 更新上传速度显示
+function updateUploadSpeed(bytesPerSecond) {
+    const uploadSpeedText = document.getElementById('uploadSpeedText');
+    if (!uploadSpeedText) return;
+    
+    // 转换为更友好的单位
+    if (bytesPerSecond >= 1024 * 1024) {
+        // MB/s
+        const speedInMBs = (bytesPerSecond / (1024 * 1024)).toFixed(2);
+        uploadSpeedText.textContent = speedInMBs + ' MB/s';
+    } else if (bytesPerSecond >= 1024) {
+        // KB/s
+        const speedInKBs = (bytesPerSecond / 1024).toFixed(2);
+        uploadSpeedText.textContent = speedInKBs + ' KB/s';
+    } else {
+        // B/s
+        uploadSpeedText.textContent = bytesPerSecond.toFixed(2) + ' B/s';
+    }
+}
+
+// 更新文件名显示
+function updateFileName(name) {
+    const nameElement = document.getElementById('uploadingFileName');
+    if (nameElement) {
+        nameElement.textContent = name;
+    }
+}
+
+// 格式化文件大小显示
+function formatFileSize(bytes) {
+    if (bytes >= 1024 * 1024 * 1024) {
+        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    } else if (bytes >= 1024 * 1024) {
+        return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+    } else if (bytes >= 1024) {
+        return (bytes / 1024).toFixed(2) + ' KB';
+    } else {
+        return bytes + ' B';
+    }
 }
 
 // 分片上传
-export async function uploadFile(file) {
+async function uploadFile(file) {
     const currentRoomId = localStorage.getItem('currentRoomId');
     const token = localStorage.getItem('token');
     
@@ -101,7 +163,8 @@ export async function uploadFile(file) {
             body: JSON.stringify({
                 fileName: file.name,
                 fileSize: file.size,
-                roomId: currentRoomId
+                roomId: roomId,
+                purpose: purpose  // 添加purpose字段
             })
         });
         
@@ -128,7 +191,8 @@ export async function uploadFile(file) {
             chunkFormData.append('uploadId', uploadId);
             chunkFormData.append('chunkIndex', i);
             chunkFormData.append('totalChunks', totalChunks);
-            chunkFormData.append('roomId', currentRoomId);
+            chunkFormData.append('roomId', roomId);
+            chunkFormData.append('purpose', purpose); // 添加purpose字段
             
             // 创建新的XHR以便监听每个分片的进度
             const xhr = new XMLHttpRequest();
@@ -162,6 +226,11 @@ export async function uploadFile(file) {
                         lastLoaded = e.loaded;
                         lastTime = currentTime;
                         totalLoaded = i * chunkSize + e.loaded;
+                        
+                        // 调用外部进度回调
+                        if (onProgress) {
+                            onProgress(overallProgress, uploadedBytes, speed);
+                        }
                     }
                 });
                 
@@ -196,8 +265,8 @@ export async function uploadFile(file) {
             await chunkPromise;
         }
         
-        // 3. 完成上传
-        const finalizeResponse = await fetch('/api/upload/complete', {
+        // 3. 完成分片上传
+        const finalizeResponse = await fetch('/api/upload/finalize', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -218,21 +287,27 @@ export async function uploadFile(file) {
         
         const finalizeData = await finalizeResponse.json();
         
-        // 文件上传成功，创建文件消息
-        sendFileMessage(finalizeData.fileUrl, file.name, file.type);
+        // 隐藏进度模态框
+        const modalEl = document.getElementById('uploadProgressModal');
+        if (modalEl) {
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) {
+                modal.hide();
+            }
+        }
         
-        // 隐藏进度条模态框
-        bootstrap.Modal.getInstance(document.getElementById('uploadProgressModal')).hide();
-        
-        window.showMessage('文件上传成功', 'success');
+        return finalizeData;
     } catch (error) {
-        console.error('文件上传失败:', error);
-        window.showMessage('文件上传失败: ' + error.message, 'danger');
+        // 隐藏进度模态框
+        const modalEl = document.getElementById('uploadProgressModal');
+        if (modalEl) {
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) {
+                modal.hide();
+            }
+        }
         
-        // 隐藏进度条模态框
-        bootstrap.Modal.getInstance(document.getElementById('uploadProgressModal')).hide();
-        
-        // 如果已有uploadId，通知后端清理
+        // 清理服务器上的临时文件
         if (uploadId) {
             try {
                 await fetch('/api/upload/cleanup', {
@@ -247,67 +322,14 @@ export async function uploadFile(file) {
                 console.error('清理上传文件失败:', e);
             }
         }
+        
+        throw error;
     }
 }
 
-// 更新进度条显示
-function updateProgress(percent) {
-    const progressBar = document.getElementById('uploadProgressBar');
-    const progressText = document.getElementById('uploadProgressText');
-    
-    if (progressBar) {
-        progressBar.style.width = percent + '%';
-        progressBar.setAttribute('aria-valuenow', percent);
-    }
-    
-    if (progressText) {
-        progressText.textContent = percent + '%';
-    }
-}
-
-// 更新已上传大小显示
-function updateUploadedSize(loadedBytes) {
-    const uploadedSizeText = document.getElementById('uploadedSizeText');
-    if (uploadedSizeText) {
-        uploadedSizeText.textContent = formatFileSize(loadedBytes) + ' / ';
-    }
-}
-
-// 更新上传速度显示
-function updateUploadSpeed(bytesPerSecond) {
-    const uploadSpeedText = document.getElementById('uploadSpeedText');
-    if (!uploadSpeedText) return;
-    
-    // 转换为更友好的单位
-    if (bytesPerSecond >= 1024 * 1024) {
-        // MB/s
-        const speedInMBs = (bytesPerSecond / (1024 * 1024)).toFixed(2);
-        uploadSpeedText.textContent = speedInMBs + ' MB/s';
-    } else if (bytesPerSecond >= 1024) {
-        // KB/s
-        const speedInKBs = (bytesPerSecond / 1024).toFixed(2);
-        uploadSpeedText.textContent = speedInKBs + ' KB/s';
-    } else {
-        // B/s
-        uploadSpeedText.textContent = bytesPerSecond.toFixed(2) + ' B/s';
-    }
-}
-
-// 格式化文件大小显示
-function formatFileSize(bytes) {
-    if (bytes >= 1024 * 1024 * 1024) {
-        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
-    } else if (bytes >= 1024 * 1024) {
-        return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-    } else if (bytes >= 1024) {
-        return (bytes / 1024).toFixed(2) + ' KB';
-    } else {
-        return bytes + ' B';
-    }
-}
 
 // 发送文件消息
-export function sendFileMessage(fileUrl, fileName, fileType) {
+function sendFileMessage(fileUrl, fileName, fileType, thumbnailUrl = null) {
     const currentRoomId = localStorage.getItem('currentRoomId');
     const token = localStorage.getItem('token');
     
@@ -331,8 +353,24 @@ export function sendFileMessage(fileUrl, fileName, fileType) {
         messageType = 'audio';
     }
     
-    // 获取当前用户信息
-    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    // 确保fileUrl以/api开头
+    let correctedFileUrl = fileUrl;
+    if (fileUrl.startsWith('/userdata/')) {
+        correctedFileUrl = fileUrl.replace('/userdata/', '/api/userdata/');
+    }
+    
+    // 构建消息数据
+    const messageData = {
+        roomId: parseInt(currentRoomId),
+        content: fileName,
+        fileUrl: correctedFileUrl,
+        type: messageType
+    };
+    
+    // 如果有缩略图URL，添加到消息数据中
+    if (thumbnailUrl) {
+        messageData.thumbnailUrl = thumbnailUrl;
+    }
     
     // 发送文件消息到服务器
     fetch('/api/messages', {
@@ -341,12 +379,7 @@ export function sendFileMessage(fileUrl, fileName, fileType) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-            roomId: parseInt(currentRoomId),
-            content: fileName,
-            fileUrl: fileUrl,  // 添加fileUrl字段
-            type: messageType
-        })
+        body: JSON.stringify(messageData)
     })
     .then(response => {
         if (!response.ok) {
@@ -360,11 +393,6 @@ export function sendFileMessage(fileUrl, fileName, fileType) {
         // 清空输入框
         const messageInput = document.getElementById('messageInput');
         if (messageInput) messageInput.value = '';
-        
-        // 刷新聊天记录
-        if (window.loadMessageHistory) {
-            window.loadMessageHistory(parseInt(currentRoomId));
-        }
     })
     .catch(error => {
         console.error('发送文件消息失败:', error);
@@ -372,16 +400,91 @@ export function sendFileMessage(fileUrl, fileName, fileType) {
     });
 }
 
+// 处理文件选择
+function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // 显示文件名和文件大小
+    document.getElementById('uploadFileName').textContent = file.name;
+    currentFileSize = file.size;
+    if (document.getElementById('fileSizeText')) {
+        document.getElementById('fileSizeText').textContent = formatFileSize(file.size);
+    }
+    
+    // 所有文件都使用分片上传
+    uploadFile(file);
+    
+    // 清空文件输入框，防止重复选择相同文件时不触发change事件
+    event.target.value = '';
+}
+
 // 绑定文件上传事件
-export function bindFileUploadEvents() {
-    // 文件上传按钮事件
-    const attachFileBtn = document.getElementById('attachFileBtn');
-    if (attachFileBtn) {
-        attachFileBtn.addEventListener('click', function() {
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.onchange = handleFileSelect;
-            fileInput.click();
+function bindFileUploadEvents() {
+    // 监听文件选择事件
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput) {
+        fileInput.addEventListener('change', handleFileSelect);
+    }
+    
+    // 监听拖拽上传事件
+    const chatContainer = document.getElementById('chatContainer');
+    if (chatContainer) {
+        // 阻止默认的拖拽行为
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            chatContainer.addEventListener(eventName, preventDefaults, false);
         });
+        
+        // 高亮拖拽区域
+        ['dragenter', 'dragover'].forEach(eventName => {
+            chatContainer.addEventListener(eventName, highlight, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            chatContainer.addEventListener(eventName, unhighlight, false);
+        });
+        
+        // 处理文件 drop 事件
+        chatContainer.addEventListener('drop', handleDrop, false);
     }
 }
+
+// 阻止默认的拖拽行为
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+// 高亮拖拽区域
+function highlight() {
+    const chatContainer = document.getElementById('chatContainer');
+    if (chatContainer) {
+        chatContainer.classList.add('drag-over');
+    }
+}
+
+// 取消高亮拖拽区域
+function unhighlight() {
+    const chatContainer = document.getElementById('chatContainer');
+    if (chatContainer) {
+        chatContainer.classList.remove('drag-over');
+    }
+}
+
+// 处理文件 drop 事件
+function handleDrop(e) {
+    const dt = e.dataTransfer;
+    const file = dt.files[0];
+    
+    if (file) {
+        uploadFile(file);
+    }
+}
+
+// 导出函数
+export {
+    handleFileSelect,
+    uploadFile,
+    sendFileMessage,
+    bindFileUploadEvents
+};
