@@ -14,16 +14,16 @@ async function checkAndInitialize() {
         return true;
     } catch (err) {
         // 配置文件不存在，运行初始化脚本
-        console.log('配置文件不存在，正在运行初始化脚本...');
+        log(LOG_LEVELS.INFO, '配置文件不存在，正在运行初始化脚本...');
         return new Promise((resolve, reject) => {
             const initProcess = spawn('node', ['scripts/init.js'], { stdio: 'inherit' });
             
             initProcess.on('close', (code) => {
                 if (code === 0) {
-                    console.log('初始化完成，继续启动应用...');
+                    log(LOG_LEVELS.INFO, '初始化完成，继续启动应用...');
                     resolve(true);
                 } else {
-                    console.error('初始化失败，退出码:', code);
+                    log(LOG_LEVELS.ERROR, `初始化失败，退出码: ${code}`);
                     reject(false);
                 }
             });
@@ -77,7 +77,7 @@ async function checkAndInitialize() {
             const proxyProcess = spawn('node', ['proxy.js'], { stdio: 'inherit' });
             
             proxyProcess.on('error', (err) => {
-                console.error('代理进程启动失败:', err);
+                log(LOG_LEVELS.ERROR, `代理进程启动失败: ${err}`);
             });
             
             // 处理工作进程间的消息转发
@@ -134,7 +134,7 @@ async function checkAndInitialize() {
             require('./app.js');
         }
     } catch (error) {
-        console.error('启动过程中发生错误:', error);
+        log(LOG_LEVELS.ERROR, `启动过程中发生错误: ${error}`);
         process.exit(1);
     }
 })();

@@ -360,9 +360,11 @@ export function bindFormEvents() {
         
                 
                 // 清除本地存储
-                localStorage.clear();
+                localStorage.removeItem('token');
+                localStorage.removeItem('userId');
+                localStorage.removeItem('user');
+                localStorage.removeItem('userPreferences');
 
-                // 刷新页面
                 window.location.reload();
             });
         });
