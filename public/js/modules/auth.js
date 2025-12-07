@@ -360,44 +360,10 @@ export function bindFormEvents() {
         
                 
                 // 清除本地存储
-                localStorage.removeItem('token');
-                localStorage.removeItem('userId');
-                localStorage.removeItem('user');
-                localStorage.removeItem('userPreferences');
-                
-                // 重置页面背景和主题
-                document.body.style.backgroundImage = '';
-                document.body.style.backgroundColor = '#f8f9fa';
-                
-                // 重置所有按钮的主题色
-                const buttons = document.querySelectorAll('.btn');
-                buttons.forEach(button => {
-                    button.style.backgroundColor = '';
-                    button.style.borderColor = '';
-                });
-                
-                // 重置其他使用主题色的元素
-                const themeColorElements = document.querySelectorAll('.theme-color-element');
-                themeColorElements.forEach(element => {
-                    element.style.borderColor = '';
-                });
-                
-                // 切换到登录界面
-                const chatSection = document.getElementById('chatSection');
-                const authSection = document.getElementById('authSection');
-                
-                if (chatSection) chatSection.style.display = 'none';
-                if (authSection) authSection.style.display = 'flex';
-                
-                // 清空表单
-                const loginForm = document.getElementById('loginForm');
-                const registerForm = document.getElementById('registerForm');
-                
-                if (loginForm) loginForm.reset();
-                if (registerForm) registerForm.reset();
-                
-                // 显示退出成功消息
-                window.showMessage('您已成功退出登录');
+                localStorage.clear();
+
+                // 刷新页面
+                window.location.reload();
             });
         });
     } else {
