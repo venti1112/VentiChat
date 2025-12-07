@@ -218,11 +218,10 @@ body {
     backdrop-filter: blur(var(--blur-amount));
     -webkit-backdrop-filter: blur(var(--blur-amount));
     border-radius: var(--border-radius);
-    margin: 0 0 0 0;
+    margin-top: 0;
 }
 .chat-container-rapper {
     height: 100%;
-    margin: 0 0 0 0;
 }
 
 .room-list { 
