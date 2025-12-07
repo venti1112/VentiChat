@@ -3,6 +3,25 @@
 // 用于跟踪已显示消息的集合，防止重复显示
 const displayedMessages = new Set();
 
+// HTML转义函数，防止XSS攻击
+function escapeHtml(text) {
+    if (!text || typeof text !== 'string') {
+        return '';
+    }
+    
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    
+    return text.replace(/[&<>"']/g, function(m) {
+        return map[m];
+    });
+}
+
 // 用户信息缓存
 const userCache = new Map();
 const userCacheExpiry = new Map();
@@ -134,6 +153,9 @@ export async function renderMessage(message) {
         };
     }
     
+    // 对用户昵称进行HTML转义，防止XSS攻击
+    senderInfo.nickname = escapeHtml(senderInfo.nickname);
+    
     // 判断是否为当前用户发送的消息
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
     const isCurrentUser = String(senderInfo.id) === String(currentUser.id);
@@ -142,7 +164,8 @@ export async function renderMessage(message) {
     let content = '';
     switch (message.type) {
         case 'text':
-            content = message.content || '';
+            // 对文本消息内容进行HTML转义，防止XSS攻击
+            content = escapeHtml(message.content || '');
             break;
         case 'image':
             // 改进图片URL处理逻辑 - 如果fileUrl为空则使用content字段
@@ -157,7 +180,7 @@ export async function renderMessage(message) {
                 // fallback到content字段
                 imageUrl = message.content;
             }
-            content = `<img src="${imageUrl}" alt="图片" class="message-image" style="max-width: 200px; max-height: 200px;">`;
+            content = `<img src="${escapeHtml(imageUrl)}" alt="图片" class="message-image" style="max-width: 200px; max-height: 200px;">`;
             break;
         case 'video':
             // 改进视频URL处理逻辑 - 如果fileUrl为空则使用content字段
@@ -174,8 +197,8 @@ export async function renderMessage(message) {
             }
             // 使用playVideoInFullscreen函数实现点击播放并自动全屏
             content = `
-                <div style="position: relative; display: inline-block;" onclick="playVideoInFullscreen('${videoUrl}')">
-                    <video src="${videoUrl}" class="message-video" style="max-width: 200px; max-height: 200px;"></video>
+                <div style="position: relative; display: inline-block;" onclick="playVideoInFullscreen('${escapeHtml(videoUrl)}')">
+                    <video src="${escapeHtml(videoUrl)}" class="message-video" style="max-width: 200px; max-height: 200px;"></video>
                     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(0, 0, 0, 0.7); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
                         <i class="bi bi-play-fill" style="color: white; font-size: 20px;"></i>
                     </div>
@@ -209,7 +232,7 @@ export async function renderMessage(message) {
             content = `
                 <div class="message-audio">
                     <audio controls preload="metadata" style="width: 250px;">
-                        <source src="${audioUrl}" type="${message.fileType || 'audio/mpeg'}">
+                        <source src="${escapeHtml(audioUrl)}" type="${escapeHtml(message.fileType || 'audio/mpeg')}">
                     </audio>
                 </div>
             `;
@@ -240,13 +263,14 @@ export async function renderMessage(message) {
                 }
             }
             
-            content = `<a href="${fileUrl}" target="_blank" class="message-file">文件: ${fileName}</a>`;
+            content = `<a href="${escapeHtml(fileUrl)}" target="_blank" class="message-file">文件: ${escapeHtml(fileName)}</a>`;
             break;
         case 'recall':
             content = '<em>消息已被撤回</em>';
             break;
         default:
-            content = message.content || '';
+            // 对默认情况也进行HTML转义
+            content = escapeHtml(message.content || '');
     }
     
     // 检查是否为待发送消息（临时消息）
