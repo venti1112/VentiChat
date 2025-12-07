@@ -236,6 +236,10 @@ export function loadMessageHistory(roomId) {
         return response.json();
     })
     .then(async messages => {
+        // 存储所有消息到全局变量和localStorage
+        window.allMessages = messages;
+        localStorage.setItem('allMessages', JSON.stringify(messages));
+        
         await window.displayMessages(messages);
     })
     .catch(error => {

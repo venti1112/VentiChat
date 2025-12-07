@@ -134,6 +134,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 });
 
+// 存储所有接收到的消息
+let allMessages = [];
+
 // 申请加入房间函数
 async function requestToJoinRoom(roomId, message = '') {
     console.log('申请加入房间:', roomId); // 添加调试日志

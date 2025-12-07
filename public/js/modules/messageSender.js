@@ -178,6 +178,83 @@ function replaceTempMessage(tempMessageId, realMessage) {
         // 替换临时消息元素
         tempMessageElement.parentNode.replaceChild(newMessageElement, tempMessageElement);
         
+        // 为新添加的解除限制按钮添加事件监听器
+        const unlockButton = newMessageElement.querySelector('.unlock-code-btn');
+        if (unlockButton) {
+            // 先移除可能已存在的事件监听器
+            const newUnlockButton = unlockButton.cloneNode(true);
+            unlockButton.parentNode.replaceChild(newUnlockButton, unlockButton);
+            
+            newUnlockButton.addEventListener('click', async function() {
+                const msgId = this.getAttribute('data-message-id');
+                
+                // 第一次确认
+                const firstConfirm = confirm('注意：即将解除此消息的HTML限制，可能会执行其中的脚本代码。\n\n您确定要继续吗？');
+                if (!firstConfirm) return;
+                
+                // 第二次确认
+                const secondConfirm = confirm('警告：这是最后的确认！\n\n解除限制后，消息中的HTML和脚本将会被执行。\n\n是否确认解除限制？');
+                if (!secondConfirm) return;
+                
+                // 添加到解除限制的消息集合
+                if (window.unrestrictedMessages) {
+                    window.unrestrictedMessages.add(msgId);
+                }
+                
+                // 更新localStorage中的消息数据
+                const allMessages = JSON.parse(localStorage.getItem('allMessages') || '[]');
+                const updatedMessages = allMessages.map(msg => {
+                    if (String(msg.messageId || msg.id || 'unknown') === msgId) {
+                        // 更新消息对象，标记为已解除限制
+                        return { ...msg, unrestricted: true };
+                    }
+                    return msg;
+                });
+                localStorage.setItem('allMessages', JSON.stringify(updatedMessages));
+                
+                // 重新渲染该消息（使用标记为unrestricted的消息对象）
+                const msgElement = this.closest('.message-item');
+                if (msgElement) {
+                    // 查找对应的消息对象（使用标记为unrestricted的版本）
+                    const message = updatedMessages.find(m => String(m.messageId || m.id || 'unknown') === msgId);
+                    if (message) {
+                        const renderMessageFunc = window.renderMessage || window.modules?.messageHandler?.renderMessage;
+                        if (renderMessageFunc) {
+                            msgElement.innerHTML = await renderMessageFunc({ ...message, unrestricted: true });
+                        }
+                        
+                        // 为新渲染的消息再次绑定事件监听器
+                        setTimeout(() => {
+                            const newUnlockButton = msgElement.querySelector('.unlock-code-btn');
+                            if (newUnlockButton) {
+                                // 克隆节点以移除旧的事件监听器
+                                const clonedButton = newUnlockButton.cloneNode(true);
+                                newUnlockButton.parentNode.replaceChild(clonedButton, newUnlockButton);
+                                
+                                // 为克隆的按钮添加事件监听器
+                                clonedButton.addEventListener('click', async function() {
+                                    // 注意：这里不需要再次添加到unrestrictedMessages，因为它已经在上面添加过了
+                                    const confirm1 = confirm('注意：即将解除此消息的HTML限制，可能会执行其中的脚本代码。\n\n您确定要继续吗？');
+                                    if (!confirm1) return;
+                                    
+                                    const confirm2 = confirm('警告：这是最后的确认！\n\n解除限制后，消息中的HTML和脚本将会被执行。\n\n是否确认解除限制？');
+                                    if (!confirm2) return;
+                                    
+                                    // 由于消息已经被标记为unrestricted，重新渲染即可
+                                    const updatedMsgElement = this.closest('.message-item');
+                                    if (updatedMsgElement) {
+                                        if (renderMessageFunc) {
+                                            updatedMsgElement.innerHTML = await renderMessageFunc({ ...message, unrestricted: true });
+                                        }
+                                    }
+                                });
+                            }
+                        }, 0);
+                    }
+                }
+            });
+        }
+        
         // 滚动到底部
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }).catch(error => {

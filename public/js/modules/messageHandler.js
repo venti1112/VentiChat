@@ -3,6 +3,9 @@
 // 用于跟踪已显示消息的集合，防止重复显示
 const displayedMessages = new Set();
 
+// 存储已解除限制的消息ID
+const unrestrictedMessages = new Set();
+
 // HTML转义函数，防止XSS攻击
 function escapeHtml(text) {
     if (!text || typeof text !== 'string') {
@@ -20,6 +23,29 @@ function escapeHtml(text) {
     return text.replace(/[&<>"']/g, function(m) {
         return map[m];
     });
+}
+
+// 检测消息是否包含代码
+function containsCode(content) {
+    if (!content || typeof content !== 'string') {
+        return false;
+    }
+    
+    // 检测常见的代码模式
+    const codePatterns = [
+        /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, // script标签
+        /<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, // iframe标签
+        /javascript:/gi, // javascript:协议
+        /on\w+\s*=/gi, // 事件属性如onclick=
+        /eval\s*\(/gi, // eval函数
+        /document\./gi, // document对象
+        /window\./gi, // window对象
+        /\w+\s*=\s*['"]?\s*<script/gi, // 可能的脚本注入
+        /<button\b[^<]*(?:(?!<\/button>)<[^<]*)*<\/button>/gi, // button标签（可能包含事件处理）
+        /<\w+\s+[^>]*\b(on\w+\s*=|javascript:)/gi // 包含事件处理程序或javascript协议的任意标签
+    ];
+    
+    return codePatterns.some(pattern => pattern.test(content));
 }
 
 // 用户信息缓存
@@ -160,12 +186,28 @@ export async function renderMessage(message) {
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
     const isCurrentUser = String(senderInfo.id) === String(currentUser.id);
     
+    // 获取消息ID，确保有有效的ID
+    const messageId = String(message.messageId || message.id || 'unknown');
+    
+    // 检查是否为已解除限制的消息（检查消息对象本身是否有unrestricted属性或者在unrestrictedMessages集合中）
+    const isUnrestricted = message.unrestricted || unrestrictedMessages.has(messageId);
+    
     // 根据消息类型显示不同内容
     let content = '';
+    let hasCode = false;
     switch (message.type) {
         case 'text':
-            // 对文本消息内容进行HTML转义，防止XSS攻击
-            content = escapeHtml(message.content || '');
+            // 检查是否包含代码
+            hasCode = containsCode(message.content || '');
+            
+            // 检查是否解除限制
+            if (isUnrestricted) {
+                // 解除限制后，直接使用原始内容
+                content = message.content || '';
+            } else {
+                // 对文本消息内容进行HTML转义，防止XSS攻击
+                content = escapeHtml(message.content || '');
+            }
             break;
         case 'image':
             // 改进图片URL处理逻辑 - 如果fileUrl为空则使用content字段
@@ -269,8 +311,17 @@ export async function renderMessage(message) {
             content = '<em>消息已被撤回</em>';
             break;
         default:
-            // 对默认情况也进行HTML转义
-            content = escapeHtml(message.content || '');
+            // 检查是否包含代码
+            hasCode = containsCode(message.content || '');
+            
+            // 检查是否解除限制
+            if (isUnrestricted) {
+                // 解除限制后，直接使用原始内容
+                content = message.content || '';
+            } else {
+                // 对默认情况也进行HTML转义
+                content = escapeHtml(message.content || '');
+            }
     }
     
     // 检查是否为待发送消息（临时消息）
@@ -286,7 +337,8 @@ export async function renderMessage(message) {
         `;
     }
     
-    return `
+    // 构建消息HTML，如果包含代码则添加解除限制按钮
+    let messageHtml = `
         <div class="message ${isCurrentUser ? 'message-right' : 'message-left'}">
             <div class="message-bubble-container">
                 <img src="${senderInfo.avatarUrl}" 
@@ -303,6 +355,34 @@ export async function renderMessage(message) {
             <div class="message-time">${messageTime}</div>
         </div>
     `;
+    
+    // 如果消息包含代码但尚未解除限制，则添加解除限制按钮
+    if (hasCode && !isUnrestricted) {
+        messageHtml = `
+            <div class="message ${isCurrentUser ? 'message-right' : 'message-left'}" data-message-id="${messageId}">
+                <div class="message-bubble-container">
+                    <img src="${senderInfo.avatarUrl}" 
+                         alt="头像" 
+                         class="avatar" 
+                         onerror="this.src='/default-avatar.png'">
+                    <div class="message-content">
+                        <div class="message-sender">${senderInfo.nickname || senderInfo.username}</div>
+                        <div class="message-bubble position-relative">
+                            ${content}
+                            <button class="btn btn-warning btn-sm position-absolute top-0 end-0 m-1 unlock-code-btn" 
+                                    style="font-size: 0.7rem; padding: 0.2rem 0.4rem;"
+                                    data-message-id="${messageId}">
+                                解除限制
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="message-time">${messageTime}</div>
+            </div>
+        `;
+    }
+    
+    return messageHtml;
 }
 
 // 显示消息
@@ -316,16 +396,49 @@ export async function displayMessages(messages) {
     // 如果只有一条消息，将其添加到现有消息列表中
     if (messages.length === 1) {
         const message = messages[0];
-        const messageId = message.messageId || message.id;
+        const messageId = String(message.messageId || message.id || 'unknown');
         
         // 将消息ID添加到已显示集合中
-        displayedMessages.add(String(messageId));
+        displayedMessages.add(messageId);
         
         // 检查消息是否已存在
         const existingMessage = chatMessages.querySelector(`.message-item[data-message-id="${messageId}"]`);
         if (existingMessage) {
             // 如果消息已存在，更新内容（可能是撤回的消息）
             existingMessage.innerHTML = await renderMessage(message);
+            // 为新添加的解除限制按钮添加事件监听器
+            const unlockButton = existingMessage.querySelector('.unlock-code-btn');
+            if (unlockButton) {
+                // 先移除可能已存在的事件监听器
+                const newUnlockButton = unlockButton.cloneNode(true);
+                unlockButton.parentNode.replaceChild(newUnlockButton, unlockButton);
+                
+                newUnlockButton.addEventListener('click', async function() {
+                    const msgId = this.getAttribute('data-message-id');
+                    
+                    // 第一次确认
+                    const firstConfirm = confirm('注意：即将解除此消息的HTML限制，可能会执行其中的脚本代码。\n\n您确定要继续吗？');
+                    if (!firstConfirm) return;
+                    
+                    // 第二次确认
+                    const secondConfirm = confirm('警告：这是最后的确认！\n\n解除限制后，消息中的HTML和脚本将会被执行。\n\n是否确认解除限制？');
+                    if (!secondConfirm) return;
+                    
+                    // 添加到解除限制的消息集合
+                    unrestrictedMessages.add(msgId);
+                    
+                    // 重新渲染该消息
+                    const msgElement = this.closest('.message-item');
+                    if (msgElement) {
+                        // 查找对应的消息对象
+                        const allMessages = JSON.parse(localStorage.getItem('allMessages') || '[]');
+                        const msg = allMessages.find(m => String(m.messageId || m.id || 'unknown') === msgId);
+                        if (msg) {
+                            msgElement.innerHTML = await renderMessage(msg);
+                        }
+                    }
+                });
+            }
             return;
         }
         
@@ -334,6 +447,41 @@ export async function displayMessages(messages) {
         messageElement.className = 'message-item mb-3';
         messageElement.setAttribute('data-message-id', messageId);
         messageElement.innerHTML = await renderMessage(message);
+        
+        // 为新添加的解除限制按钮添加事件监听器
+        const unlockButton = messageElement.querySelector('.unlock-code-btn');
+        if (unlockButton) {
+            // 先移除可能已存在的事件监听器
+            const newUnlockButton = unlockButton.cloneNode(true);
+            unlockButton.parentNode.replaceChild(newUnlockButton, unlockButton);
+            
+            newUnlockButton.addEventListener('click', async function() {
+                const msgId = this.getAttribute('data-message-id');
+                
+                // 第一次确认
+                const firstConfirm = confirm('注意：即将解除此消息的HTML限制，可能会执行其中的脚本代码。\n\n您确定要继续吗？');
+                if (!firstConfirm) return;
+                
+                // 第二次确认
+                const secondConfirm = confirm('警告：这是最后的确认！\n\n解除限制后，消息中的HTML和脚本将会被执行。\n\n是否确认解除限制？');
+                if (!secondConfirm) return;
+                
+                // 添加到解除限制的消息集合
+                unrestrictedMessages.add(msgId);
+                
+                // 重新渲染该消息
+                const msgElement = this.closest('.message-item');
+                if (msgElement) {
+                    // 查找对应的消息对象
+                    const allMessages = JSON.parse(localStorage.getItem('allMessages') || '[]');
+                    const msg = allMessages.find(m => String(m.messageId || m.id || 'unknown') === msgId);
+                    if (msg) {
+                        msgElement.innerHTML = await renderMessage(msg);
+                    }
+                }
+            });
+        }
+        
         chatMessages.appendChild(messageElement);
     } else {
         // 如果是多条消息（历史消息），替换整个消息列表
@@ -347,14 +495,14 @@ export async function displayMessages(messages) {
         
         // 将所有消息ID添加到已显示集合中
         messages.forEach(msg => {
-            const messageId = msg.messageId || msg.id;
-            displayedMessages.add(String(messageId));
+            const msgId = String(msg.messageId || msg.id || 'unknown');
+            displayedMessages.add(msgId);
         });
         
         // 使用 Promise.all 并行处理所有消息的渲染
         const renderedMessages = await Promise.all(messages.map(async (message) => {
             const rendered = await renderMessage(message);
-            const messageId = message.messageId || message.id;
+            const messageId = String(message.messageId || message.id || 'unknown');
             return `
                 <div class="message-item mb-3" data-message-id="${messageId}">
                     ${rendered}
@@ -363,6 +511,40 @@ export async function displayMessages(messages) {
         }));
         
         chatMessages.innerHTML = renderedMessages.join('');
+        
+        // 为解除限制按钮添加事件监听器（针对多消息情况）
+        const unlockButtons = chatMessages.querySelectorAll('.unlock-code-btn');
+        unlockButtons.forEach(button => {
+            // 先移除可能已存在的事件监听器
+            const newButton = button.cloneNode(true);
+            button.parentNode.replaceChild(newButton, button);
+            
+            newButton.addEventListener('click', async function() {
+                const messageId = this.getAttribute('data-message-id');
+                
+                // 第一次确认
+                const firstConfirm = confirm('注意：即将解除此消息的HTML限制，可能会执行其中的脚本代码。\n\n您确定要继续吗？');
+                if (!firstConfirm) return;
+                
+                // 第二次确认
+                const secondConfirm = confirm('警告：这是最后的确认！\n\n解除限制后，消息中的HTML和脚本将会被执行。\n\n是否确认解除限制？');
+                if (!secondConfirm) return;
+                
+                // 添加到解除限制的消息集合
+                unrestrictedMessages.add(messageId);
+                
+                // 重新渲染该消息
+                const messageElement = this.closest('.message-item');
+                if (messageElement) {
+                    // 查找对应的消息对象
+                    const allMessages = JSON.parse(localStorage.getItem('allMessages') || '[]');
+                    const message = allMessages.find(msg => String(msg.messageId || msg.id || 'unknown') === messageId);
+                    if (message) {
+                        messageElement.innerHTML = await renderMessage(message);
+                    }
+                }
+            });
+        });
     }
     
     // 为图片添加点击事件以全屏查看

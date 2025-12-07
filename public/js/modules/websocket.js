@@ -3,6 +3,9 @@
 // 当前房间ID
 let currentRoomId = null;
 
+// 存储所有消息
+let allMessages = [];
+
 // 存储已发送消息的ID，避免重复显示自己发送的消息
 const sentMessageIds = new Set();
 
@@ -96,6 +99,11 @@ export function initializeWebSocket(token) {
         console.log('Received new message:', message);
         
         try {
+            // 将消息添加到所有消息列表中
+            allMessages.push(message);
+            // 更新本地存储
+            localStorage.setItem('allMessages', JSON.stringify(allMessages));
+            
             // 检查是否是当前聊天室的消息
             const currentRoomId = localStorage.getItem('currentRoomId');
             if (currentRoomId && String(currentRoomId) === String(message.roomId)) {
