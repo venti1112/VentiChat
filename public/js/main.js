@@ -1,7 +1,7 @@
 // 模块化主入口文件
 import { showMessage, showConfirm, showRegisterForm, showLoginForm, openProfilePopup, closeProfilePopup } from './modules/ui.js';
 import { checkLoginStatus, bindFormEvents, getUserPreferences, applyUserPreferences } from './modules/auth.js';
-import { updateProfile, bindProfileForm } from './modules/profile.js';
+import { updateProfile, bindProfileFormEvents } from './modules/profile.js';
 import { displayMessages, renderMessage, getUserInfoById, clearDisplayedMessages } from './modules/messageHandler.js';
 import { displayRooms, enterRoom, loadMessageHistory, loadRooms, bindRoomButtons } from './modules/roomManager.js';
 import { initializeWebSocket, updateUnreadCount, updateRoomUnreadCount } from './modules/websocket.js';
@@ -60,7 +60,7 @@ function showLoginModal() {
  */
 async function initializeModules() {
     // 绑定个人资料表单
-    bindProfileForm();
+    bindProfileFormEvents();
     
     // 注意：不在这里调用bindFormEvents，避免重复绑定
     // bindFormEvents(); 

@@ -5,7 +5,7 @@ const { log } = require('../utils/logger');
 // 创建聊天室
 exports.createRoom = async (req, res) => {
     try {
-        const { name, isPrivate, requireApproval, allowImages, allowVideos, allowFiles } = req.body;
+        const { name, isPrivate, requireApproval, allowImages, allowVideos, allowFiles, allowAudio } = req.body;
         
         // 记录创建聊天室的尝试
         log('INFO', `用户 ${req.user.username}(ID: ${req.user.userId}) 正在创建聊天室: ${name}`);
@@ -18,7 +18,8 @@ exports.createRoom = async (req, res) => {
             requireApproval: requireApproval !== undefined ? requireApproval : true,
             allowImages: allowImages !== undefined ? allowImages : true,
             allowVideos: allowVideos !== undefined ? allowVideos : true,
-            allowFiles: allowFiles !== undefined ? allowFiles : true
+            allowFiles: allowFiles !== undefined ? allowFiles : true,
+            allowAudio: allowAudio !== undefined ? allowAudio : true
         });
 
         // 将创建者加入聊天室并设为室主
@@ -41,6 +42,7 @@ exports.createRoom = async (req, res) => {
             allowImages: room.allowImages,
             allowVideos: room.allowVideos,
             allowFiles: room.allowFiles,
+            allowAudio: room.allowAudio,
             createdAt: room.createdAt
         });
     } catch (error) {
@@ -508,7 +510,7 @@ exports.kickMember = async (req, res) => {
 exports.updateRoomSettings = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, requireApproval, allowImages, allowVideos, allowFiles } = req.body;
+        const { name, requireApproval, allowImages, allowVideos, allowFiles, allowAudio } = req.body;
         
         // 检查权限：必须是室主（已在中间件中验证）
         const room = await models.Room.findByPk(id);
@@ -520,7 +522,8 @@ exports.updateRoomSettings = async (req, res) => {
             requireApproval,
             allowImages,
             allowVideos,
-            allowFiles
+            allowFiles,
+            allowAudio
         });
         
         res.json(room);

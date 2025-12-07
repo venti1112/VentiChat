@@ -536,7 +536,8 @@ export function bindRoomButtons() {
                 requireApproval: formData.get('requireApproval') === 'on',
                 allowImages: formData.get('allowImages') === 'on',
                 allowVideos: formData.get('allowVideos') === 'on',
-                allowFiles: formData.get('allowFiles') === 'on'
+                allowFiles: formData.get('allowFiles') === 'on',
+                allowAudio: formData.get('allowAudio') === 'on'
             };
             
             createRoom(roomData);

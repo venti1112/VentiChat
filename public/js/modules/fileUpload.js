@@ -1,6 +1,7 @@
 // 文件上传模块
 let currentUploadId = null;
 let currentChunkXHR = null;
+let currentFileSize = 0; // 添加currentFileSize变量声明
 
 // 显示上传进度模态框
 function showUploadProgress() {
@@ -82,7 +83,8 @@ function formatFileSize(bytes) {
 }
 
 // 分片上传
-async function uploadFile(file) {
+async function uploadFile(file, options = {}) {
+    const { purpose = 'message' } = options; // 默认为'message'，也可为'avatar'或'background'
     const currentRoomId = localStorage.getItem('currentRoomId');
     const token = localStorage.getItem('token');
     
@@ -91,7 +93,8 @@ async function uploadFile(file) {
         return;
     }
     
-    if (!currentRoomId) {
+    // 只有消息类型的上传才需要聊天室ID
+    if (purpose === 'message' && !currentRoomId) {
         window.showMessage('请先选择一个聊天室', 'warning');
         return;
     }
@@ -154,18 +157,24 @@ async function uploadFile(file) {
     
     try {
         // 1. 初始化分片上传
+        const initBody = {
+            fileName: file.name,
+            fileSize: file.size,
+            purpose: purpose // 传递上传目的
+        };
+        
+        // 只有消息类型的上传才需要聊天室ID
+        if (purpose === 'message') {
+            initBody.roomId = currentRoomId;
+        }
+        
         const initResponse = await fetch('/api/upload/initiate', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({
-                fileName: file.name,
-                fileSize: file.size,
-                roomId: roomId,
-                purpose: purpose  // 添加purpose字段
-            })
+            body: JSON.stringify(initBody)
         });
         
         if (!initResponse.ok) {
@@ -191,8 +200,12 @@ async function uploadFile(file) {
             chunkFormData.append('uploadId', uploadId);
             chunkFormData.append('chunkIndex', i);
             chunkFormData.append('totalChunks', totalChunks);
-            chunkFormData.append('roomId', roomId);
-            chunkFormData.append('purpose', purpose); // 添加purpose字段
+            chunkFormData.append('purpose', purpose); // 传递上传目的
+            
+            // 只有消息类型的上传才需要聊天室ID
+            if (purpose === 'message') {
+                chunkFormData.append('roomId', currentRoomId);
+            }
             
             // 创建新的XHR以便监听每个分片的进度
             const xhr = new XMLHttpRequest();
@@ -228,9 +241,11 @@ async function uploadFile(file) {
                         totalLoaded = i * chunkSize + e.loaded;
                         
                         // 调用外部进度回调
+                        /*
                         if (onProgress) {
                             onProgress(overallProgress, uploadedBytes, speed);
                         }
+                        */
                     }
                 });
                 
@@ -266,18 +281,26 @@ async function uploadFile(file) {
         }
         
         // 3. 完成分片上传
-        const finalizeResponse = await fetch('/api/upload/finalize', {
+        const finalizeBody = {
+            uploadId: uploadId,
+            fileName: file.name,
+            fileSize: file.size,
+            totalChunks: totalChunks,
+            purpose: purpose // 传递上传目的
+        };
+        
+        // 只有消息类型的上传才需要聊天室ID
+        if (purpose === 'message') {
+            finalizeBody.roomId = currentRoomId;
+        }
+        
+        const finalizeResponse = await fetch('/api/upload/complete', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({
-                uploadId: uploadId,
-                fileName: file.name,
-                fileSize: file.size,
-                roomId: currentRoomId
-            })
+            body: JSON.stringify(finalizeBody)
         });
         
         if (!finalizeResponse.ok) {
@@ -345,17 +368,19 @@ function sendFileMessage(fileUrl, fileName, fileType, thumbnailUrl = null) {
     
     // 确定消息类型
     let messageType = 'file';
-    if (fileType.startsWith('image/')) {
+    const normalizedFileType = fileType?.toLowerCase() || '';
+    
+    if (normalizedFileType.startsWith('image/')) {
         messageType = 'image';
-    } else if (fileType.startsWith('video/')) {
+    } else if (normalizedFileType.startsWith('video/')) {
         messageType = 'video';
-    } else if (fileType.startsWith('audio/')) {
+    } else if (normalizedFileType.startsWith('audio/')) {
         messageType = 'audio';
     }
     
     // 确保fileUrl以/api开头
     let correctedFileUrl = fileUrl;
-    if (fileUrl.startsWith('/userdata/')) {
+    if (fileUrl && fileUrl.startsWith('/userdata/')) {
         correctedFileUrl = fileUrl.replace('/userdata/', '/api/userdata/');
     }
     
@@ -393,6 +418,10 @@ function sendFileMessage(fileUrl, fileName, fileType, thumbnailUrl = null) {
         // 清空输入框
         const messageInput = document.getElementById('messageInput');
         if (messageInput) messageInput.value = '';
+        // 新加载聊天记录以确保消息显示正确
+        if (window.loadMessageHistory) {
+            window.loadMessageHistory(currentRoomId);
+        }
     })
     .catch(error => {
         console.error('发送文件消息失败:', error);
@@ -401,7 +430,7 @@ function sendFileMessage(fileUrl, fileName, fileType, thumbnailUrl = null) {
 }
 
 // 处理文件选择
-function handleFileSelect(event) {
+async function handleFileSelect(event) {
     const file = event.target.files[0];
     if (!file) return;
     
@@ -412,8 +441,18 @@ function handleFileSelect(event) {
         document.getElementById('fileSizeText').textContent = formatFileSize(file.size);
     }
     
-    // 所有文件都使用分片上传
-    uploadFile(file);
+    try {
+        // 使用分片上传，指定用途为消息
+        const uploadResult = await uploadFile(file, { purpose: 'message' });
+        
+        // 上传成功后发送文件消息
+        if (uploadResult && uploadResult.fileUrl) {
+            sendFileMessage(uploadResult.fileUrl, file.name, file.type, uploadResult.thumbnailUrl || null);
+        }
+    } catch (error) {
+        console.error('文件上传失败:', error);
+        window.showMessage('文件上传失败: ' + error.message, 'danger');
+    }
     
     // 清空文件输入框，防止重复选择相同文件时不触发change事件
     event.target.value = '';
@@ -477,7 +516,7 @@ function handleDrop(e) {
     const file = dt.files[0];
     
     if (file) {
-        uploadFile(file);
+        uploadFile(file, { purpose: 'message' });
     }
 }
 

@@ -34,6 +34,8 @@ router.get('/users/reset-background', authMiddleware, userController.resetBackgr
 router.put('/users/preferences', authMiddleware, userController.updateUserPreferences);
 // 更新用户资料 - 修改个人信息
 router.put('/users/profile', authMiddleware, userController.updateProfile);
+// 修改用户密码 - 修改用户登录密码
+router.put('/users/password', authMiddleware, userController.changePassword);
 // 获取用户偏好设置 - 获取当前用户的界面偏好和其他设置
 router.get('/users/preferences', authMiddleware, userController.getUserPreferences);
 // 获取当前用户的头像URL - 返回当前登录用户的头像图片地址

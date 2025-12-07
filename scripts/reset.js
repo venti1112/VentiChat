@@ -81,6 +81,7 @@ async function resetDatabase() {
                 allow_images BOOLEAN DEFAULT true,
                 allow_videos BOOLEAN DEFAULT true,
                 allow_files BOOLEAN DEFAULT true,
+                allow_audio BOOLEAN DEFAULT true,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB;
         `);
@@ -105,7 +106,7 @@ async function resetDatabase() {
                 room_id INT NOT NULL,
                 user_id INT NOT NULL,
                 content TEXT,
-                type ENUM('text', 'image', 'video', 'file') DEFAULT 'text',
+                type ENUM('text', 'image', 'video', 'file', 'audio') DEFAULT 'text',
                 file_url VARCHAR(255),
                 file_size INT DEFAULT 0,
                 is_deleted BOOLEAN DEFAULT false,

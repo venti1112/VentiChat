@@ -210,14 +210,7 @@ export async function renderMessage(message) {
                 <div class="message-audio">
                     <audio controls preload="metadata" style="width: 250px;">
                         <source src="${audioUrl}" type="${message.fileType || 'audio/mpeg'}">
-                        您的浏览器不支持音频播放。<br>
-                        <a href="${audioUrl}" target="_blank" download="${audioFileName}">点击下载音频</a>
                     </audio>
-                    <div class="mt-1">
-                        <a href="${audioUrl}" target="_blank" download="${audioFileName}">
-                            <i class="bi bi-download"></i> ${audioFileName}
-                        </a>
-                    </div>
                 </div>
             `;
             break;
@@ -300,12 +293,6 @@ export async function displayMessages(messages) {
     if (messages.length === 1) {
         const message = messages[0];
         const messageId = message.messageId || message.id;
-        
-        // 检查消息是否已显示过，防止重复显示
-        if (displayedMessages.has(String(messageId))) {
-            console.log('消息已显示过，跳过:', messageId);
-            return;
-        }
         
         // 将消息ID添加到已显示集合中
         displayedMessages.add(String(messageId));

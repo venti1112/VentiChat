@@ -48,6 +48,49 @@ async function updateProfile(event) {
             preferencesData.backgroundUrl = bgResult.fileUrl;
         }
         
+        // 检查密码修改
+        const currentPassword = formData.get('currentPassword');
+        const newPassword = formData.get('newPassword');
+        const confirmPassword = formData.get('confirmPassword');
+        
+        // 如果填写了密码字段中的任何一个，则执行密码修改逻辑
+        if (currentPassword || newPassword || confirmPassword) {
+            // 验证密码字段
+            if (!currentPassword) {
+                throw new Error('请输入当前密码');
+            }
+            
+            if (!newPassword) {
+                throw new Error('请输入新密码');
+            }
+            
+            if (newPassword !== confirmPassword) {
+                throw new Error('两次输入的新密码不一致');
+            }
+            
+            if (newPassword.length < 8) {
+                throw new Error('新密码至少需要8位字符');
+            }
+            
+            // 调用密码修改API
+            const passwordResponse = await fetch('/api/users/password', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    currentPassword,
+                    newPassword
+                })
+            });
+            
+            if (!passwordResponse.ok) {
+                const errorData = await passwordResponse.json();
+                throw new Error(errorData.error || '密码修改失败');
+            }
+        }
+        
         // 更新用户资料
         const profileResponse = await fetch('/api/users/profile', {
             method: 'PUT',
@@ -105,6 +148,11 @@ async function updateProfile(event) {
         // 显示成功消息
         window.showMessage('个人资料更新成功！', 'success');
         
+        // 清空密码字段
+        document.getElementById('currentPassword').value = '';
+        document.getElementById('newPassword').value = '';
+        document.getElementById('confirmPassword').value = '';
+        
         // 关闭弹窗
         window.closeProfilePopup();
     } catch (error) {
@@ -124,11 +172,22 @@ export function bindProfileForm() {
         profileForm.addEventListener('submit', function(e) {
             e.preventDefault();
             
-            const formData = new FormData(this);
+            const form = e.target;
+            const formData = new FormData(form);
+            
+            // 显示加载状态
+            const submitButton = form.querySelector('button[type="submit"]');
+            const originalText = submitButton.innerHTML;
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 保存中...';
+            
             const token = localStorage.getItem('token');
             
             if (!token) {
                 window.showMessage('未登录，请重新登录', 'danger');
+                // 恢复按钮状态
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalText;
                 return;
             }
             
@@ -176,6 +235,11 @@ export function bindProfileForm() {
             .catch(error => {
                 console.error('更新个人资料失败:', error);
                 window.showMessage('更新失败: ' + error.message, 'danger');
+            })
+            .finally(() => {
+                // 恢复按钮状态
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalText;
             });
         });
     }

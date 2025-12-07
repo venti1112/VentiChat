@@ -43,6 +43,11 @@ module.exports = (sequelize) => {
             defaultValue: true, 
             field: 'allow_files' 
         },
+        allowAudio: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true,
+            field: 'allow_audio'
+        },
         createdAt: {
             type: DataTypes.DATE,
             defaultValue: DataTypes.NOW,

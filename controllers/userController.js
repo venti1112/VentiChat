@@ -317,6 +317,57 @@ exports.updateProfile = async (req, res) => {
     }
 };
 
+// 修改用户密码
+exports.changePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        const userId = req.user.userId;
+        
+        // 参数验证
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: '当前密码和新密码都是必填项' });
+        }
+        
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: '新密码至少需要6位字符' });
+        }
+        
+        const User = req.app.get('models').User;
+        const user = await User.findByPk(userId);
+        
+        if (!user) {
+            return res.status(404).json({ error: '用户不存在' });
+        }
+        
+        // 验证当前密码
+        const isPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
+        if (!isPasswordValid) {
+            return res.status(400).json({ error: '当前密码错误' });
+        }
+        
+        // 检查新密码是否与旧密码相同
+        const isNewPasswordSame = await bcrypt.compare(newPassword, user.passwordHash);
+        if (isNewPasswordSame) {
+            return res.status(400).json({ error: '新密码不能与当前密码相同' });
+        }
+        
+        // 哈希新密码
+        const salt = await bcrypt.genSalt(10);
+        const newPasswordHash = await bcrypt.hash(newPassword, salt);
+        
+        // 更新密码
+        await User.update(
+            { passwordHash: newPasswordHash },
+            { where: { userId: userId } }
+        );
+        
+        res.json({ message: '密码修改成功' });
+    } catch (error) {
+        console.error('修改密码失败:', error);
+        res.status(500).json({ error: '服务器内部错误' });
+    }
+};
+
 // 搜索用户
 exports.searchUsers = async (req, res) => {
     try {
@@ -499,6 +550,8 @@ exports.resetBackground = async (req, res) => {
                 fs.unlinkSync(oldBackgroundPath);
             }
         }
+        
+        res.json({ message: '背景图片已重置为默认' });
     } catch (error) {
         console.error('重置背景图片错误:', error);
         res.status(500).json({ error: '重置背景图片失败' });

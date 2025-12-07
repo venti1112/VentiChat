@@ -111,6 +111,11 @@ body {
     display: none;
 }
 
+/* 上传进度模态框遮罩 - 提高z-index使其显示在个人资料模态框之上 */
+#uploadProgressModal .modal-overlay {
+    z-index: 10050;
+}
+
 /* 模态框 */
 .custom-modal {
     background: var(--secondary-bg-color);
@@ -128,6 +133,11 @@ body {
     background: var(--secondary-bg-color);
     backdrop-filter: blur(var(--blur-amount));
     -webkit-backdrop-filter: blur(var(--blur-amount));
+}
+
+/* Bootstrap上传进度模态框特殊处理 - 提高z-index */
+.modal#uploadProgressModal {
+    z-index: 10060;
 }
 
 /* 模态框头部 */

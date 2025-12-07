@@ -25,6 +25,15 @@ export function initializeRoomSettings() {
         });
     }
     
+    // 表单提交事件
+    const roomSettingsForm = document.getElementById('roomSettingsForm');
+    if (roomSettingsForm) {
+        roomSettingsForm.addEventListener('submit', function(e) {
+            e.preventDefault(); // 防止表单默认提交
+            saveRoomSettings();
+        });
+    }
+    
     // 为设置模态框添加隐藏事件监听器，确保清理工作
     const settingsModalElement = document.getElementById('settingsModal');
     if (settingsModalElement) {
@@ -78,6 +87,7 @@ export async function showRoomSettings(roomId) {
         document.getElementById('allowImagesSetting').checked = room.allowImages;
         document.getElementById('allowVideosSetting').checked = room.allowVideos;
         document.getElementById('allowFilesSetting').checked = room.allowFiles;
+        document.getElementById('allowAudioSetting').checked = room.allowAudio;
 
         // 显示模态框
         const settingsModalElement = document.getElementById('settingsModal');
@@ -115,9 +125,10 @@ export async function saveRoomSettings() {
         const allowImages = document.getElementById('allowImagesSetting').checked;
         const allowVideos = document.getElementById('allowVideosSetting').checked;
         const allowFiles = document.getElementById('allowFilesSetting').checked;
+        const allowAudio = document.getElementById('allowAudioSetting').checked;
 
         // 发送更新请求
-        const response = await fetch(`/api/rooms/${currentRoomId}`, {
+        const response = await fetch(`/api/rooms/${currentRoomId}/settings`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -128,7 +139,8 @@ export async function saveRoomSettings() {
                 requireApproval,
                 allowImages,
                 allowVideos,
-                allowFiles
+                allowFiles,
+                allowAudio
             })
         });
 

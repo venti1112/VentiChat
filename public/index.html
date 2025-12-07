@@ -153,7 +153,7 @@
                         <div class="mb-3">
                             <label for="newPassword" class="form-label">新密码</label>
                             <input type="password" class="form-control" id="newPassword" name="newPassword">
-                            <div class="form-text">至少6位字符</div>
+                            <div class="form-text">至少8位字符</div>
                         </div>
                         <div class="mb-3">
                             <label for="confirmPassword" class="form-label">确认新密码</label>
@@ -493,6 +493,10 @@
                                 <input type="checkbox" class="form-check-input" name="allowFiles" checked>
                                 <label class="form-check-label">允许发送文件</label>
                             </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="allowAudio" checked>
+                                <label class="form-check-label">允许发送音频</label>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -553,6 +557,10 @@
                             <div class="form-check">
                                 <input type="checkbox" class="form-check-input" id="allowFilesSetting" name="allowFiles">
                                 <label class="form-check-label" for="allowFilesSetting">允许发送文件</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="allowAudioSetting" name="allowAudio">
+                                <label class="form-check-label" for="allowAudioSetting">允许发送音频</label>
                             </div>
                         </div>
                     </form>

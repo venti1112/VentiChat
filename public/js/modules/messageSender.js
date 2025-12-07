@@ -121,7 +121,7 @@ export function sendMessage() {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            rid: parseInt(currentRoomId),
+            roomId: parseInt(currentRoomId),
             content: content,
             type: 'text'
         })
@@ -137,6 +137,11 @@ export function sendMessage() {
         
         // 清空输入框
         if (messageInput) messageInput.value = '';
+        
+        // 通过HTTP发送成功后，重新加载聊天记录以确保消息显示正确
+        if (window.loadMessageHistory) {
+            window.loadMessageHistory(currentRoomId);
+        }
     })
     .catch(error => {
         console.error('发送消息失败:', error);

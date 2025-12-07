@@ -47,7 +47,7 @@ exports.sendMessage = async (req, res) => {
         }
         
         // 验证消息类型
-        if (!['text', 'image', 'video', 'file'].includes(type)) {
+        if (!['text', 'image', 'video', 'file', 'audio'].includes(type)) {
             return res.status(400).json({ error: '无效的消息类型' });
         }
         
@@ -64,7 +64,7 @@ exports.sendMessage = async (req, res) => {
         }
         
         // 检查文件权限（如果是文件消息）
-        if (type === 'image' || type === 'video' || type === 'file') {
+        if (type === 'image' || type === 'video' || type === 'file' || type === 'audio') {
             const room = await Room.findByPk(roomId);
             if (!room) {
                 return res.status(404).json({ error: '聊天室不存在' });
@@ -80,6 +80,10 @@ exports.sendMessage = async (req, res) => {
             
             if (type === 'file' && !room.allowFiles) {
                 return res.status(403).json({ error: '该聊天室不允许发送文件' });
+            }
+            
+            if (type === 'audio' && !room.allowAudio) {
+                return res.status(403).json({ error: '该聊天室不允许发送音频' });
             }
         }
         
@@ -122,6 +126,22 @@ exports.sendMessage = async (req, res) => {
         
         // 广播消息到房间
         io.to(`room_${roomId}`).emit('newMessage', messageWithSender);
+        
+        // 向房间内所有用户（除了发送者）发送消息（支持集群部署）
+        const roomMembers = await RoomMember.findAll({
+            where: {
+                roomId: roomId
+            },
+            attributes: ['userId']
+        });
+        
+        // 使用WebSocketManager实现跨进程广播
+        const WebSocketManager = require('../utils/websocketManager');
+        for (const member of roomMembers) {
+            if (member.userId !== req.user.userId) {
+                await WebSocketManager.sendToUser(member.userId, 'newMessage', messageWithSender, io);
+            }
+        }
         
         // 实时推送未读计数更新
         const totalUnreadCount = await calculateTotalUnreadCount(req.user.userId);
@@ -388,6 +408,10 @@ exports.getRoomMessages = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+
+
+
 
 
 

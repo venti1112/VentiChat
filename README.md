@@ -117,6 +117,7 @@
 | allow_images | BOOLEAN | DEFAULT true | 是否允许在聊天室发送图片 |
 | allow_videos | BOOLEAN | DEFAULT true | 是否允许在聊天室发送视频 |
 | allow_files | BOOLEAN | DEFAULT true | 是否允许在聊天室发送文件 |
+| allow_audio | BOOLEAN | DEFAULT true | 是否允许在聊天室发送音频 |
 | created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 聊天室的创建时间，系统自动记录 |
 
 #### 3. room_members 表 - 聊天室成员表
