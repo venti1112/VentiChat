@@ -218,7 +218,11 @@ body {
     backdrop-filter: blur(var(--blur-amount));
     -webkit-backdrop-filter: blur(var(--blur-amount));
     border-radius: var(--border-radius);
-    margin-top: 0; /* 移除顶部外边距，与用户信息卡片对齐 */
+    margin: 0 0 0 0;
+}
+.chat-container-rapper {
+    height: 100%;
+    margin: 0 0 0 0;
 }
 
 .room-list { 
@@ -262,7 +266,7 @@ body {
 }
 
 .chat-messages { 
-    height: calc(100vh - 220px); 
+    height: calc(100vh - 180px); 
     overflow-y: auto;
     padding: 15px;
 }
@@ -438,7 +442,7 @@ body {
 
 /* 输入区域 */
 .input-area { 
-    height: 60px; 
+    height: 40px; 
 }
 
 /* 修复发送按钮和输入框不在同一直线的问题 */
