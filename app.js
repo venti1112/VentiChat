@@ -114,6 +114,29 @@ app.set('upload', upload);
 // 路由
 app.use('/api', require('./routes/index'));
 
+// 404 处理中间件 - 记录未匹配的路由请求
+app.use((req, res, next) => {
+    const clientIP = req.ip || 
+                   (req.headers['x-forwarded-for'] || 
+                    req.connection.remoteAddress || 
+                    '未知IP');
+    
+    log(LOG_LEVELS.WARN, `404 Not Found - IP: ${clientIP} - Method: ${req.method} - URL: ${req.originalUrl}`);
+    
+    // 如果是API请求，返回JSON格式错误
+    if (req.originalUrl.startsWith('/api')) {
+        return res.status(404).json({ 
+            error: 'API endpoint not found',
+            code: 404,
+            message: '请求的接口不存在'
+        });
+    }
+    
+    // 对于其他请求，尝试发送首页或返回简单HTML
+    const indexPath = path.join(__dirname, 'public', 'index.html');
+    res.status(404).send('<h1>404 页面未找到</h1><p>您请求的页面不存在。</p>');
+});
+
     // 创建HTTP服务器
     const server = http.createServer(app);
     

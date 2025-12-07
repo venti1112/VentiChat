@@ -858,3 +858,51 @@ exports.setMemberRole = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+// 删除聊天室（仅限房主）
+exports.deleteRoom = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.userId;
+        
+        // 获取房间信息
+        const room = await models.Room.findByPk(id);
+        if (!room) {
+            return res.status(404).json({ error: '聊天室不存在' });
+        }
+        
+        // 检查用户是否是该房间的创建者
+        if (room.creatorId !== userId) {
+            return res.status(403).json({ error: '只有房主才能解散聊天室' });
+        }
+        
+        // 删除房间相关数据
+        // 1. 删除房间成员关系
+        await models.RoomMember.destroy({
+            where: {
+                roomId: id
+            }
+        });
+        
+        // 2. 删除房间消息
+        await models.Message.destroy({
+            where: {
+                roomId: id
+            }
+        });
+        
+        // 3. 删除房间本身
+        await models.Room.destroy({
+            where: {
+                roomId: id
+            }
+        });
+        
+        log('INFO', `用户 ${req.user.username}(ID: ${userId}) 已解散聊天室: ${room.name}(ID: ${id})`);
+        
+        res.json({ message: '聊天室已成功解散' });
+    } catch (error) {
+        log('ERROR', `用户 ${req.user.username}(ID: ${req.user.userId}) 解散聊天室失败: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+};

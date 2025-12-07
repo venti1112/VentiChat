@@ -213,7 +213,7 @@ body {
 
 /* 聊天界面样式 */
 .chat-container { 
-    height: calc(100vh - 180px); 
+    height: calc(100vh - 140px); 
     background: rgba(255, 255, 255, 0.3);
     backdrop-filter: blur(var(--blur-amount));
     -webkit-backdrop-filter: blur(var(--blur-amount));
@@ -222,14 +222,14 @@ body {
 }
 
 .room-list { 
-    height: calc(100vh - 260px); /* 减少高度以腾出空间给用户信息栏 */
+    height: calc(100vh - 210px); /* 减少高度以腾出空间给用户信息栏 */
     overflow-y: auto; 
     background: var(--card-bg-color);
     backdrop-filter: blur(var(--blur-amount));
     -webkit-backdrop-filter: blur(var(--blur-amount));
     border: none;
     border-radius: var(--border-radius);
-    margin-top: 0; /* 确保顶部没有额外边距，与用户信息栏对齐 */
+    margin-top: -10px; /* 向上移动10像素 */
     display: flex;
     flex-direction: column;
 }
@@ -262,7 +262,7 @@ body {
 }
 
 .chat-messages { 
-    height: calc(100vh - 260px); 
+    height: calc(100vh - 220px); 
     overflow-y: auto;
     padding: 15px;
 }

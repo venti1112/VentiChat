@@ -75,6 +75,9 @@ router.put('/rooms/:id/settings', authMiddleware, roomController.updateRoomSetti
 // 设置聊天室成员角色 - 修改聊天室中成员的角色（如设为管理员）
 router.put('/rooms/:roomId/members/:userId/role', authMiddleware, roomController.setMemberRole);
 
+// 删除聊天室 - 仅限房主解散自己的聊天室
+router.delete('/rooms/:id', authMiddleware, roomController.deleteRoom);
+
 // 消息相关路由
 const messageController = require('../controllers/messageController');
 // 获取聊天室消息历史记录 - 返回指定聊天室的历史消息（按房间ID在URL路径中）

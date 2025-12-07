@@ -34,6 +34,14 @@ export function initializeRoomSettings() {
         });
     }
     
+    // 删除房间按钮事件
+    const deleteRoomBtn = document.getElementById('deleteRoomBtn');
+    if (deleteRoomBtn) {
+        deleteRoomBtn.addEventListener('click', () => {
+            deleteRoom();
+        });
+    }
+    
     // 为设置模态框添加隐藏事件监听器，确保清理工作
     const settingsModalElement = document.getElementById('settingsModal');
     if (settingsModalElement) {
@@ -176,5 +184,63 @@ export async function saveRoomSettings() {
     } catch (error) {
         console.error('保存设置失败:', error);
         showMessage('保存失败: ' + error.message, 'danger');
+    }
+}
+
+/**
+ * 删除当前房间
+ */
+async function deleteRoom() {
+    if (!currentRoomId) {
+        showMessage('未选择聊天室', 'warning');
+        return;
+    }
+
+    // 确认删除操作
+    if (!confirm('确定要解散这个聊天室吗？此操作无法撤销，所有消息和成员关系都将被删除。')) {
+        return;
+    }
+
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            showMessage('请先登录', 'warning');
+            return;
+        }
+
+        const response = await fetch(`/api/rooms/${currentRoomId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || '解散聊天室失败');
+        }
+
+        const result = await response.json();
+        showMessage(result.message, 'success');
+
+        // 关闭模态框
+        const settingsModalElement = document.getElementById('settingsModal');
+        if (settingsModalElement) {
+            const modal = bootstrap.Modal.getInstance(settingsModalElement);
+            if (modal) {
+                modal.hide();
+            }
+        }
+
+        // 清除当前房间信息
+        localStorage.removeItem('currentRoomId');
+        localStorage.removeItem('currentRoomName');
+
+        // 刷新房间列表
+        window.location.reload();
+    } catch (error) {
+        console.error('删除房间失败:', error);
+        showMessage(error.message || '解散聊天室失败', 'danger');
     }
 }
