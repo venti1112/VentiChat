@@ -231,50 +231,6 @@ exports.forceLogout = async (req, res) => {
     }
 };
 
-// 用户注册
-exports.register = async (req, res) => {
-    try {
-        const { username, password, nickname } = req.body;
-        
-        // 检查用户名是否已存在
-        const User = req.app.get('models').User;
-        const existingUser = await User.findOne({ where: { username } });
-        if (existingUser) {
-            return res.status(409).json({ error: '用户名已存在' });
-        }
-        
-        // 哈希密码
-        const salt = await bcrypt.genSalt(10);
-        const passwordHash = await bcrypt.hash(password, salt);
-        
-        // 设置默认头像
-        const defaultAvatarUrl = '/default-avatar.png';
-        
-        // 创建用户
-        const user = await User.create({
-            username,
-            passwordHash,
-            nickname: nickname || username,
-            avatarUrl: defaultAvatarUrl
-        });
-        
-        // 加入默认大聊天室
-        const Room = req.app.get('models').Room;
-        const RoomMember = req.app.get('models').RoomMember;
-        const defaultRoom = await Room.findOne({ where: { name: 'VentiChat大厅' } });
-        if (defaultRoom) {
-            await RoomMember.create({
-                userId: user.userId,
-                roomId: defaultRoom.roomId
-            });
-        }
-        
-        res.status(201).json({ message: '注册成功' });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-};
-
 // 更新用户资料
 exports.updateProfile = async (req, res) => {
     try {

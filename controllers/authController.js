@@ -208,6 +208,17 @@ exports.register = async (req, res) => {
             avatarUrl
         });
         
+        // 加入默认大聊天室
+        const Room = req.app.get('models').Room;
+        const RoomMember = req.app.get('models').RoomMember;
+        const defaultRoom = await Room.findOne({ where: { name: 'VentiChat大厅' } });
+        if (defaultRoom) {
+            await RoomMember.create({
+                userId: user.userId,
+                roomId: defaultRoom.roomId
+            });
+        }
+        
         log('INFO', `新用户注册: ${username} (${user.userId})`);
         
         res.status(201).json({ 
