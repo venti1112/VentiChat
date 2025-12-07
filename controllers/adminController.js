@@ -15,7 +15,7 @@ exports.getUsers = async (req, res) => {
             nickname: user.nickname,
             status: user.status,
             createdAt: user.createdAt,
-            avatarUrl: user.avatarUrl || '/default-avatar.png'
+            avatarUrl: user.avatarUrl || '/assets/default-avatar.png'
         }));
         
         res.json(formattedUsers);

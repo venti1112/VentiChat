@@ -93,7 +93,7 @@ app.use(ipBanMiddleware);
 
 // 对于根路径，提供index.html文件
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'main.html'));
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // 文件上传配置

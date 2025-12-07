@@ -30,7 +30,7 @@ export function checkLoginStatus() {
                 
                 if (userNickname) userNickname.textContent = user.nickname || user.username;
                 if (userUsername) userUsername.textContent = user.username;
-                if (userAvatar) userAvatar.src = user.avatarUrl || '/default-avatar.png';
+                if (userAvatar) userAvatar.src = user.avatarUrl || '/assets/default-avatar.png';
                 if (userId) userId.textContent = 'UID: ' + (user.id || user.userId);
             } catch (e) {
                 console.error('解析保存的用户信息失败:', e);
@@ -46,7 +46,7 @@ export function checkLoginStatus() {
                 console.warn('加载用户个性化设置失败:', error);
                 // 使用默认设置
                 applyUserPreferences({
-                    backgroundUrl: '/wp.jpg',
+                    backgroundUrl: '/assets/wp.jpg',
                     themeColor: '#4cd8b8'
                 });
             });
@@ -74,7 +74,7 @@ export function checkLoginStatus() {
                 
                 if (userNickname) userNickname.textContent = data.user.nickname || data.user.username;
                 if (userUsername) userUsername.textContent = data.user.username;
-                if (userAvatar) userAvatar.src = data.user.avatarUrl || '/default-avatar.png';
+                if (userAvatar) userAvatar.src = data.user.avatarUrl || '/assets/default-avatar.png';
                 if (userId) userId.textContent = 'UID: ' + (data.user.id || data.user.userId);
                 
                 // 更新本地存储的用户信息
@@ -180,7 +180,7 @@ export function bindFormEvents() {
                     
                     if (userNickname) userNickname.textContent = data.user.nickname;
                     if (userUsername) userUsername.textContent = data.user.username;
-                    if (userAvatar) userAvatar.src = data.user.avatarUrl || '/default-avatar.png';
+                    if (userAvatar) userAvatar.src = data.user.avatarUrl || '/assets/default-avatar.png';
                     if (userId) userId.textContent = 'UID: ' + data.user.id;
                     
                     // 切换到聊天界面
@@ -206,7 +206,7 @@ export function bindFormEvents() {
                                 console.warn('加载用户个性化设置失败:', error);
                                 // 使用默认设置
                                 applyUserPreferences({
-                                    backgroundUrl: '/wp.jpg',
+                                    backgroundUrl: '/assets/wp.jpg',
                                     themeColor: '#4cd8b8'
                                 });
                             });
@@ -362,7 +362,7 @@ export function getUserPreferences() {
     
     // 定义默认设置
     const defaultPreferences = {
-        backgroundUrl: '/wp.jpg',
+        backgroundUrl: '/assets/wp.jpg',
         themeColor: '#4cd8b8'
     };
     
@@ -465,7 +465,7 @@ export function applyUserPreferences(preferences) {
     if (!preferences) {
         console.warn('用户个性化设置未定义，使用默认设置');
         preferences = {
-            backgroundUrl: '/wp.jpg',
+            backgroundUrl: '/assets/wp.jpg',
             themeColor: '#4cd8b8'
         };
     }

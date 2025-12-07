@@ -345,7 +345,7 @@ exports.getRoomMembers = async (req, res) => {
                 uid: user.userId,
                 username: user.username,
                 nickname: user.nickname,
-                avatarUrl: user.avatarUrl || '/default-avatar.png',
+                avatarUrl: user.avatarUrl || '/assets/default-avatar.png',
                 isCreator: user.userId === room.creatorId,
                 isModerator: rm.isModerator
             };
@@ -800,7 +800,7 @@ exports.searchRooms = async (req, res) => {
             id: user.userId,
             username: user.username,
             nickname: user.nickname,
-            avatarUrl: user.avatarUrl || '/default-avatar.png'
+            avatarUrl: user.avatarUrl || '/assets/default-avatar.png'
         }));
         
         res.json({

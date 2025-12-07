@@ -39,7 +39,7 @@ export async function getUserInfoById(userId) {
             id: currentUser.id,
             username: currentUser.username,
             nickname: currentUser.nickname || currentUser.username,
-            avatarUrl: currentUser.avatarUrl || '/default-avatar.png'
+            avatarUrl: currentUser.avatarUrl || '/assets/default-avatar.png'
         };
     }
     
@@ -92,7 +92,7 @@ export async function renderMessage(message) {
                 id: message.User.userId,
                 username: message.User.username,
                 nickname: message.User.nickname || message.User.username,
-                avatarUrl: message.User.avatarUrl || '/default-avatar.png'
+                avatarUrl: message.User.avatarUrl || '/assets/default-avatar.png'
             };
         } else if (message.Sender && typeof message.Sender === 'object') {
             // 兼容旧的Sender字段
@@ -100,7 +100,7 @@ export async function renderMessage(message) {
                 id: message.Sender.userId || message.Sender.id,
                 username: message.Sender.username,
                 nickname: message.Sender.nickname || message.Sender.username,
-                avatarUrl: message.Sender.avatarUrl || '/default-avatar.png'
+                avatarUrl: message.Sender.avatarUrl || '/assets/default-avatar.png'
             };
         } else {
             // 如果没有现成的用户信息，则获取用户信息
@@ -130,7 +130,7 @@ export async function renderMessage(message) {
             id: message.User?.userId || message.Sender?.userId || message.Sender?.id || message.userId || 'unknown',
             username: message.User?.username || message.Sender?.username || `用户${message.User?.userId || message.Sender?.userId || message.userId || '未知'}`,
             nickname: message.User?.nickname || message.Sender?.nickname || message.Sender?.username || `用户${message.User?.userId || message.Sender?.userId || message.userId || '未知'}`,
-            avatarUrl: message.User?.avatarUrl || message.Sender?.avatarUrl || '/default-avatar.png'
+            avatarUrl: message.User?.avatarUrl || message.Sender?.avatarUrl || '/assets/default-avatar.png'
         };
     }
     
@@ -178,6 +178,45 @@ export async function renderMessage(message) {
                     <video src="${videoUrl}" class="message-video" style="max-width: 200px; max-height: 200px;"></video>
                     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(0, 0, 0, 0.7); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
                         <i class="bi bi-play-fill" style="color: white; font-size: 20px;"></i>
+                    </div>
+                </div>
+            `;
+            break;
+        case 'audio':
+            // 处理音频URL - 如果fileUrl为空则使用content字段
+            let audioUrl = '';
+            let audioFileName = message.content || '音频文件';
+            
+            if (message.fileUrl) {
+                audioUrl = message.fileUrl;
+            } else if (message.dataValues && message.dataValues.fileUrl) {
+                audioUrl = message.dataValues.fileUrl;
+            } else if (message.data && message.data.fileUrl) {
+                audioUrl = message.data.fileUrl;
+            } else if (message.content) {
+                // fallback到content字段
+                audioUrl = message.content;
+            }
+            
+            // 如果content字段包含URL路径，尝试从中提取文件名
+            if (message.content && message.content.includes('/')) {
+                const urlParts = message.content.split('/');
+                if (urlParts.length > 0) {
+                    audioFileName = urlParts[urlParts.length - 1];
+                }
+            }
+            
+            content = `
+                <div class="message-audio">
+                    <audio controls preload="metadata" style="width: 250px;">
+                        <source src="${audioUrl}" type="${message.fileType || 'audio/mpeg'}">
+                        您的浏览器不支持音频播放。<br>
+                        <a href="${audioUrl}" target="_blank" download="${audioFileName}">点击下载音频</a>
+                    </audio>
+                    <div class="mt-1">
+                        <a href="${audioUrl}" target="_blank" download="${audioFileName}">
+                            <i class="bi bi-download"></i> ${audioFileName}
+                        </a>
                     </div>
                 </div>
             `;
@@ -236,7 +275,7 @@ export async function renderMessage(message) {
                 <img src="${senderInfo.avatarUrl}" 
                      alt="头像" 
                      class="avatar" 
-                     onerror="this.src='/default-avatar.png'">
+                     onerror="this.src='/assets/default-avatar.png'">
                 <div class="message-content">
                     <div class="message-sender">${senderInfo.nickname || senderInfo.username}</div>
                     <div class="message-bubble">

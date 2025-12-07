@@ -1,39 +1,23 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const mime = require('mime-types');
 
 // 确保userdata目录及子目录存在
 const userdataDir = path.join(__dirname, '..', 'public', 'userdata');
 const avatarDir = path.join(userdataDir, 'avatar');
 const pictureDir = path.join(userdataDir, 'picture');
 const videoDir = path.join(userdataDir, 'video');
-const fileDir = path.join(userdataDir, 'file'); // 修复拼写错误: flie -> file
-const tempDir = path.join(userdataDir, 'temp'); // 临时目录用于分片上传
+const audioDir = path.join(userdataDir, 'audio');
+const fileDir = path.join(userdataDir, 'file');
+const tempDir = path.join(userdataDir, 'temp');
 
 // 创建所有需要的目录
-[userdataDir, avatarDir, pictureDir, videoDir, fileDir, tempDir].forEach(dir => {
+[userdataDir, avatarDir, pictureDir, videoDir, audioDir, fileDir, tempDir].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 });
-
-// 为了兼容已存在的flie目录，我们也创建它（但不使用它）
-const oldFileDir = path.join(userdataDir, 'flie');
-if (!fs.existsSync(oldFileDir)) {
-  fs.mkdirSync(oldFileDir, { recursive: true });
-} else {
-  // 将旧目录中的文件移动到新目录
-  const files = fs.readdirSync(oldFileDir);
-  files.forEach(file => {
-    const oldPath = path.join(oldFileDir, file);
-    const newPath = path.join(fileDir, file);
-    // 只有当目标文件不存在时才移动
-    if (!fs.existsSync(newPath)) {
-      fs.renameSync(oldPath, newPath);
-      console.log(`Moved file from ${oldPath} to ${newPath}`);
-    }
-  });
-}
 
 // 根据文件类型确定存储目录
 const getDestination = (fileType) => {
@@ -44,6 +28,8 @@ const getDestination = (fileType) => {
       return pictureDir;
     case 'video':
       return videoDir;
+    case 'audio':
+      return audioDir;
     default:
       return fileDir;
   }
@@ -58,8 +44,10 @@ const getUrlPrefix = (fileType) => {
       return '/userdata/picture';
     case 'video':
       return '/userdata/video';
+    case 'audio':
+      return '/userdata/audio';
     default:
-      return '/userdata/file'; // 修复拼写错误: flie -> file
+      return '/userdata/file';
   }
 };
 
@@ -93,31 +81,6 @@ const chunkStorage = multer.diskStorage({
   }
 });
 
-// 文件过滤器
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = {
-    avatar: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'],
-    image: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/svg+xml'],
-    video: ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/flv', 'video/webm', 'video/mpeg'],
-    file: [] // 所有文件类型都允许作为普通文件
-  };
-
-  // 获取请求中的文件类型
-  const fileType = req.fileType || 'file';
-
-  if (fileType === 'avatar' && allowedTypes.avatar.includes(file.mimetype)) {
-    cb(null, true);
-  } else if (fileType === 'image' && allowedTypes.image.includes(file.mimetype)) {
-    cb(null, true);
-  } else if (fileType === 'video' && allowedTypes.video.includes(file.mimetype)) {
-    cb(null, true);
-  } else if (fileType === 'file') {
-    cb(null, true); // 所有文件都允许作为普通文件
-  } else {
-    cb(new Error(`不支持的文件类型: ${file.mimetype}`), false);
-  }
-};
-
 // 限制配置
 const limits = {
   avatar: {
@@ -130,6 +93,10 @@ const limits = {
   },
   video: {
     fileSize: 100 * 1024 * 1024, // 100MB for videos
+    files: 1
+  },
+  audio: {
+    fileSize: 50 * 1024 * 1024, // 50MB for audio files
     files: 1
   },
   file: {
@@ -153,7 +120,6 @@ const createUpload = (type) => {
   
   return multer({
     storage: storage,
-    fileFilter: fileFilter,
     limits: limits[type] || limits.file
   });
 };
@@ -167,64 +133,31 @@ const uploadSingle = (fieldName = 'file', type = 'file') => {
 };
 
 // 导出多个文件上传中间件
-const uploadMultiple = (fields = [{ name: 'files', maxCount: 10 }], type = 'file') => {
+const uploadArray = (fieldName = 'files', type = 'file', maxCount = 10) => {
   return (req, res, next) => {
     req.fileType = type;
-    return createUpload(type).fields(fields)(req, res, next);
+    return createUpload(type).array(fieldName, maxCount)(req, res, next);
   };
 };
 
-// 文件验证函数
-const validateFile = (file, roomSettings) => {
-  if (!file) {
-    throw new Error('没有选择文件');
-  }
-  
-  // 根据文件类型检查聊天室设置
-  const fileType = getFileType(file.mimetype);
-  
-  switch (fileType) {
-    case 'image':
-      if (!roomSettings.allowImages) {
-        throw new Error('该聊天室不允许发送图片');
-      }
-      break;
-    case 'video':
-      if (!roomSettings.allowVideos) {
-        throw new Error('该聊天室不允许发送视频');
-      }
-      break;
-    case 'file':
-      if (!roomSettings.allowFiles) {
-        throw new Error('该聊天室不允许发送文件');
-      }
-      break;
-  }
-  
-  return true;
-};
-
-// 根据MIME类型获取文件类型
-const getFileType = (mimeType) => {
+// 添加getFileType函数定义
+function getFileType(mimeType) {
+  // 简化文件类型判断逻辑，只根据MIME类型前缀判断
   if (mimeType.startsWith('image/')) {
     return 'image';
   } else if (mimeType.startsWith('video/')) {
     return 'video';
+  } else if (mimeType.startsWith('audio/')) {
+    return 'audio';
   } else {
     return 'file';
   }
-};
-
-// 获取文件的URL路径
-const getFileUrl = (filename, fileType) => {
-  const prefix = getUrlPrefix(fileType);
-  return `${prefix}/${filename}`;
-};
+}
 
 module.exports = {
   uploadSingle,
-  uploadMultiple,
-  validateFile,
-  getFileType,
-  getFileUrl
+  uploadArray,
+  getDestination,
+  getUrlPrefix,
+  getFileType
 };

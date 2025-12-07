@@ -327,12 +327,12 @@ export function displayPendingRequests(requests) {
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="d-flex align-items-center">
-                            <img src="${request.user.avatarUrl || '/default-avatar.png'}" 
+                            <img src="${request.user.avatarUrl || '/assets/default-avatar.png'}" 
                                  alt="头像" 
                                  class="rounded-circle me-3" 
                                  width="40" 
                                  height="40"
-                                 onerror="this.src='/default-avatar.png'">
+                                 onerror="this.src='/assets/default-avatar.png'">
                             <div>
                                 <h6 class="mb-1">${request.user.nickname || request.user.username || '未知用户'}</h6>
                                 <small class="text-muted">申请时间: ${new Date(request.requestTime).toLocaleString()}</small>
@@ -644,12 +644,12 @@ function displaySearchResults(rooms, users) {
             resultsHTML += `
                 <div class="list-group-item d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center">
-                        <img src="${user.avatarUrl || '/default-avatar.png'}" 
+                        <img src="${user.avatarUrl || '/assets/default-avatar.png'}" 
                              alt="头像" 
                              class="rounded-circle me-2" 
                              width="32" 
                              height="32"
-                             onerror="this.src='/default-avatar.png'">
+                             onerror="this.src='/assets/default-avatar.png'">
                         <div>
                             <h6 class="mb-0">${user.nickname || user.username}</h6>
                             <small class="text-muted">用户名: ${user.username} | UID: ${user.id}</small>
@@ -811,12 +811,12 @@ function displayRoomMembers(members) {
         li.className = 'list-group-item d-flex justify-content-between align-items-center';
         li.innerHTML = `
             <div class="d-flex align-items-center">
-                <img src="${member.avatarUrl || '/default-avatar.png'}" 
+                <img src="${member.avatarUrl || '/assets/default-avatar.png'}" 
                      alt="头像" 
                      class="rounded-circle me-2" 
                      width="32" 
                      height="32"
-                     onerror="this.src='/default-avatar.png'">
+                     onerror="this.src='/assets/default-avatar.png'">
                 <div>
                     <div>${member.nickname || member.username}</div>
                     ${member.role ? `<small class="text-muted">${getRoleDisplayName(member.role)}</small>` : ''}

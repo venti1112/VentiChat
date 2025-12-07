@@ -1,56 +1,18 @@
 const RoomMember = require('../models/roomMember');
 const fs = require('fs');
 const path = require('path');
-const { getFileType } = require('../utils/fileUpload');
+const mime = require('mime-types');
+const { getFileType, getDestination } = require('../utils/fileUpload');
 
-// 根据文件扩展名获取MIME类型
-function getMimeTypeFromFileExt(ext) {
-    const mimeTypes = {
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.png': 'image/png',
-        '.gif': 'image/gif',
-        '.webp': 'image/webp',
-        '.bmp': 'image/bmp',
-        '.svg': 'image/svg+xml',
-        '.mp4': 'video/mp4',
-        '.avi': 'video/avi',
-        '.mov': 'video/mov',
-        '.wmv': 'video/wmv',
-        '.flv': 'video/flv',
-        '.webm': 'video/webm',
-        '.mpeg': 'video/mpeg'
-    };
+// 根据文件名获取MIME类型
+function getMimeTypeFromFilename(filename) {
+    // 使用mime-types库来获取MIME类型
+    const mimeType = mime.lookup(filename);
     
-    return mimeTypes[ext.toLowerCase()] || 'application/octet-stream';
+    // 如果找不到MIME类型，则返回默认值
+    return mimeType || 'application/octet-stream';
 }
 
-// 根据文件类型确定存储目录（复制自utils/fileUpload.js）
-function getDestination(fileType) {
-    // 确保userdata目录及子目录存在
-    const userdataDir = path.join(__dirname, '..', 'public', 'userdata');
-    const avatarDir = path.join(userdataDir, 'avatar');
-    const pictureDir = path.join(userdataDir, 'picture');
-    const videoDir = path.join(userdataDir, 'video');
-    const fileDir = path.join(userdataDir, 'file');
-    
-    [userdataDir, avatarDir, pictureDir, videoDir, fileDir].forEach(dir => {
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
-    });
-    
-    switch (fileType) {
-        case 'avatar':
-            return avatarDir;
-        case 'image':
-            return pictureDir;
-        case 'video':
-            return videoDir;
-        default:
-            return fileDir;
-    }
-}
 
 // 获取文件的URL路径（复制自utils/fileUpload.js）
 function getFileUrl(filename, fileType) {
@@ -65,6 +27,9 @@ function getFileUrl(filename, fileType) {
             break;
         case 'video':
             prefix = '/userdata/video';
+            break;
+        case 'audio':
+            prefix = '/userdata/audio';
             break;
         default:
             prefix = '/userdata/file';
@@ -239,7 +204,7 @@ exports.completeChunkedUpload = async (req, res) => {
 
         // 确定文件类型和目标目录
         const fileExt = path.extname(fileName);
-        const mimeType = getMimeTypeFromFileExt(fileExt);
+        const mimeType = getMimeTypeFromFilename(fileName);
         const fileType = getFileType(mimeType);
         const destinationDir = getDestination(fileType);
         
@@ -254,31 +219,79 @@ exports.completeChunkedUpload = async (req, res) => {
             fs.mkdirSync(targetDir, { recursive: true });
         }
 
-        // 创建写入流
-        const writeStream = fs.createWriteStream(finalPath);
-
         // 组装分片目录路径
         const tempDir = path.join('public', 'temp', uploadId);
-
-        // 按顺序合并分片
-        for (let i = 0; i < totalChunks; i++) {
-            const chunkPath = path.join(tempDir, `chunk-${i}`);
-            const chunkData = fs.readFileSync(chunkPath);
-            writeStream.write(chunkData);
-            fs.unlinkSync(chunkPath); // 删除已合并的分片
+        
+        // 检查临时目录是否存在
+        if (!fs.existsSync(tempDir)) {
+            return res.status(400).json({ error: '上传会话已过期或不存在' });
         }
 
+        // 使用同步方式合并分片，确保顺序正确
+        const writeStream = fs.createWriteStream(finalPath);
+        
+        for (let i = 0; i < totalChunks; i++) {
+            const chunkPath = path.join(tempDir, `chunk-${i}`);
+            
+            // 检查分片是否存在
+            if (!fs.existsSync(chunkPath)) {
+                // 删除已经创建的文件和临时目录
+                if (fs.existsSync(finalPath)) {
+                    fs.unlinkSync(finalPath);
+                }
+                if (fs.existsSync(tempDir)) {
+                    fs.rmSync(tempDir, { recursive: true });
+                }
+                return res.status(400).json({ error: `缺失分片 ${i}` });
+            }
+            
+            // 读取分片内容并写入最终文件
+            const chunkData = fs.readFileSync(chunkPath);
+            writeStream.write(chunkData);
+        }
+        
+        // 关闭写入流并等待完成
         writeStream.end();
         
         // 等待写入完成
         await new Promise((resolve, reject) => {
             writeStream.on('finish', resolve);
-            writeStream.on('error', reject);
+            writeStream.on('error', (err) => {
+                // 发生错误时清理已创建的文件
+                if (fs.existsSync(finalPath)) {
+                    fs.unlinkSync(finalPath);
+                }
+                reject(err);
+            });
         });
 
-        // 清理临时目录，使用递归删除确保删除所有文件和子目录
-        if (fs.existsSync(tempDir)) {
-            fs.rmSync(tempDir, { recursive: true });
+        // 验证文件是否正确创建
+        if (!fs.existsSync(finalPath)) {
+            if (fs.existsSync(tempDir)) {
+                fs.rmSync(tempDir, { recursive: true });
+            }
+            return res.status(500).json({ error: '文件合并失败' });
+        }
+
+        // 获取实际文件大小进行验证
+        const stats = fs.statSync(finalPath);
+        if (stats.size === 0) {
+            // 删除空文件
+            fs.unlinkSync(finalPath);
+            if (fs.existsSync(tempDir)) {
+                fs.rmSync(tempDir, { recursive: true });
+            }
+            return res.status(500).json({ error: '合并后的文件为空' });
+        }
+
+        // 清理临时目录（无论成功与否都要清理）
+        try {
+            if (fs.existsSync(tempDir)) {
+                fs.rmSync(tempDir, { recursive: true });
+            }
+        } catch (cleanupError) {
+            console.warn('清理临时文件时出错:', cleanupError);
+            // 不中断主流程，只是记录警告
         }
 
         // 获取文件URL
@@ -287,11 +300,25 @@ exports.completeChunkedUpload = async (req, res) => {
         res.json({
             fileUrl: fileUrl,
             fileName: fileName,
-            fileSize: fs.statSync(finalPath).size
+            fileSize: stats.size
         });
     } catch (error) {
         console.error('完成分片上传错误:', error);
-        res.status(500).json({ error: '完成分片上传失败' });
+        
+        // 尝试清理可能残留的文件
+        try {
+            const { uploadId, fileName } = req.body;
+            if (uploadId) {
+                const tempDir = path.join('public', 'temp', uploadId);
+                if (fs.existsSync(tempDir)) {
+                    fs.rmSync(tempDir, { recursive: true });
+                }
+            }
+        } catch (cleanupError) {
+            console.warn('异常处理时清理临时文件失败:', cleanupError);
+        }
+        
+        res.status(500).json({ error: '完成分片上传失败: ' + error.message });
     }
 };
 

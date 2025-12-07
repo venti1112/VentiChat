@@ -113,7 +113,7 @@ exports.getProfile = async (req, res) => {
             id: user.userId,
             username: user.username,
             nickname: user.nickname,
-            avatarUrl: user.avatarUrl || '/default-avatar.png'
+            avatarUrl: user.avatarUrl || '/assets/default-avatar.png'
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -143,7 +143,7 @@ exports.getUserById = async (req, res) => {
             id: user.userId,
             username: user.username,
             nickname: user.nickname,
-            avatarUrl: user.avatarUrl || '/default-avatar.png'
+            avatarUrl: user.avatarUrl || '/assets/default-avatar.png'
         });
     } catch (error) {
         console.error('获取用户信息失败:', error);
@@ -170,7 +170,7 @@ exports.getUserPreferences = async (req, res) => {
         }
         
         res.json({
-            backgroundUrl: user.backgroundUrl || '/wp.jpg',
+            backgroundUrl: user.backgroundUrl || '/assets/wp.jpg',
             themeColor: user.themeColor || '#4cd8b8'
         });
     } catch (error) {
@@ -246,7 +246,7 @@ exports.register = async (req, res) => {
         const passwordHash = await bcrypt.hash(password, salt);
         
         // 设置默认头像
-        const defaultAvatarUrl = '/default-avatar.png';
+        const defaultAvatarUrl = '/assets/default-avatar.png';
         
         // 创建用户
         const user = await User.create({
@@ -312,7 +312,7 @@ exports.updateProfile = async (req, res) => {
                 id: updatedUser.userId,
                 username: updatedUser.username,
                 nickname: updatedUser.nickname,
-                avatarUrl: updatedUser.avatarUrl || '/default-avatar.png'
+                avatarUrl: updatedUser.avatarUrl || '/assets/default-avatar.png'
             }
         });
     } catch (error) {
@@ -363,7 +363,7 @@ exports.getAvatarUrl = async (req, res) => {
         }
         
         res.json({
-            avatarUrl: user.avatarUrl || '/default-avatar.png'
+            avatarUrl: user.avatarUrl || '/assets/default-avatar.png'
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -405,7 +405,7 @@ exports.updateUserPreferences = async (req, res) => {
         res.json({
             message: '偏好设置更新成功',
             preferences: {
-                backgroundUrl: updatedUser.backgroundUrl || '/wp.jpg',
+                backgroundUrl: updatedUser.backgroundUrl || '/assets/wp.jpg',
                 themeColor: updatedUser.themeColor || '#4cd8b8'
             }
         });
@@ -465,7 +465,7 @@ exports.resetBackground = async (req, res) => {
         // 更新用户背景图片URL为默认值
         const User = req.app.get('models').User;
         const [updatedRowsCount] = await User.update(
-            { backgroundUrl: '/wp.jpg' },
+            { backgroundUrl: '/assets/wp.jpg' },
             {
                 where: { userId: req.user.userId }
             }
@@ -483,7 +483,7 @@ exports.resetBackground = async (req, res) => {
         res.json({
             message: '背景图片重置成功',
             preferences: {
-                backgroundUrl: updatedUser.backgroundUrl || '/wp.jpg',
+                backgroundUrl: updatedUser.backgroundUrl || '/assets/wp.jpg',
                 themeColor: updatedUser.themeColor || '#4cd8b8'
             }
         });

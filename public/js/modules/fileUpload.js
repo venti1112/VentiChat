@@ -15,141 +15,12 @@ export function handleFileSelect(event) {
     currentFileSize = file.size;
     document.getElementById('fileSizeText').textContent = formatFileSize(file.size);
     
-    // 检查文件大小（大于25MB需要分片上传）
-    if (file.size > 25 * 1024 * 1024) {
-        uploadLargeFile(file);
-    } else {
-        uploadFile(file);
-    }
+    // 所有文件都使用分片上传
+    uploadFile(file);
 }
 
-// 上传普通文件
-export function uploadFile(file) {
-    const currentRoomId = localStorage.getItem('currentRoomId');
-    const token = localStorage.getItem('token');
-    
-    if (!token) {
-        window.showMessage('未登录，请先登录', 'danger');
-        return;
-    }
-    
-    if (!currentRoomId) {
-        window.showMessage('请先选择一个聊天室', 'warning');
-        return;
-    }
-    
-    // 显示进度条模态框，设置 backdrop 为 static 防止点击外部关闭
-    const progressModalElement = document.getElementById('uploadProgressModal');
-    if (progressModalElement) {
-        const progressModal = new bootstrap.Modal(progressModalElement, {
-            backdrop: 'static',
-            keyboard: false
-        });
-        progressModal.show();
-    }
-    
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('roomId', currentRoomId);
-    
-    // 根据文件类型确定上传端点
-    let uploadEndpoint = '/api/messages/file';
-    if (file.type.startsWith('image/')) {
-        uploadEndpoint = '/api/messages/image';
-    } else if (file.type.startsWith('video/')) {
-        uploadEndpoint = '/api/messages/video';
-    }
-    
-    const xhr = new XMLHttpRequest();
-    currentXHR = xhr; // 保存当前请求的引用
-    
-    // 绑定取消按钮事件
-    const cancelBtn = document.getElementById('cancelUploadBtn');
-    if (cancelBtn) {
-        // 清除之前的事件监听器
-        const newCancelBtn = cancelBtn.cloneNode(true);
-        cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
-        
-        newCancelBtn.addEventListener('click', () => {
-            if (currentXHR) {
-                currentXHR.abort();
-                currentXHR = null;
-            }
-        });
-    }
-    
-    // 初始化上传速度计算变量
-    let startTime = Date.now();
-    let lastLoaded = 0;
-    let lastTime = startTime;
-    
-    // 监听上传进度
-    xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-            const percentComplete = Math.round((e.loaded / e.total) * 100);
-            updateProgress(percentComplete);
-            
-            // 更新已上传大小显示
-            updateUploadedSize(e.loaded);
-            
-            // 计算上传速度
-            const currentTime = Date.now();
-            const elapsedTime = (currentTime - lastTime) / 1000; // 转换为秒
-            const loadedDiff = e.loaded - lastLoaded;
-            
-            if (elapsedTime > 0) {
-                const speed = loadedDiff / elapsedTime; // bytes per second
-                updateUploadSpeed(speed);
-            }
-            
-            // 更新变量
-            lastLoaded = e.loaded;
-            lastTime = currentTime;
-        }
-    });
-    
-    // 处理上传完成
-    xhr.addEventListener('load', () => {
-        currentXHR = null; // 清除引用
-        
-        if (xhr.status === 200) {
-            const data = JSON.parse(xhr.responseText);
-            // 文件上传成功，创建文件消息
-            sendFileMessage(data.fileUrl, file.name, file.type);
-            // 隐藏进度条模态框
-            bootstrap.Modal.getInstance(document.getElementById('uploadProgressModal')).hide();
-        } else {
-            try {
-                const errorData = JSON.parse(xhr.responseText);
-                throw new Error(errorData.error || '上传失败');
-            } catch (e) {
-                throw new Error('上传失败');
-            }
-        }
-    });
-    
-    // 处理上传错误
-    xhr.addEventListener('error', () => {
-        currentXHR = null; // 清除引用
-        window.showMessage('文件上传失败: 网络错误', 'danger');
-        bootstrap.Modal.getInstance(document.getElementById('uploadProgressModal')).hide();
-    });
-    
-    // 处理用户取消上传
-    xhr.addEventListener('abort', () => {
-        currentXHR = null; // 清除引用
-        window.showMessage('文件上传已取消', 'info');
-        bootstrap.Modal.getInstance(document.getElementById('uploadProgressModal')).hide();
-    });
-    
-    // 发送请求
-    xhr.open('POST', uploadEndpoint, true);
-    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-    xhr.send(formData);
-}
-
-// 上传大文件（分片上传）
-export async function uploadLargeFile(file) {
+// 分片上传
+export async function uploadFile(file) {
     const currentRoomId = localStorage.getItem('currentRoomId');
     const token = localStorage.getItem('token');
     
@@ -456,28 +327,12 @@ export function sendFileMessage(fileUrl, fileName, fileType) {
         messageType = 'image';
     } else if (fileType.startsWith('video/')) {
         messageType = 'video';
+    } else if (fileType.startsWith('audio/')) {
+        messageType = 'audio';
     }
     
     // 获取当前用户信息
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-    
-    // 创建临时消息对象用于立即显示
-    const tempMessage = {
-        id: 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-        content: fileName,
-        fileUrl: fileUrl,
-        type: messageType,
-        sentAt: new Date().toISOString(),
-        Sender: {
-            id: currentUser.id,
-            nickname: currentUser.nickname || currentUser.username,
-            username: currentUser.username,
-            avatarUrl: currentUser.avatarUrl || '/default-avatar.png'
-        }
-    };
-    
-    // 立即显示消息
-    window.displayMessages([tempMessage]);
     
     // 发送文件消息到服务器
     fetch('/api/messages', {
@@ -506,37 +361,14 @@ export function sendFileMessage(fileUrl, fileName, fileType) {
         const messageInput = document.getElementById('messageInput');
         if (messageInput) messageInput.value = '';
         
-        // 用服务器返回的真实消息替换临时消息
-        const chatMessages = document.getElementById('chatMessages');
-        if (chatMessages) {
-            const tempMessageElement = chatMessages.querySelector(`.message-item[data-message-id="${tempMessage.id}"]`);
-            if (tempMessageElement) {
-                window.renderMessage(data).then(renderedMessage => {
-                    const newElement = document.createElement('div');
-                    newElement.innerHTML = renderedMessage;
-                    const newMessageElement = newElement.firstElementChild;
-                    newMessageElement.className = 'message-item mb-3';
-                    newMessageElement.setAttribute('data-message-id', data.id);
-                    tempMessageElement.parentNode.replaceChild(newMessageElement, tempMessageElement);
-                    
-                    // 滚动到底部
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                });
-            }
+        // 刷新聊天记录
+        if (window.loadMessageHistory) {
+            window.loadMessageHistory(parseInt(currentRoomId));
         }
     })
     .catch(error => {
         console.error('发送文件消息失败:', error);
         window.showMessage('发送文件消息失败: ' + error.message, 'danger');
-        
-        // 移除临时消息
-        const chatMessages = document.getElementById('chatMessages');
-        if (chatMessages) {
-            const tempMessageElement = chatMessages.querySelector(`.message-item[data-message-id="${tempMessage.id}"]`);
-            if (tempMessageElement) {
-                tempMessageElement.remove();
-            }
-        }
     });
 }
 

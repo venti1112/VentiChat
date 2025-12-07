@@ -171,7 +171,7 @@ async function clearFailedLoginAttempts(clientIP) {
 exports.register = async (req, res) => {
     try {
         const { username, nickname, password, confirmPassword } = req.body;
-        let avatarUrl = '/default-avatar.png'; // 默认头像路径
+        let avatarUrl = '/assets/default-avatar.png'; // 默认头像路径
         
         // 验证输入
         if (!username || !nickname || !password || !confirmPassword) {

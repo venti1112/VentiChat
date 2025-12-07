@@ -150,16 +150,8 @@ router.put('/messages/:messageId/retract', authMiddleware, messageController.rec
 
 // 文件相关路由
 const fileController = require('../controllers/fileController');
-// 上传图片消息 - 允许用户在聊天中发送图片文件
-router.post('/messages/image', authMiddleware, uploadSingle('file', 'image'), fileController.handleUpload);
-// 上传视频消息 - 允许用户在聊天中发送视频文件
-router.post('/messages/video', authMiddleware, uploadSingle('file', 'video'), fileController.handleUpload);
-// 上传文件消息 - 允许用户在聊天中发送任意类型文件
-router.post('/messages/file', authMiddleware, uploadSingle('file', 'file'), fileController.handleUpload);
 
 // 文件上传路由
-// 上传图片 - 通用图片上传接口
-router.post('/upload/image', authMiddleware, uploadSingle('file', 'image'), fileController.handleUpload);
 // 初始化分块上传 - 开始一个大文件的分块上传过程
 router.post('/upload/initiate', authMiddleware, fileController.initiateChunkedUpload);
 // 上传文件块 - 上传大文件的一个数据块
