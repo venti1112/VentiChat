@@ -35,23 +35,20 @@ exports.login = async (req, res) => {
             return res.status(400).json({ message: '用户名和密码不能为空' });
         }
         
+        // 获取系统设置
+        const systemSettings = await SystemSetting.findOne();
+        const maxLoginAttempts = systemSettings?.maxLoginAttempts || 5;
+        
         // 检查IP是否被封禁（使用Redis）
         const bannedIP = await redisClient.checkBannedIP(clientIP);
         
         // 如果IP被封禁且未到解封时间，并且失败次数达到上限
-        if (bannedIP && new Date() < new Date(bannedIP.unbanTime)) {
-            // 获取系统设置
-            const systemSettings = await SystemSetting.findOne();
-            const maxLoginAttempts = systemSettings?.maxLoginAttempts || 5;
-            
-            // 只有在失败次数达到上限时才阻止登录
-            if (bannedIP.failedAttempts >= maxLoginAttempts) {
-                log('WARN', `被封禁IP尝试登录 - IP: ${clientIP}, 用户名: ${username}`);
-                return res.status(403).json({ 
-                    message: '您的IP已被封禁，请稍后再试',
-                    redirect: '/login'
-                });
-            }
+        if (bannedIP && new Date() < new Date(bannedIP.unbanTime) && bannedIP.failedAttempts >= maxLoginAttempts) {
+            log('WARN', `被封禁IP尝试登录 - IP: ${clientIP}, 用户名: ${username}`);
+            return res.status(403).json({ 
+                message: '您的IP已被封禁，请稍后再试',
+                redirect: '/login'
+            });
         }
         
         // 如果IP被封禁但已到解封时间，则从封禁列表中移除

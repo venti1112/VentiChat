@@ -285,10 +285,10 @@ redisClient.incrementIPFailures = async function(ip, maxAttempts, lockTimeMinute
                 unbanTime: unbanTime
             };
         } else {
-            // 更新失败次数，设置较长的过期时间（例如30分钟）
-            // 这样可以在一定时间后自动清除未达到封禁条件的记录
-            const tempUnbanTime = new Date(Date.now() + 30 * 60 * 1000); // 30分钟后过期
-            await this.addBannedIP(ip, tempUnbanTime, failedAttempts);
+            // 未达到最大尝试次数，仅记录失败次数但不解封IP
+            // 使用较短的过期时间（例如30分钟）来自动清理这些记录
+            const tempExpireTime = new Date(Date.now() + 30 * 60 * 1000); // 30分钟后过期
+            await this.addBannedIP(ip, tempExpireTime, failedAttempts);
             return {
                 banned: false,
                 failedAttempts: failedAttempts
