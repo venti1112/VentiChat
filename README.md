@@ -43,7 +43,7 @@
    ```bash
    npm start
    ```
-   首次启动时，系统会自动运行初始化脚本，请根据提示输入信息（输入的 MySQL 账号必须要有创建数据库的权限）
+   首次启动时，系统会自动运行初始化脚本，请访问初始化页面进行初始化设置（输入的 MySQL 账号必须要有创建数据库的权限）
 
 5. 浏览器访问 `http://localhost:[端口号]`（默认端口在初始化时配置）
 
@@ -63,7 +63,7 @@
 - `models/`: 数据模型
 - `public/`: 静态资源文件
 - `routes/`: 路由配置
-- `scripts/`: 脚本文件
+- `setup/`: 初始化脚本
 - `utils/`: 工具函数
 
 ## 主要功能模块
@@ -182,7 +182,7 @@
 系统对不同类型的文件上传设置了不同的大小限制：
 - 头像图片：最大5MB
 - 背景图片：最大10MB
-- 聊天消息中的图片/视频/文件：受[max_file_size](file:///c%3A/Users/Venti/Documents/Project/VentiChat/models/systemSetting.js#L22-L26)系统设置限制（默认10MB）
+- 聊天消息中的图片/视频/文件：受[max_file_size](models/systemSetting.js#L22-L26)系统设置限制（默认10MB）
 
 ### 权限层级说明
 
@@ -362,7 +362,7 @@
 
 ### 自定义配置
 
-配置文件位于 [config/config.json](file:///C:/Users/Venti/Documents/Project/VentiChat/config/config.json)，可以修改以下参数：
+配置文件位于 [config/config.json]，可以修改以下参数：
 - 数据库连接信息
 - 服务器端口
 - 加密密钥

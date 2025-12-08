@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VentiChat 初始化配置</title>
+    <!-- 添加禁止缓存的元标签 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4cd8b8;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #3ab09e;
+        }
+        .section {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+        .section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        .hidden {
+            display: none;
+        }
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .progress {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .initializing {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        #countdown {
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>VentiChat 初始化配置</h1>
+        
+        <div id="messageArea"></div>
+        
+        <form id="initForm">
+            <div class="section">
+                <h2>数据库配置</h2>
+                <div class="form-group">
+                    <label for="dbHost">MySQL主机地址:</label>
+                    <input type="text" id="dbHost" name="dbHost" value="localhost" required>
+                </div>
+                <div class="form-group">
+                    <label for="dbPort">MySQL端口:</label>
+                    <input type="number" id="dbPort" name="dbPort" value="3306" required>
+                </div>
+                <div class="form-group">
+                    <label for="dbUser">MySQL用户名:</label>
+                    <input type="text" id="dbUser" name="dbUser" value="root" required>
+                </div>
+                <div class="form-group">
+                    <label for="dbPassword">MySQL密码:</label>
+                    <input type="password" id="dbPassword" name="dbPassword">
+                </div>
+                <div class="form-group">
+                    <label for="dbName">数据库名称:</label>
+                    <input type="text" id="dbName" name="dbName" value="ventichat" required>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Redis配置</h2>
+                <div class="form-group">
+                    <label for="redisHost">Redis主机地址:</label>
+                    <input type="text" id="redisHost" name="redisHost" value="localhost" required>
+                </div>
+                <div class="form-group">
+                    <label for="redisPort">Redis端口:</label>
+                    <input type="number" id="redisPort" name="redisPort" value="6379" required>
+                </div>
+                <div class="form-group">
+                    <label for="redisPassword">Redis密码 (留空表示无密码):</label>
+                    <input type="password" id="redisPassword" name="redisPassword">
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>管理员账户</h2>
+                <div class="form-group">
+                    <label for="adminUsername">管理员用户名:</label>
+                    <input type="text" id="adminUsername" name="adminUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="adminPassword">管理员密码:</label>
+                    <input type="password" id="adminPassword" name="adminPassword" required>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>服务器配置</h2>
+                <div class="form-group">
+                    <label for="baseUrl">基础URL:</label>
+                    <input type="text" id="baseUrl" name="baseUrl" value="http://localhost" required>
+                </div>
+                <div class="form-group">
+                    <label for="port">服务端口:</label>
+                    <input type="number" id="port" name="port" value="3012" required>
+                </div>
+                <div class="form-group">
+                    <label for="workerCount">工作进程数量 (0表示使用CPU核心数):</label>
+                    <input type="number" id="workerCount" name="workerCount" value="0" min="0">
+                </div>
+            </div>
+            
+            <button type="submit">初始化数据库</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('initForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const data = {};
+            for (let [key, value] of formData.entries()) {
+                // Convert number fields
+                if (['dbPort', 'redisPort', 'port', 'workerCount'].includes(key)) {
+                    data[key] = parseInt(value) || value;
+                } else {
+                    data[key] = value;
+                }
+            }
+            
+            try {
+                // Submit form via POST with streaming response
+                const response = await fetch('/setup', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                // Process the streaming response
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                document.getElementById('initForm').style.display = 'none';
+
+                let buffer = '';
+                let redirectUrl = '/';
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // Keep incomplete line in buffer
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const result = JSON.parse(line.slice(6)); // Remove 'data: ' prefix
+                                
+                                if (result.status === 'initializing') {
+                                    showMessage(result.message, 'initializing');
+                                } else if (result.status === 'completed') {
+                                    redirectUrl = result.redirectUrl || '/';
+                                    showMessage(result.message + ' <span id="countdown">10</span> 秒后跳转...', 'success');
+                                    
+                                    // Start countdown
+                                    let count = 10;
+                                    const countdownInterval = setInterval(() => {
+                                        count--;
+                                        const countdownElement = document.getElementById('countdown');
+                                        if (countdownElement) {
+                                            countdownElement.textContent = count;
+                                        }
+                                        
+                                        if (count <= 0) {
+                                            clearInterval(countdownInterval);
+                                            window.location.href = redirectUrl;
+                                        }
+                                    }, 1000);
+                                } else if (result.status === 'error') {
+                                    showMessage(result.message, 'error');
+                                }
+                            } catch (e) {
+                                console.error('Error parsing JSON:', e);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                showMessage('网络错误: ' + error.message, 'error');
+            }
+        });
+        
+        function showMessage(message, type) {
+            const messageArea = document.getElementById('messageArea');
+            messageArea.innerHTML = `<div class="message ${type}">${message}</div>`;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>

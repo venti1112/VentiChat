@@ -4,9 +4,7 @@
   "description": "A real-time chat application built with Node.js and Socket.IO",
   "main": "cluster.js",
   "scripts": {
-    "start": "node cluster.js",
-    "init": "node scripts/init.js",
-    "reset": "node scripts/reset.js"
+    "start": "node cluster.js"
   },
   "keywords": [
     "chat",

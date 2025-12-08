@@ -16,7 +16,7 @@ async function checkAndInitialize() {
         // 配置文件不存在，运行初始化脚本
         log(LOG_LEVELS.INFO, '配置文件不存在，正在运行初始化脚本...');
         return new Promise((resolve, reject) => {
-            const initProcess = spawn('node', ['scripts/init.js'], { stdio: 'inherit' });
+            const initProcess = spawn('node', ['setup/setup.js'], { stdio: 'inherit' });
             
             initProcess.on('close', (code) => {
                 if (code === 0) {

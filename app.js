@@ -218,7 +218,7 @@ app.use((req, res, next) => {
         await WebSocketManager.storeUserSocket(userId, socket.id, workerId);
         
         // 输出WebSocket连接建立日志
-        log(LOG_LEVELS.INFO, `WebSocket连接已建立 [用户: ${username}(${userId})] [Socket ID: ${socket.id}]`);
+        log(LOG_LEVELS.DEBUG, `WebSocket连接已建立 [用户: ${username}(${userId})] [Socket ID: ${socket.id}]`);
         
         // 发送连接成功的事件给客户端
         socket.emit('connected', { message: '连接成功', userId: userId });
@@ -227,7 +227,7 @@ app.use((req, res, next) => {
         socket.on('disconnect', async (reason) => {
             await WebSocketManager.removeUserSocket(userId, socket.id, workerId);
             // 输出WebSocket连接断开日志
-            log(LOG_LEVELS.INFO, `WebSocket连接已断开 [用户: ${username}(${userId})] [Socket ID: ${socket.id}] [原因: ${reason}]`);
+            log(LOG_LEVELS.DEBUG, `WebSocket连接已断开 [用户: ${username}(${userId})] [Socket ID: ${socket.id}] [原因: ${reason}]`);
         });
 
         // 加入聊天室
@@ -238,7 +238,7 @@ app.use((req, res, next) => {
                 socket.join(`room_${roomId}`);
                 socket.emit('joinedRoom', { roomId: roomId }); // 确认加入房间
                 // 输出加入聊天室日志
-                log(LOG_LEVELS.INFO, `用户加入聊天室 [用户: ${username}(${userId})] [房间ID: ${roomId}]`);
+                log(LOG_LEVELS.DEBUG, `用户加入聊天室 [用户: ${username}(${userId})] [房间ID: ${roomId}]`);
             }
         });
         

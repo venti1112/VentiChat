@@ -191,7 +191,7 @@ exports.logout = async (req, res) => {
         if (token) {
             // 解码Token获取用户名
             try {
-                const decoded = jwt.verify(token, config.jwt.secret);
+                const decoded = jwt.verify(token, config.encryptionKey);
                 username = decoded.username;
                 
                 // 从Redis中移除Token

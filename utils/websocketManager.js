@@ -23,7 +23,7 @@ class WebSocketManager {
             // 存储Socket到用户的映射，方便快速查找
             await redisClient.set(`socket:${socketId}`, userId);
             
-            log(LOG_LEVELS.DEBUG, `存储用户Socket信息: 用户=${userId}, Socket=${socketId}, 工作进程=${workerId}`);
+            log(LOG_LEVELS.DEBUG, `存储用户Socket信息: 用户=${userId}, Socket=${socketId}`);
         } catch (error) {
             log(LOG_LEVELS.ERROR, `存储用户Socket信息失败: ${error.message}`);
         }
@@ -43,7 +43,7 @@ class WebSocketManager {
             // 删除Socket到用户的映射
             await redisClient.del(`socket:${socketId}`);
             
-            log(LOG_LEVELS.DEBUG, `删除用户Socket信息: 用户=${userId}, Socket=${socketId}, 工作进程=${workerId}`);
+            log(LOG_LEVELS.DEBUG, `删除用户Socket信息: 用户=${userId}, Socket=${socketId}`);
         } catch (error) {
             log(LOG_LEVELS.ERROR, `删除用户Socket信息失败: ${error.message}`);
         }
