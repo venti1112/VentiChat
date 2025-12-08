@@ -31,6 +31,12 @@ async function checkAndInitialize() {
     }
 }
 
+// 优雅关闭服务器
+function shutdownServer() {
+    log(LOG_LEVELS.INFO, '正在关闭服务器...');
+    process.exit(1);
+}
+
 // 等待检查和可能的初始化完成后再继续
 (async () => {
     try {
@@ -47,6 +53,9 @@ async function checkAndInitialize() {
 
         // 存储工作进程引用
         const workers = {};
+
+        // 记录工作进程错误状态
+        const workerErrors = {};
 
         // 获取下一个工作进程ID的函数
         function getNextWorkerId() {
@@ -71,6 +80,20 @@ async function checkAndInitialize() {
                 
                 // 向工作进程发送其ID
                 worker.send({ type: 'assignId', workerId: workerId });
+                
+                // 监听工作进程的消息，检查是否有错误报告
+                worker.on('message', (msg) => {
+                    if (msg.type === 'workerError') {
+                        log(LOG_LEVELS.ERROR, `工作进程 ${workerId} 报告严重错误: ${msg.error}`);
+                        workerErrors[workerId] = true;
+                        
+                        // 如果是启动过程中的致命错误，关闭整个服务器
+                        if (msg.fatal) {
+                            log(LOG_LEVELS.ERROR, '检测到工作进程启动致命错误，正在关闭服务器...');
+                            shutdownServer();
+                        }
+                    }
+                });
             }
             
             // 启动负载均衡代理进程
@@ -106,6 +129,15 @@ async function checkAndInitialize() {
             
             cluster.on('exit', (worker, code, signal) => {
                 const workerId = processIds.get(worker.process.pid);
+                
+                // 检查是否是因为严重错误退出
+                if (workerErrors[workerId]) {
+                    log(LOG_LEVELS.ERROR, `工作进程 ${workerId} 因严重错误退出 (代码: ${code}, 信号: ${signal})`);
+                    log(LOG_LEVELS.ERROR, '由于工作进程严重错误，正在关闭服务器...');
+                    shutdownServer();
+                    return;
+                }
+                
                 log(LOG_LEVELS.INFO, `工作进程 ${workerId} 已退出 (代码: ${code}, 信号: ${signal})`);
                 log(LOG_LEVELS.INFO, '正在启动新的工作进程...');
                 const newWorker = cluster.fork({
@@ -117,6 +149,20 @@ async function checkAndInitialize() {
                 
                 // 向新工作进程发送其ID
                 newWorker.send({ type: 'assignId', workerId: newWorkerId });
+                
+                // 监听新工作进程的错误消息
+                newWorker.on('message', (msg) => {
+                    if (msg.type === 'workerError') {
+                        log(LOG_LEVELS.ERROR, `工作进程 ${newWorkerId} 报告严重错误: ${msg.error}`);
+                        workerErrors[newWorkerId] = true;
+                        
+                        // 如果是启动过程中的致命错误，关闭整个服务器
+                        if (msg.fatal) {
+                            log(LOG_LEVELS.ERROR, '检测到工作进程启动致命错误，正在关闭服务器...');
+                            shutdownServer();
+                        }
+                    }
+                });
             });
         } else {
             // 工作进程代码
@@ -130,11 +176,43 @@ async function checkAndInitialize() {
                 }
             });
             
+            // 捕获未处理的错误并报告给主进程
+            process.on('uncaughtException', (error) => {
+                process.send({ 
+                    type: 'workerError', 
+                    error: error.message,
+                    fatal: true
+                });
+                log(LOG_LEVELS.ERROR, `工作进程发生未捕获异常: ${error.message}\n${error.stack}`);
+                process.exit(1);
+            });
+            
+            process.on('unhandledRejection', (reason, promise) => {
+                process.send({ 
+                    type: 'workerError', 
+                    error: reason.message || reason,
+                    fatal: true
+                });
+                log(LOG_LEVELS.ERROR, `工作进程发生未处理的Promise拒绝: ${reason}\n${reason instanceof Error ? reason.stack : ''}`);
+                process.exit(1);
+            });
+            
             // 启动应用
-            require('./app.js');
+            try {
+                require('./app.js');
+            } catch (error) {
+                // 发送错误信息给主进程
+                process.send({ 
+                    type: 'workerError', 
+                    error: error.message,
+                    fatal: true
+                });
+                log(LOG_LEVELS.ERROR, `工作进程启动失败: ${error.message}\n${error.stack}`);
+                process.exit(1);
+            }
         }
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `启动过程中发生错误: ${error}`);
+        log(LOG_LEVELS.ERROR, `启动过程中发生错误: ${error}\n${error.stack}`);
         process.exit(1);
     }
 })();

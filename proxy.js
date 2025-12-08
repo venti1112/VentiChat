@@ -56,7 +56,7 @@ server.on('upgrade', (req, socket, head) => {
     // 创建目标URL
     const targetUrl = 'http://localhost:' + targetPort;
     
-    // 将WebSocket升级请求代理到选定的工作进程
+    // 将WebSocket升级请求到选定的工作进程
     proxyMiddleware.upgrade(req, socket, head, {
         target: targetUrl,
         changeOrigin: true
@@ -67,5 +67,5 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 server.listen(parseInt(config.port), () => {
-    log(LOG_LEVELS.INFO, `代理服务器已监听端口 ${config.port}`);
+    log(LOG_LEVELS.INFO, `服务器已监听端口 ${config.port}`);
 });

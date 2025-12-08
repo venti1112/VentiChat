@@ -8,21 +8,37 @@ const redisConfig = {
     port: config.redis.port,
     password: config.redis.password || undefined,
     // 连接池配置
-    retryDelayOnFailover: 100,
-    maxRetriesPerRequest: 3,
-    enableAutoPipelining: true
+    enableAutoPipelining: true,
+    // 禁用内置重试机制，我们自己实现
+    retryStrategy: () => false
 };
 
 // 创建Redis客户端实例
 const redisClient = redis.createClient(redisConfig);
 
+// 添加isRedisConnected属性并初始化为false
+redisClient.isRedisConnected = false;
+
+// 添加quiet模式属性，可通过setQuiet方法设置
+let quiet = false;
+
+// 设置quiet模式
+redisClient.setQuiet = function(q) {
+    quiet = q;
+};
+
 // Redis连接事件处理
 redisClient.on('connect', () => {
-    log(LOG_LEVELS.INFO, 'Redis客户端已连接');
+    if (!quiet) {
+        log(LOG_LEVELS.DEBUG, 'Redis客户端已连接');
+    }
 });
 
 redisClient.on('ready', () => {
-    log(LOG_LEVELS.INFO, 'Redis客户端准备就绪');
+    if (!quiet) {
+        log(LOG_LEVELS.DEBUG, 'Redis客户端准备就绪');
+    }
+    redisClient.isRedisConnected = true;
 });
 
 redisClient.on('error', (err) => {
@@ -34,13 +50,66 @@ redisClient.on('reconnecting', () => {
 });
 
 redisClient.on('end', () => {
-    log(LOG_LEVELS.INFO, 'Redis客户端连接已关闭');
+    log(LOG_LEVELS.INFO, 'Redis客户端连接已关闭，开始重试连接...');
+    redisClient.isRedisConnected = false;
+    // 当连接关闭时，启动我们的重试机制
+    retryRedisConnection();
 });
 
 // 连接Redis
 redisClient.connect().catch(err => {
-    log(LOG_LEVELS.ERROR, `Redis连接失败: ${err.message}`);
+    log(LOG_LEVELS.ERROR, `Redis初次连接失败: ${err.message}`);
+    redisClient.isRedisConnected = false;
+    // 启动重试机制
+    retryRedisConnection();
 });
+
+// Redis连接重试函数 - 先尝试重连一次，如果失败则每5秒重试一次
+let redisRetryInterval = null;
+
+// 检查Redis连接状态的函数
+function checkRedisConnection() {
+    return isRedisConnected;
+}
+
+async function retryRedisConnection() {
+    // 清除现有的重试定时器（如果有的话）
+    if (redisRetryInterval) {
+        clearInterval(redisRetryInterval);
+        redisRetryInterval = null;
+    }
+    
+    // 先尝试立即重连一次
+    if (!quiet) {
+        log(LOG_LEVELS.INFO, '尝试重新连接Redis...');
+    }
+    
+    try {
+        await redisClient.connect();
+        log(LOG_LEVELS.INFO, 'Redis连接已恢复');
+        isRedisConnected = true;
+        redisClient.isRedisConnected = isRedisConnected; // 更新属性值
+        return;
+    } catch (err) {
+        log(LOG_LEVELS.ERROR, `Redis重连失败: ${err.message}`);
+        isRedisConnected = false;
+        redisClient.isRedisConnected = isRedisConnected; // 更新属性值
+    }
+    
+    // 每5秒重试一次
+    redisRetryInterval = setInterval(async () => {
+        try {
+            await redisClient.connect();
+            log(LOG_LEVELS.INFO, 'Redis连接已恢复');
+            isRedisConnected = true;
+            redisClient.isRedisConnected = isRedisConnected; // 更新属性值
+            clearInterval(redisRetryInterval);
+            redisRetryInterval = null;
+        } catch (err) {
+            log(LOG_LEVELS.ERROR, `Redis重连失败: ${err.message}`);
+        }
+    }, 5000);
+}
 
 /**
  * 存储用户Token

@@ -3,14 +3,15 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
-const { Sequelize } = require('sequelize'); // 只导入Sequelize类
+const { Sequelize } = require('sequelize');
 const multer = require('multer');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const cluster = require('cluster');
 const config = require('./config/config.json');
+const { log, LOG_LEVELS, processIds } = require('./utils/logger');
 const redisClient = require('./utils/redisClient');
-const { log, logHttpError, logDatabaseQuery, logDatabaseRetry, logBrowserDevToolsWarning, LOG_LEVELS, processIds } = require('./utils/logger');
+const { sequelize } = require('./utils/databaseClient');
 
 // 处理来自主进程的转发消息
 if (cluster.isWorker) {
@@ -30,23 +31,6 @@ const app = express();
 // 配置Express信任代理
 app.set('trust proxy', true);
 
-// 初始化Sequelize，配置连接池
-const sequelize = new Sequelize(config.db.database, config.db.user, config.db.password, {
-    host: config.db.host,
-    port: parseInt(config.db.port), // 确保端口是数字类型
-    dialect: 'mysql',
-    logging: logDatabaseQuery, // 使用自定义日志函数记录数据库查询
-    dialectOptions: {
-        dateStrings: true,
-        typeCast: true
-    },
-    pool: {
-        max: 10,         // 最大连接数
-        min: 0,          // 最小连接数
-        acquire: 30000,  // 获取连接的最长等待时间（毫秒）
-        idle: 10000      // 连接的最大空闲时间（毫秒）
-    }
-});
 
 // 加载模型（每个模型接收 sequelize 实例，自行使用 sequelize.DataTypes）
 const models = {
@@ -91,6 +75,10 @@ app.use(realIpMiddleware);
 const ipBanMiddleware = require('./middleware/ipBanMiddleware');
 app.use(ipBanMiddleware);
 
+// Redis状态检查中间件
+const redisStatusMiddleware = require('./middleware/redisStatusMiddleware');
+app.use(redisStatusMiddleware);
+
 // 对于根路径，提供index.html文件
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -110,6 +98,15 @@ const upload = multer({ storage });
 
 // 将upload实例挂载到app上
 app.set('upload', upload);
+
+// 用户Socket映射
+const userSocketMap = new Map();
+// 将userSocketMap挂载到app上
+app.set('userSocketMap', userSocketMap);
+
+// 数据库状态检查中间件
+const databaseStatusMiddleware = require('./middleware/databaseStatusMiddleware');
+app.use(databaseStatusMiddleware);
 
 // 路由
 app.use('/api', require('./routes/index'));
@@ -171,7 +168,7 @@ app.use((req, res, next) => {
         const { processIds } = require('./utils/logger');
         const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
         const port = process.env.WORKER_PORT || config.port;
-        log(LOG_LEVELS.INFO, `工作进程 ${workerId} 启动完成，监听端口 ${parseInt(port) + 1}`);
+        log(LOG_LEVELS.INFO, `工作进程 ${workerId} 已监听端口 ${parseInt(port)}`);
     });
     
     io.on('connection', async (socket) => {
@@ -263,6 +260,7 @@ app.use((req, res, next) => {
         // 处理发送消息事件
         socket.on('sendMessage', async (data) => {
             try {
+                
                 log(LOG_LEVELS.DEBUG, `收到发送消息请求 [用户: ${username}(${userId})] [数据: ${JSON.stringify(data)}]`);
                 
                 const { rid, content, type } = data;
@@ -344,76 +342,61 @@ app.use((req, res, next) => {
         });
     });
 
-// 数据库连接和重试逻辑
-let connectionRetryCount = 0;
-const maxRetries = 5;
-const retryDelay = 5000; // 5秒
-
-async function connectToDatabase() {
-    try {
-        await sequelize.authenticate();
-        log(LOG_LEVELS.INFO, '数据库连接成功');
-        connectionRetryCount = 0; // 重置重试计数
-        return true;
-    } catch (error) {
-        connectionRetryCount++;
-        log(LOG_LEVELS.ERROR, `数据库连接失败 (尝试 ${connectionRetryCount}/${maxRetries}): ${error.message}`);
-        
-        if (connectionRetryCount < maxRetries) {
-            log(LOG_LEVELS.INFO, `将在 ${retryDelay/1000} 秒后重试...`);
-            return false;
-        } else {
-            log(LOG_LEVELS.ERROR, '达到最大重试次数，数据库连接失败');
-            return false;
-        }
-    }
-}
-
-// 重试数据库连接
-async function retryDatabaseConnection() {
-    const interval = setInterval(async () => {
-        const connected = await connectToDatabase();
-        if (connected) {
-            clearInterval(interval);
-            log(LOG_LEVELS.INFO, '数据库连接已恢复');
-        } else if (connectionRetryCount >= maxRetries) {
-            clearInterval(interval);
-        }
-    }, retryDelay);
-}
 
 // 处理未捕获的异常
 process.on('uncaughtException', (err) => {
     log(LOG_LEVELS.ERROR, `未捕获的异常: ${err.message}\n${err.stack}`);
+    
+    // 向主进程发送错误信息
+    if (process.send) {
+        process.send({ 
+            type: 'workerError', 
+            error: err.message,
+            fatal: true
+        });
+    }
+    
     process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
     log(LOG_LEVELS.ERROR, `未处理的Promise拒绝: ${reason}\n${reason instanceof Error ? reason.stack : ''}`);
+    
+    // 向主进程发送错误信息
+    if (process.send) {
+        process.send({ 
+            type: 'workerError', 
+            error: reason.message || reason,
+            fatal: true
+        });
+    }
+    
     process.exit(1);
 });
 
 // 启动服务器函数
 async function startServer(httpServer) {
-    // 从环境变量获取端口号，如果没有则使用配置文件中的端口
-    const port = process.env.WORKER_PORT ? parseInt(process.env.WORKER_PORT) : parseInt(config.port) + 1;
-    
-    // 先尝试连接数据库
-    const connected = await connectToDatabase();
-    
-    if (connected) {
+    try {
+        // 从环境变量获取端口号，如果没有则使用配置文件中的端口
+        const port = process.env.WORKER_PORT ? parseInt(process.env.WORKER_PORT) : parseInt(config.port) + 1;
+        
         // 启动服务器
         httpServer.listen(port, () => {
             const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
         });
-    } else {
-        // 如果初始连接失败，启动重试机制
-        retryDatabaseConnection();
+    } catch (error) {
+        log(LOG_LEVELS.ERROR, `启动服务器时发生错误: ${error.message}\n${error.stack}`);
         
-        // 即使数据库未连接也启动服务器，但会返回500错误
-        httpServer.listen(port, () => {
-            const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
-        });
+        // 向主进程发送错误信息
+        if (process.send) {
+            process.send({ 
+                type: 'workerError', 
+                error: error.message,
+                fatal: true
+            });
+        }
+        
+        process.exit(1);
     }
 }
 
