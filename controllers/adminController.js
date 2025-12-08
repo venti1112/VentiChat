@@ -1,4 +1,4 @@
-const { models } = require('../models');
+const models = require('../models');
 const { log, LOG_LEVELS } = require('../utils/logger');
 
 // 获取所有用户（管理员）
@@ -8,18 +8,19 @@ exports.getUsers = async (req, res) => {
             attributes: ['userId', 'username', 'nickname', 'status', 'createdAt']
         });
         
-        // 格式化返回数据，确保字段名与前端一致
+        // 格式化返回数据，确保字段名与前端一致，并简化状态信息
         const formattedUsers = users.map(user => ({
             id: user.userId,
             username: user.username,
             nickname: user.nickname,
-            status: user.status,
+            status: user.status === 1 ? 'active' : 'inactive', // 将数字状态转换为可读的状态
             createdAt: user.createdAt,
             avatarUrl: user.avatarUrl || '/default-avatar.png'
         }));
         
         res.json(formattedUsers);
     } catch (error) {
+        log('ERROR', `获取用户列表失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };
@@ -49,6 +50,7 @@ exports.createUser = async (req, res) => {
         
         res.json({ message: '用户创建成功', user: { id: user.userId, username: user.username, nickname: user.nickname } });
     } catch (error) {
+        log('ERROR', `创建用户失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };
@@ -74,6 +76,7 @@ exports.updateUser = async (req, res) => {
         
         res.json({ message: '用户信息更新成功' });
     } catch (error) {
+        log('ERROR', `更新用户信息失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };
@@ -96,6 +99,7 @@ exports.deleteUser = async (req, res) => {
         
         res.json({ message: '用户删除成功' });
     } catch (error) {
+        log('ERROR', `删除用户失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };
@@ -117,6 +121,7 @@ exports.updateUserStatus = async (req, res) => {
         
         res.json({ message: '用户状态更新成功' });
     } catch (error) {
+        log('ERROR', `更新用户状态失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };
@@ -125,8 +130,22 @@ exports.updateUserStatus = async (req, res) => {
 exports.getRooms = async (req, res) => {
     try {
         const rooms = await models.Room.findAll();
-        res.json(rooms);
+        
+        // 为每个房间添加成员数量
+        const roomsWithMemberCount = await Promise.all(rooms.map(async (room) => {
+            const memberCount = await models.RoomMember.count({
+                where: { roomId: room.roomId }
+            });
+            
+            return {
+                ...room.toJSON(),
+                memberCount: memberCount
+            };
+        }));
+        
+        res.json(roomsWithMemberCount);
     } catch (error) {
+        log('ERROR', `获取聊天室列表失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };
@@ -143,6 +162,7 @@ exports.getRoom = async (req, res) => {
         
         res.json(room);
     } catch (error) {
+        log('ERROR', `获取聊天室详情失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };
@@ -163,7 +183,7 @@ exports.getRoomMembers = async (req, res) => {
         
         // 格式化成员信息
         const members = roomMembers.map(rm => ({
-            uid: rm.User.userId,
+            uid: rm.User.id,
             username: rm.User.username,
             nickname: rm.User.nickname,
             avatarUrl: rm.User.avatarUrl,
@@ -172,6 +192,7 @@ exports.getRoomMembers = async (req, res) => {
         
         res.json(members);
     } catch (error) {
+        log('ERROR', `获取聊天室成员失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };
@@ -181,19 +202,18 @@ exports.deleteRoom = async (req, res) => {
     try {
         const { id } = req.params;
         
-        // 删除聊天室相关数据
-        await models.RoomMember.destroy({ where: { roomId: id } });
-        await models.Message.destroy({ where: { roomId: id } });
-        await models.JoinRequest.destroy({ where: { roomId: id } });
-        
-        // 删除聊天室
-        const result = await models.Room.destroy({ where: { roomId: id } });
-        if (result === 0) {
+        // 查找房间
+        const room = await models.Room.findByPk(id);
+        if (!room) {
             return res.status(404).json({ error: '聊天室不存在' });
         }
         
+        // 删除房间及相关数据
+        await room.destroy();
+        
         res.json({ message: '聊天室删除成功' });
     } catch (error) {
+        log('ERROR', `删除聊天室失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };

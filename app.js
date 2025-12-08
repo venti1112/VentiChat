@@ -57,7 +57,7 @@ app.set('models', models);
 
 // 中间件
 app.use(express.json());
-app.use(cookieParser()); // 添加 cookie-parser 中间件
+app.use(cookieParser());
 
 // 添加Worker ID到响应头的中间件（放在最前面，确保所有请求都有这个header）
 app.use((req, res, next) => {
@@ -68,7 +68,6 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/userdata', express.static(path.join(__dirname, 'public', 'userdata')));
 
 // IP处理中间件 - 从反向代理获取真实IP
 const realIpMiddleware = require('./middleware/realIpMiddleware');
@@ -82,10 +81,7 @@ app.use(ipBanMiddleware);
 const redisStatusMiddleware = require('./middleware/redisStatusMiddleware');
 app.use(redisStatusMiddleware);
 
-// 对于根路径，提供index.html文件
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+
 
 // 文件上传配置
 const storage = multer.diskStorage({

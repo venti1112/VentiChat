@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员后台 - VentiChat</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="/admin/main.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- 侧边栏 -->
+            <nav class="col-md-3 col-lg-2 d-md-block bg-dark sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="#" data-page="dashboard">
+                                <i class="bi bi-speedometer2 me-2"></i>
+                                仪表盘
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-page="users">
+                                <i class="bi bi-people me-2"></i>
+                                用户管理
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-page="rooms">
+                                <i class="bi bi-chat-dots me-2"></i>
+                                聊天室管理
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-page="settings">
+                                <i class="bi bi-gear me-2"></i>
+                                系统设置
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- 主内容区 -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <!-- 页面标题 -->
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2" id="page-title">仪表盘</h1>
+                </div>
+
+                <!-- 页面内容区域 -->
+                <div id="page-content">
+                    <!-- 仪表盘页面 -->
+                    <div id="dashboard-page" class="page-content active">
+                        <!-- 统计卡片 -->
+                        <div class="row">
+                            <div class="col-md-3 mb-4">
+                                <div class="card text-white bg-primary">
+                                    <div class="card-body">
+                                        <h5 class="card-title">用户总数</h5>
+                                        <p class="card-text display-6" id="total-users">0</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-4">
+                                <div class="card text-white bg-success">
+                                    <div class="card-body">
+                                        <h5 class="card-title">聊天室总数</h5>
+                                        <p class="card-text display-6" id="total-rooms">0</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-4">
+                                <div class="card text-white bg-info">
+                                    <div class="card-body">
+                                        <h5 class="card-title">在线用户数</h5>
+                                        <p class="card-text display-6" id="online-users">0</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-4">
+                                <div class="card text-white bg-warning">
+                                    <div class="card-body">
+                                        <h5 class="card-title">服务器状态</h5>
+                                        <p class="card-text" id="server-status">检查中...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 系统信息 -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">
+                                        系统信息
+                                    </div>
+                                    <div class="card-body">
+                                        <table class="table table-borderless">
+                                            <tbody>
+                                                <tr>
+                                                    <td><strong>Node.js 版本:</strong></td>
+                                                    <td id="node-version">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>操作系统:</strong></td>
+                                                    <td id="os-info">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>架构:</strong></td>
+                                                    <td id="arch-info">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>CPU核心数:</strong></td>
+                                                    <td id="cpu-info">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>总内存:</strong></td>
+                                                    <td id="total-mem-info">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>可用内存:</strong></td>
+                                                    <td id="free-mem-info">-</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 用户管理页面 -->
+                    <div id="users-page" class="page-content">
+                        <div class="card">
+                            <div class="card-header">
+                                用户列表
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>用户名</th>
+                                                <th>昵称</th>
+                                                <th>状态</th>
+                                                <th>创建时间</th>
+                                                <th>操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="users-table-body">
+                                            <!-- 动态填充用户数据 -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 聊天室管理页面 -->
+                    <div id="rooms-page" class="page-content">
+                        <div class="card">
+                            <div class="card-header">
+                                聊天室列表
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>房间名</th>
+                                                <th>类型</th>
+                                                <th>创建者</th>
+                                                <th>成员数</th>
+                                                <th>操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="rooms-table-body">
+                                            <!-- 动态填充聊天室数据 -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 系统设置页面 -->
+                    <div id="settings-page" class="page-content">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">
+                                        基本设置
+                                    </div>
+                                    <div class="card-body">
+                                        <form id="basic-settings-form">
+                                            <div class="mb-3">
+                                                <label for="site-name" class="form-label">站点名称</label>
+                                                <input type="text" class="form-control" id="site-name">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="message-retention-days" class="form-label">聊天记录保存天数</label>
+                                                <input type="number" class="form-control" id="message-retention-days">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="max-file-size" class="form-label">最大文件大小 (bytes)</label>
+                                                <input type="number" class="form-control" id="max-file-size">
+                                            </div>
+                                            <button type="submit" class="btn btn-primary">保存设置</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">
+                                        系统配置
+                                    </div>
+                                    <div class="card-body">
+                                        <form id="system-config-form">
+                                            <div class="mb-3">
+                                                <label for="db-host" class="form-label">数据库主机</label>
+                                                <input type="text" class="form-control" id="db-host">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="db-port" class="form-label">数据库端口</label>
+                                                <input type="number" class="form-control" id="db-port">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="db-user" class="form-label">数据库用户名</label>
+                                                <input type="text" class="form-control" id="db-user">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="db-password" class="form-label">数据库密码</label>
+                                                <input type="password" class="form-control" id="db-password">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="db-name" class="form-label">数据库名</label>
+                                                <input type="text" class="form-control" id="db-name">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="redis-host" class="form-label">Redis主机</label>
+                                                <input type="text" class="form-control" id="redis-host">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="redis-port" class="form-label">Redis端口</label>
+                                                <input type="number" class="form-control" id="redis-port">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="redis-password" class="form-label">Redis密码</label>
+                                                <input type="password" class="form-control" id="redis-password">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="base-url" class="form-label">基础URL</label>
+                                                <input type="text" class="form-control" id="base-url">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="server-port" class="form-label">服务端口</label>
+                                                <input type="number" class="form-control" id="server-port">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="encryption-key" class="form-label">加密密钥</label>
+                                                <input type="text" class="form-control" id="encryption-key">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="log-level" class="form-label">日志等级</label>
+                                                <select class="form-select" id="log-level">
+                                                    <option value="DEBUG">DEBUG</option>
+                                                    <option value="INFO">INFO</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="worker-threads" class="form-label">工作线程数</label>
+                                                <input type="number" class="form-control" id="worker-threads">
+                                            </div>
+                                            <button type="submit" class="btn btn-primary">保存配置</button>
+                                        </form>
+                                    </div>
+                                </div>
+                                
+                                <div class="card mt-4">
+                                    <div class="card-header">
+                                        危险操作
+                                    </div>
+                                    <div class="card-body">
+                                        <button class="btn btn-danger" id="clear-all-messages">删除所有聊天记录</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- 用户管理模态框 -->
+    <div class="modal fade" id="userModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="userModalLabel">编辑用户</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="user-edit-form">
+                        <input type="hidden" id="edit-user-id">
+                        <div class="mb-3">
+                            <label for="edit-username" class="form-label">用户名</label>
+                            <input type="text" class="form-control" id="edit-username">
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-nickname" class="form-label">昵称</label>
+                            <input type="text" class="form-control" id="edit-nickname">
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-password" class="form-label">密码 (留空表示不修改)</label>
+                            <input type="password" class="form-control" id="edit-password">
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-status" class="form-label">状态</label>
+                            <select class="form-select" id="edit-status">
+                                <option value="active">正常</option>
+                                <option value="banned">封禁</option>
+                            </select>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="edit-is-admin">
+                            <label class="form-check-label" for="edit-is-admin">
+                                管理员
+                            </label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="save-user-btn">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 聊天室成员模态框 -->
+    <div class="modal fade" id="roomMembersModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">聊天室成员</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>用户名</th>
+                                    <th>昵称</th>
+                                    <th>角色</th>
+                                </tr>
+                            </thead>
+                            <tbody id="room-members-list">
+                                <!-- 动态填充成员数据 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/admin/main.js"></script>
+</body>
+</html>

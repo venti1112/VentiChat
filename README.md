@@ -294,6 +294,80 @@
 3. **Token清理**：定期清理过期的用户认证Token
 4. **其他清理任务**：清理不再需要的系统数据
 
+## API 接口
+
+### 认证相关接口
+
+- `POST /api/auth/register` - 用户注册
+- `POST /api/auth/login` - 用户登录
+- `POST /api/auth/logout` - 用户登出
+- `GET /api/auth/verify` - 验证令牌有效性
+
+### 用户相关接口
+
+- `GET /api/users/profile/:userId` - 获取用户资料
+- `PUT /api/users/profile` - 更新个人资料
+- `GET /api/users/search?keyword=xxx` - 搜索用户
+- `GET /api/users/preferences` - 获取用户偏好设置
+- `PUT /api/users/preferences` - 更新用户偏好设置
+- `POST /api/users/upload-background` - 上传聊天背景图
+- `POST /api/users/reset-background` - 重置聊天背景图
+
+### 聊天室相关接口
+
+- `GET /api/rooms` - 获取用户加入的聊天室列表
+- `POST /api/rooms` - 创建聊天室
+- `POST /api/rooms/private` - 创建私聊
+- `GET /api/rooms/search?keyword=xxx` - 搜索公开聊天室
+- `GET /api/rooms/:id` - 获取聊天室信息
+- `GET /api/rooms/:roomId/members` - 获取聊天室成员列表
+- `DELETE /api/rooms/:roomId/members/:userId` - 踢出聊天室成员
+- `POST /api/rooms/:id/join-request` - 发送加入聊天室请求
+- `GET /api/rooms/:id/pending-requests` - 获取待处理的加入请求
+- `POST /api/rooms/:id/approve-join-request` - 批准/拒绝加入请求
+- `PUT /api/rooms/:id/settings` - 更新聊天室设置
+- `PUT /api/rooms/:roomId/members/:userId/role` - 设置成员角色
+
+### 消息相关接口
+
+- `GET /api/messages/:roomId` - 获取聊天室消息
+- `GET /api/messages/history/:roomId` - 获取聊天室历史消息
+- `POST /api/messages` - 发送消息
+- `PUT /api/messages/:messageId/retract` - 撤回消息
+
+### 文件上传相关接口
+
+- `POST /api/messages/image` - 上传图片
+- `POST /api/messages/video` - 上传视频
+- `POST /api/messages/file` - 上传文件
+- `POST /api/messages/chunked/initiate` - 初始化分块上传
+- `POST /api/messages/chunked/upload` - 上传文件块
+- `POST /api/messages/chunked/complete` - 完成分块上传
+
+### 管理员接口
+
+需要管理员权限才能访问以下接口:
+
+- `GET /api/admin/users` - 获取所有用户列表
+- `POST /api/admin/users` - 创建用户
+- `PUT /api/admin/users/:userId` - 更新用户信息
+- `DELETE /api/admin/users/:userId` - 删除用户
+- `PUT /api/admin/users/:userId/status` - 更新用户状态
+- `GET /api/admin/rooms` - 获取所有聊天室列表
+- `GET /api/admin/rooms/:id` - 获取聊天室详情
+- `GET /api/admin/rooms/:id/members` - 获取聊天室成员列表
+- `DELETE /api/admin/rooms/:id` - 删除聊天室
+- `GET /api/admin/config` - 获取系统配置
+- `PUT /api/admin/config` - 更新系统配置
+
+### 自定义配置
+
+配置文件位于 [config/config.json](file:///C:/Users/Venti/Documents/Project/VentiChat/config/config.json)，可以修改以下参数：
+- 数据库连接信息
+- 服务器端口
+- 加密密钥
+- 基础 URL
+
 ## 开发指南
 
 ### 添加新功能

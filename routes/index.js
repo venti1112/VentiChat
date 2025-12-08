@@ -179,22 +179,42 @@ router.get('/userdata/:type/:filename', authMiddleware, async (req, res) => {
 const adminController = require('../controllers/adminController');
 const adminMiddleware = require('../middleware/authMiddleware').adminMiddleware;
 // 获取所有用户列表 - 管理员查看系统中所有用户的信息
-router.get('/admin/users', adminMiddleware, adminController.getUsers);
+router.get('/admin/users', authMiddleware, adminMiddleware, adminController.getUsers);
 // 创建用户 - 管理员手动创建新用户
-router.post('/admin/users', adminMiddleware, adminController.createUser);
+router.post('/admin/users', authMiddleware, adminMiddleware, adminController.createUser);
 // 更新用户信息 - 管理员修改指定用户的信息
-router.put('/admin/users/:userId', adminMiddleware, adminController.updateUser);
+router.put('/admin/users/:userId', authMiddleware, adminMiddleware, adminController.updateUser);
 // 删除用户 - 管理员删除指定用户
-router.delete('/admin/users/:userId', adminMiddleware, adminController.deleteUser);
+router.delete('/admin/users/:userId', authMiddleware, adminMiddleware, adminController.deleteUser);
 // 更新用户状态 - 管理员更改用户账户状态（如启用/禁用）
-router.put('/admin/users/:userId/status', adminMiddleware, adminController.updateUserStatus);
+router.put('/admin/users/:userId/status', authMiddleware, adminMiddleware, adminController.updateUserStatus);
 // 获取所有聊天室列表 - 管理员查看系统中所有聊天室的信息
-router.get('/admin/rooms', adminMiddleware, adminController.getRooms);
+router.get('/admin/rooms', authMiddleware, adminMiddleware, adminController.getRooms);
 // 获取聊天室详情 - 管理员查看指定聊天室的详细信息
-router.get('/admin/rooms/:id', adminMiddleware, adminController.getRoom);
-// 获取聊天室成员列表 - 管理员查看指定聊天室的所有成员信息
-router.get('/admin/rooms/:id/members', adminMiddleware, adminController.getRoomMembers);
+router.get('/admin/rooms/:id', authMiddleware, adminMiddleware, adminController.getRoom);
 // 删除聊天室 - 管理员删除指定聊天室
-router.delete('/admin/rooms/:id', adminMiddleware, adminController.deleteRoom);
+router.delete('/admin/rooms/:id', authMiddleware, adminMiddleware, adminController.deleteRoom);
+
+// 配置管理路由
+const configController = require('../controllers/configController');
+// 获取系统配置 - 管理员获取当前的系统设置
+router.get('/admin/config', authMiddleware, adminMiddleware, configController.getConfig);
+// 更新系统配置 - 管理员修改系统设置
+router.put('/admin/config', authMiddleware, adminMiddleware, configController.updateConfig);
+
+// 系统设置路由
+const systemSettingController = require('../controllers/systemSettingController');
+// 获取系统设置
+router.get('/system/settings', systemSettingController.getSettings);
+// 更新系统设置
+router.put('/system/settings', authMiddleware, adminMiddleware, systemSettingController.updateSettings);
+
+// 清除所有消息记录
+router.post('/admin/messages/clear', authMiddleware, adminMiddleware, systemSettingController.clearAllMessages);
+
+// 系统信息路由
+const systemInfoController = require('../controllers/systemInfoController');
+// 获取系统信息
+router.get('/system/info', systemInfoController.getSystemInfo);
 
 module.exports = router;

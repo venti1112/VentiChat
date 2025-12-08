@@ -70,7 +70,10 @@ module.exports = (sequelize) => {
     });
 
     User.associate = function(models) {
-        // 根据新要求，移除所有外键关联
+        User.hasMany(models.RoomMember, {
+            foreignKey: 'userId',
+            as: 'RoomMembers'
+        });
     };
 
     return User;

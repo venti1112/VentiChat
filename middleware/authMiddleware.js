@@ -108,7 +108,7 @@ exports.authMiddleware = async (req, res, next) => {
 };
 
 // 管理员中间件
-exports.adminMiddleware = (req, res, next) => {
+exports.adminMiddleware = async (req, res, next) => {
     // 检查用户是否已通过认证
     if (!req.user) {
         const clientIP = getClientIP(req);
@@ -118,18 +118,30 @@ exports.adminMiddleware = (req, res, next) => {
         });
     }
     
-    // 检查用户是否为管理员
-    if (!req.user.isAdmin) {
-        // 获取客户端IP
-        const clientIP = getClientIP(req);
+    try {
+        // 重新从数据库获取用户信息，确保是最新的
+        const user = await models.User.findByPk(req.user.userId || req.user.id);
         
-        // 记录未授权的管理员访问尝试
-        logUnauthorizedAccess(clientIP, req.user.username, req.method, req.path, 403, '需要管理员权限');
+        // 检查用户是否为管理员
+        if (!user.isAdmin) {
+            // 获取客户端IP
+            const clientIP = getClientIP(req);
+            
+            // 记录未授权的管理员访问尝试
+            logUnauthorizedAccess(clientIP, user ? user.username : '未知用户', req.method, req.path, 403, '需要管理员权限');
+            
+            return res.status(403).json({ 
+                message: '需要管理员权限'
+            });
+        }
         
-        return res.status(403).json({ 
-            message: '需要管理员权限'
+        // 更新req.user为最新的用户信息
+        req.user = user;
+        next();
+    } catch (error) {
+        log('ERROR', `管理员中间件错误: ${error.message}`);
+        return res.status(500).json({ 
+            message: '服务器内部错误'
         });
     }
-    
-    next();
 };

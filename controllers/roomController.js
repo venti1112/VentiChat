@@ -298,6 +298,86 @@ exports.getRoomMembers = async (req, res) => {
             return res.status(400).json({ error: '无效的聊天室ID' });
         }
         
+        // 检查用户是否是该房间的成员或者管理员
+        const membership = await models.RoomMember.findOne({
+            where: {
+                userId: req.user.userId,
+                roomId: roomId
+            }
+        });
+        
+        // 如果不是成员，检查是否是管理员
+        let isAdmin = false;
+        if (!membership) {
+            const user = await models.User.findByPk(req.user.userId);
+            isAdmin = user.isAdmin;
+        }
+        
+        // 如果既不是成员也不是管理员，则拒绝访问
+        if (!membership && !isAdmin) {
+            return res.status(403).json({ error: '您不是该聊天室的成员' });
+        }
+        
+        // 获取房间信息以获取创建者ID
+        const room = await models.Room.findByPk(roomId);
+        if (!room) {
+            return res.status(404).json({ error: '聊天室不存在' });
+        }
+        
+        // 获取房间成员
+        const roomMembers = await models.RoomMember.findAll({
+            where: { roomId: roomId }
+        });
+        
+        // 获取涉及的用户ID列表
+        const userIds = roomMembers.map(rm => rm.userId);
+        
+        // 获取用户信息
+        const users = await models.User.findAll({
+            where: {
+                userId: {
+                    [Op.in]: userIds
+                }
+            },
+            attributes: ['userId', 'username', 'nickname', 'avatarUrl']
+        });
+        
+        // 创建用户信息映射
+        const userMap = {};
+        users.forEach(user => {
+            userMap[user.userId] = user;
+        });
+        
+        // 格式化成员信息
+        const members = roomMembers.map(rm => {
+            const user = userMap[rm.userId];
+            return {
+                uid: user.userId,
+                username: user.username,
+                nickname: user.nickname,
+                avatarUrl: user.avatarUrl || '/default-avatar.png',
+                isCreator: user.userId === room.creatorId,
+                isModerator: rm.isModerator
+            };
+        });
+        
+        res.json(members);
+    } catch (error) {
+        log('ERROR', `获取房间成员列表失败: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 获取聊天室成员ID列表（公开接口）
+exports.getRoomMemberIds = async (req, res) => {
+    try {
+        const { roomId } = req.params;
+        
+        // 验证roomId参数
+        if (!roomId || roomId === 'undefined' || String(roomId).trim() === '' || String(roomId).trim() === 'undefined') {
+            return res.status(400).json({ error: '无效的聊天室ID' });
+        }
+        
         // 检查用户是否是该房间的成员
         const membership = await models.RoomMember.findOne({
             where: {

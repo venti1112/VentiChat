@@ -37,7 +37,10 @@ module.exports = (sequelize) => {
     });
 
     RoomMember.associate = function(models) {
-        // 根据新要求，移除所有外键关联
+        RoomMember.belongsTo(models.User, {
+            foreignKey: 'userId',
+            as: 'User'
+        });
     };
 
     return RoomMember;
