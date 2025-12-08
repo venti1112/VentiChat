@@ -127,7 +127,7 @@ exports.sendMessage = async (req, res) => {
         // 广播消息到房间
         io.to(`room_${roomId}`).emit('newMessage', messageWithSender);
         
-        // 向房间内所有用户（除了发送者）发送消息（支持集群部署）
+        // 向房间内所有用户（除了发送者）发送消息
         const roomMembers = await RoomMember.findAll({
             where: {
                 roomId: roomId

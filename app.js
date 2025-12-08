@@ -21,6 +21,9 @@ if (cluster.isWorker) {
             const io = app.get('io');
             const WebSocketManager = require('./utils/websocketManager');
             WebSocketManager.emitToSocket(msg.socketId, msg.event, msg.data, io);
+        } else if (msg.type === 'assignId') {
+            // 不再使用assignId消息设置ID，而是直接从端口号推导
+            log(LOG_LEVELS.DEBUG, `忽略assignId消息，将从端口号推导ID`);
         }
     });
 }
@@ -164,10 +167,13 @@ app.use((req, res, next) => {
     
     // 在工作进程启动后进行日志输出
     server.on('listening', () => {
-        const cluster = require('cluster');
-        const { processIds } = require('./utils/logger');
-        const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
+        // 直接从端口号计算工作进程ID
         const port = process.env.WORKER_PORT || config.port;
+        const workerId = parseInt(port) - parseInt(config.port);
+        
+        // 设置进程ID映射
+        processIds.set(process.pid, workerId);
+        
         log(LOG_LEVELS.INFO, `工作进程 ${workerId} 已监听端口 ${parseInt(port)}`);
     });
     

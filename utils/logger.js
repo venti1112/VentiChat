@@ -330,11 +330,6 @@ if (cluster.isMaster || cluster.isPrimary) {
     processIds.set(process.pid, process.pid);
 }
 
-// 监听工作进程退出事件
-cluster.on('exit', (worker) => {
-    processIds.delete(worker.process.pid);
-    // 重用ID不是必须的，让ID持续增长更简单且避免冲突
-});
 
 module.exports = {
     log,

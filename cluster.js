@@ -59,7 +59,9 @@ function shutdownServer() {
 
         // 获取下一个工作进程ID的函数
         function getNextWorkerId() {
-            return nextWorkerId++;
+            // 简单地返回当前最大ID+1
+            const ids = Object.keys(workers).map(Number);
+            return ids.length > 0 ? Math.max(...ids) + 1 : 1;
         }
 
         // 初始化进程编号
@@ -68,24 +70,19 @@ function shutdownServer() {
             
             log(LOG_LEVELS.INFO, `主进程准备就绪，将创建 ${numCPUs} 个工作进程`);
             
-            // 衍生工作进程，并立即分配内部编号
-            for (let i = 0; i < numCPUs; i++) {
+            // 衍生工作进程，使用固定的ID分配策略
+            for (let i = 1; i <= numCPUs; i++) {
                 const worker = cluster.fork({
-                    WORKER_PORT: (parseInt(config.port) + i + 1).toString()  // 每个工作进程使用独立端口，确保是字符串类型
+                    WORKER_PORT: (parseInt(config.port) + i).toString()
                 });
-                // 立即为工作进程分配内部编号
-                const workerId = getNextWorkerId();
-                workers[workerId] = worker;
-                processIds.set(worker.process.pid, workerId);
-                
-                // 向工作进程发送其ID
-                worker.send({ type: 'assignId', workerId: workerId });
+                workers[i] = worker;
+                processIds.set(worker.process.pid, i);
                 
                 // 监听工作进程的消息，检查是否有错误报告
                 worker.on('message', (msg) => {
                     if (msg.type === 'workerError') {
-                        log(LOG_LEVELS.ERROR, `工作进程 ${workerId} 报告严重错误: ${msg.error}`);
-                        workerErrors[workerId] = true;
+                        log(LOG_LEVELS.ERROR, `工作进程 ${i} 报告严重错误: ${msg.error}`);
+                        workerErrors[i] = true;
                         
                         // 如果是启动过程中的致命错误，关闭整个服务器
                         if (msg.fatal) {
@@ -130,33 +127,52 @@ function shutdownServer() {
             });
             
             cluster.on('exit', (worker, code, signal) => {
-                const workerId = processIds.get(worker.process.pid);
+                // 查找退出的工作进程ID
+                let workerId = null;
+                for (const [id, w] of Object.entries(workers)) {
+                    if (w.process.pid === worker.process.pid) {
+                        workerId = parseInt(id);
+                        break;
+                    }
+                }
+                
+                // 从workers映射中删除已退出的进程
+                if (workerId !== null) {
+                    delete workers[workerId];
+                }
                 
                 // 检查是否是因为严重错误退出
-                if (workerErrors[workerId]) {
+                if (workerId !== null && workerErrors[workerId]) {
                     log(LOG_LEVELS.ERROR, `工作进程 ${workerId} 因严重错误退出 (代码: ${code}, 信号: ${signal})`);
                     log(LOG_LEVELS.ERROR, '由于工作进程严重错误，正在关闭服务器...');
                     shutdownServer();
                     return;
                 }
                 
-                log(LOG_LEVELS.INFO, `工作进程 ${workerId} 已退出 (代码: ${code}, 信号: ${signal})`);
+                log(LOG_LEVELS.INFO, `工作进程 ${workerId !== null ? workerId : 'unknown'} 已退出 (代码: ${code}, 信号: ${signal})`);
                 log(LOG_LEVELS.INFO, '正在启动新的工作进程...');
-                const newWorker = cluster.fork({
-                    WORKER_PORT: (parseInt(config.port) + Object.keys(workers).length + 1).toString()
-                });
-                const newWorkerId = getNextWorkerId();
-                workers[newWorkerId] = newWorker;
-                processIds.set(newWorker.process.pid, newWorkerId);
                 
-                // 向新工作进程发送其ID
-                newWorker.send({ type: 'assignId', workerId: newWorkerId });
+                // 先清理旧的进程ID映射
+                processIds.delete(worker.process.pid);
+                
+                // 使用相同的ID创建工作进程
+                const newWorker = cluster.fork({
+                    WORKER_PORT: (parseInt(config.port) + workerId).toString()
+                });
+                
+                // 使用相同的ID为新工作进程分配编号
+                if (workerId !== null) {
+                    workers[workerId] = newWorker;
+                    processIds.set(newWorker.process.pid, workerId);
+                }
                 
                 // 监听新工作进程的错误消息
                 newWorker.on('message', (msg) => {
                     if (msg.type === 'workerError') {
-                        log(LOG_LEVELS.ERROR, `工作进程 ${newWorkerId} 报告严重错误: ${msg.error}`);
-                        workerErrors[newWorkerId] = true;
+                        log(LOG_LEVELS.ERROR, `工作进程 ${workerId} 报告严重错误: ${msg.error}`);
+                        if (workerId !== null) {
+                            workerErrors[workerId] = true;
+                        }
                         
                         // 如果是启动过程中的致命错误，关闭整个服务器
                         if (msg.fatal) {
@@ -165,51 +181,16 @@ function shutdownServer() {
                         }
                     }
                 });
+                
+                // 当新工作进程开始时，重新建立消息监听
+                newWorker.on('online', () => {
+                    log(LOG_LEVELS.INFO, `新工作进程 ${workerId !== null ? workerId : 'unknown'} 已上线`);
+                });
             });
         } else {
             // 工作进程代码
-            process.on('message', (msg) => {
-                if (msg.type === 'assignId') {
-                    // 设置工作进程ID
-                    processIds.set(process.pid, msg.workerId);
-                    log(LOG_LEVELS.INFO, `工作进程ID已分配: ${msg.workerId}`);
-                }
-            });
-            
-            // 捕获未处理的错误并报告给主进程
-            process.on('uncaughtException', (error) => {
-                process.send({ 
-                    type: 'workerError', 
-                    error: error.message,
-                    fatal: true
-                });
-                log(LOG_LEVELS.ERROR, `工作进程发生未捕获异常: ${error.message}\n${error.stack}`);
-                process.exit(1);
-            });
-            
-            process.on('unhandledRejection', (reason, promise) => {
-                process.send({ 
-                    type: 'workerError', 
-                    error: reason.message || reason,
-                    fatal: true
-                });
-                log(LOG_LEVELS.ERROR, `工作进程发生未处理的Promise拒绝: ${reason}\n${reason instanceof Error ? reason.stack : ''}`);
-                process.exit(1);
-            });
-            
-            // 启动应用
-            try {
-                require('./app.js');
-            } catch (error) {
-                // 发送错误信息给主进程
-                process.send({ 
-                    type: 'workerError', 
-                    error: error.message,
-                    fatal: true
-                });
-                log(LOG_LEVELS.ERROR, `工作进程启动失败: ${error.message}\n${error.stack}`);
-                process.exit(1);
-            }
+            require('./app.js');
+            // 工作进程的日志由 app.js 内部处理
         }
     } catch (error) {
         log(LOG_LEVELS.ERROR, `启动过程中发生错误: ${error}\n${error.stack}`);
