@@ -133,10 +133,31 @@ function colorizeConsoleMessage(message) {
 function formatMessage(level, message) {
     const timestamp = getTimestamp();
     const levelName = getLevelName(level);
-    const processType = cluster.isMaster || cluster.isPrimary ? '主进程' : '工作进程';
     const processInternalId = processIds.has(process.pid) ? processIds.get(process.pid) : process.pid;
     
-    return `[${timestamp}] [${levelName}] [${processType}:${processInternalId}] ${message}`;
+    // 确定进程类型
+    let processType = '未知进程';
+    if (cluster.isMaster || cluster.isPrimary) {
+        // 特殊处理代理进程 - 通过进程标题判断
+        if (process.title && process.title.includes('proxy')) {
+            processType = '代理进程';
+        } else {
+            processType = '主进程';
+        }
+    } else if (cluster.isWorker) {
+        processType = '工作进程';
+    } else if (processIds.has(process.pid)) {
+        processType = '工作进程'; // 通过ID判断为工作进程
+    }
+    
+    // 对于主进程，不显示ID；对于代理进程，显示特殊标识；对于工作进程，显示其ID
+    if (processType === '主进程') {
+        return `[${timestamp}] [${levelName}] [${processType}] ${message}`;
+    } else if (processType === '代理进程') {
+        return `[${timestamp}] [${levelName}] [${processType}] ${message}`;
+    } else {
+        return `[${timestamp}] [${levelName}] [${processType}:${processInternalId}] ${message}`;
+    }
 }
 
 /**

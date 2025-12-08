@@ -97,7 +97,9 @@ function shutdownServer() {
             }
             
             // 启动负载均衡代理进程
-            const proxyProcess = spawn('node', ['proxy.js'], { stdio: 'inherit' });
+            const proxyProcess = spawn('node', ['proxy.js'], { 
+                stdio: 'inherit'
+            });
             
             proxyProcess.on('error', (err) => {
                 log(LOG_LEVELS.ERROR, `代理进程启动失败: ${err}`);
@@ -167,8 +169,6 @@ function shutdownServer() {
         } else {
             // 工作进程代码
             process.on('message', (msg) => {
-                log(LOG_LEVELS.DEBUG, `工作进程 ${process.pid} 收到主进程消息: ${JSON.stringify(msg)}`);
-                
                 if (msg.type === 'assignId') {
                     // 设置工作进程ID
                     processIds.set(process.pid, msg.workerId);

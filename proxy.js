@@ -4,6 +4,9 @@ const config = require('./config/config.json');
 const { log, LOG_LEVELS } = require('./utils/logger');
 const http = require('http');
 
+// 设置进程标题以标识代理进程
+process.title = 'ventichat-proxy';
+
 // 获取工作进程数量
 const numCPUs = config.workerCount && config.workerCount > 0 ? config.workerCount : require('os').cpus().length;
 
@@ -67,5 +70,5 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 server.listen(parseInt(config.port), () => {
-    log(LOG_LEVELS.INFO, `服务器已监听端口 ${config.port}`);
+    log(LOG_LEVELS.INFO, `代理服务已监听端口 ${config.port}`);
 });
