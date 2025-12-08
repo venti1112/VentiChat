@@ -10,7 +10,7 @@ const jwt = require('jsonwebtoken');
 const cluster = require('cluster');
 const config = require('./config/config.json');
 const redisClient = require('./utils/redisClient');
-const { log, logHttpError, logDatabaseQuery, logDatabaseRetry, logBrowserDevToolsWarning, LOG_LEVELS, logServerShutdown, processIds } = require('./utils/logger');
+const { log, logHttpError, logDatabaseQuery, logDatabaseRetry, logBrowserDevToolsWarning, LOG_LEVELS, processIds } = require('./utils/logger');
 
 // 处理来自主进程的转发消息
 if (cluster.isWorker) {
@@ -391,16 +391,6 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
     log(LOG_LEVELS.ERROR, `未处理的Promise拒绝: ${reason}\n${reason instanceof Error ? reason.stack : ''}`);
     process.exit(1);
-});
-
-process.on('SIGINT', () => {
-    logServerShutdown();
-    process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-    logServerShutdown();
-    process.exit(0);
 });
 
 // 启动服务器函数

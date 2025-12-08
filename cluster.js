@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const { spawn } = require('child_process');
 const configPath = path.join(__dirname, 'config', 'config.json');
-const { log, LOG_LEVELS, logServerShutdown, processIds } = require('./utils/logger');
+const { log, LOG_LEVELS, processIds } = require('./utils/logger');
 
 // 检查配置文件是否存在，如果不存在则运行初始化脚本
 async function checkAndInitialize() {
@@ -138,13 +138,3 @@ async function checkAndInitialize() {
         process.exit(1);
     }
 })();
-
-process.on('SIGINT', () => {
-    logServerShutdown();
-    process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-    logServerShutdown();
-    process.exit(0);
-});

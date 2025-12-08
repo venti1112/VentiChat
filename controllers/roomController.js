@@ -512,9 +512,13 @@ exports.updateRoomSettings = async (req, res) => {
         const { id } = req.params;
         const { name, requireApproval, allowImages, allowVideos, allowFiles, allowAudio } = req.body;
         
-        // 检查权限：必须是室主（已在中间件中验证）
+        // 检查权限：必须是室主
         const room = await models.Room.findByPk(id);
         if (!room) return res.status(404).json({ error: '聊天室不存在' });
+        
+        if (room.creatorId !== req.user.userId) {
+            return res.status(403).json({ error: '只有室主可以修改设置' });
+        }
         
         // 更新设置
         await room.update({

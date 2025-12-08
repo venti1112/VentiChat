@@ -296,14 +296,6 @@ function logBrowserDevToolsWarning(ip, username) {
     log(LOG_LEVELS.DEBUG, `浏览器开发者工具探测 - IP: ${ip}, 用户: ${username}`);
 }
 
-/**
- * 记录服务器正常退出
- */
-function logServerShutdown() {
-    const processType = cluster.isMaster || cluster.isPrimary ? '主进程' : '工作进程';
-    const processInternalId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
-    log(LOG_LEVELS.INFO, `${processType} ${processInternalId} 正常退出`);
-}
 
 // 在进程启动时分配ID - 使用 cluster.worker.id 作为工作进程ID
 if (cluster.isMaster || cluster.isPrimary) {
@@ -334,7 +326,6 @@ module.exports = {
     logDatabaseQuery,
     logDatabaseRetry,
     logBrowserDevToolsWarning,
-    logServerShutdown,
     LOG_LEVELS,
-    processIds // 导出processIds以便其他模块可以使用
+    processIds
 };
