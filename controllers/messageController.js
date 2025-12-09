@@ -35,18 +35,6 @@ exports.sendMessage = async (req, res) => {
         const { content, type, fileUrl } = req.body;
         const { roomId } = req.params;
         
-        // 检查用户是否在聊天室中
-        const roomMember = await RoomMember.findOne({
-            where: { 
-                userId: req.user.userId, 
-                roomId 
-            }
-        });
-        
-        if (!roomMember) {
-            return res.status(403).json({ error: '您不是该聊天室的成员' });
-        }
-        
         // 验证消息类型
         if (!['text', 'image', 'video', 'file', 'audio'].includes(type)) {
             return res.status(400).json({ error: '无效的消息类型' });
@@ -220,15 +208,6 @@ exports.getRoomUnreadCount = async (req, res) => {
     try {
         const { id } = req.params;
         
-        // 检查用户是否在聊天室中
-        const roomMember = await RoomMember.findOne({
-            where: { userId: req.user.userId, roomId: id }
-        });
-        
-        if (!roomMember) {
-            return res.status(403).json({ error: '您不是该聊天室的成员' });
-        }
-        
         // 获取聊天室最后一条消息
         const lastMessage = await Message.findOne({
             where: { roomId: id },
@@ -252,16 +231,7 @@ exports.markAsRead = async (req, res) => {
     try {
         const { roomId } = req.body;
         const userId = req.user.userId;
-        
-        // 检查用户是否在聊天室中
-        const roomMember = await RoomMember.findOne({
-            where: { userId, roomId }
-        });
-        
-        if (!roomMember) {
-            return res.status(403).json({ error: '您不是该聊天室的成员' });
-        }
-        
+
         // 获取聊天室最新消息ID
         const latestMessage = await Message.findOne({
             where: { roomId },
@@ -306,19 +276,7 @@ exports.getMessageHistory = async (req, res) => {
     try {
         const { roomId } = req.params;
         const { limit = 50, beforeId } = req.query;
-        
-        // 检查用户是否是聊天室成员
-        const roomMember = await RoomMember.findOne({
-            where: {
-                userId: req.user.userId,
-                roomId
-            }
-        });
-        
-        if (!roomMember) {
-            return res.status(403).json({ error: '您不是该聊天室的成员' });
-        }
-        
+
         // 构建查询条件
         const whereClause = { roomId };
         if (beforeId) {
@@ -372,18 +330,6 @@ exports.getRoomMessages = async (req, res) => {
     try {
         const { roomId } = req.params;
         const { before } = req.query; // 可选的分页参数
-        
-        // 检查用户是否是聊天室成员
-        const roomMember = await RoomMember.findOne({
-            where: {
-                userId: req.user.userId,
-                roomId
-            }
-        });
-        
-        if (!roomMember) {
-            return res.status(403).json({ error: '您不是该聊天室的成员' });
-        }
         
         // 构建查询条件
         const whereClause = { roomId };

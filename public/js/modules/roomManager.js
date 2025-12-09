@@ -373,9 +373,22 @@ export async function handleJoinRequest(roomId, userId, action) {
     }
 
     try {
-        const response = await fetch(`/api/rooms/${roomId}/join/${userId}`, {
-            credentials: 'same-origin'
-        });
+        let response;
+        if (action === 'approve') {
+            // 批准加入请求
+            response = await fetch(`/api/rooms/${roomId}/join/${userId}`, {
+                credentials: 'same-origin'
+            });
+        } else {
+            // 拒绝加入请求
+            response = await fetch(`/api/rooms/${roomId}/join-request/${userId}`, {
+                method: 'DELETE',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+        }
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));

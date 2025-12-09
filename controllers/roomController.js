@@ -518,6 +518,41 @@ exports.addMember = async (req, res) => {
     }
 };
 
+// 拒绝用户加入聊天室的请求
+exports.rejectJoinRequest = async (req, res) => {
+    try {
+        // 修复参数名称不一致的问题
+        const { roomId, userId } = req.params;
+        
+        // 查找聊天室
+        const room = await models.Room.findByPk(roomId);
+        if (!room) {
+            return res.status(404).json({ error: '聊天室不存在' });
+        }
+        
+        // 查找加入请求
+        const joinRequest = await models.JoinRequest.findOne({
+            where: { 
+                userId: userId, 
+                roomId: roomId, 
+                status: 'pending' 
+            }
+        });
+        
+        if (!joinRequest) {
+            return res.status(404).json({ error: '未找到待处理的加入请求' });
+        }
+        
+        // 将加入请求标记为已拒绝
+        await joinRequest.update({ status: 'rejected' });
+        
+        res.json({ success: true, message: '已拒绝用户的加入请求' });
+    } catch (error) {
+        log('ERROR', `拒绝用户加入请求失败: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+};
+
 // 获取待处理的加入请求
 exports.getPendingRequests = async (req, res) => {
     try {

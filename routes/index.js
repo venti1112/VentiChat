@@ -63,6 +63,8 @@ router.get('/rooms/:roomId/join', authMiddleware, roomController.sendJoinRequest
 router.get('/rooms/:roomId/pending-requests', authMiddleware, roomMemberMiddleware, roomController.getPendingRequests);
 // 拉入聊天室
 router.get('/rooms/:roomId/join/:userId', authMiddleware, roomAdminMiddleware, roomController.addMember);
+// 拒绝用户加入聊天室的请求
+router.delete('/rooms/:roomId/join-request/:userId', authMiddleware, roomAdminMiddleware, roomController.rejectJoinRequest);
 // 更新聊天室设置
 router.put('/rooms/:roomId/settings', authMiddleware, roomAdminMiddleware, roomController.updateRoomSettings);
 // 设置聊天室成员角色
@@ -75,11 +77,11 @@ router.delete('/rooms/:roomId', authMiddleware, roomCreatorMiddleware, roomContr
 // 消息相关路由
 const messageController = require('../controllers/messageController');
 // 获取聊天室消息历史记录 
-router.get('/messages/:roomId/history', authMiddleware, messageController.getMessageHistory);
+router.get('/messages/:roomId/history', authMiddleware, roomMemberMiddleware, messageController.getMessageHistory);
 // 获取聊天室消息
-router.get('/messages/:roomId', authMiddleware, messageController.getRoomMessages);
+router.get('/messages/:roomId', authMiddleware, roomMemberMiddleware, messageController.getRoomMessages);
 // 发送消息
-router.post('/messages/:roomId/send', authMiddleware, messageRateLimiter, messageController.sendMessage);
+router.post('/messages/:roomId/send', authMiddleware, messageRateLimiter, roomMemberMiddleware, messageController.sendMessage);
 // 撤回消息
 router.delete('/messages/:messageId', authMiddleware, messageController.recallMessage);
 
