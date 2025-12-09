@@ -300,49 +300,50 @@
 
 - `POST /api/auth/register` - 用户注册
 - `POST /api/auth/login` - 用户登录
-- `POST /api/auth/logout` - 用户登出
+- `POST /api/auth/check-username` - 检查用户名是否存在
+- `GET /api/auth/logout` - 用户登出
 - `GET /api/auth/verify` - 验证令牌有效性
 
 ### 用户相关接口
 
 - `GET /api/users/profile/:userId` - 获取用户资料
 - `PUT /api/users/profile` - 更新个人资料
-- `GET /api/users/search?keyword=xxx` - 搜索用户
+- `PUT /api/users/password` - 修改用户密码
 - `GET /api/users/preferences` - 获取用户偏好设置
 - `PUT /api/users/preferences` - 更新用户偏好设置
-- `POST /api/users/upload-background` - 上传聊天背景图
-- `POST /api/users/reset-background` - 重置聊天背景图
+- `GET /api/users/reset-background` - 重置聊天背景图
 
 ### 聊天室相关接口
 
 - `GET /api/rooms` - 获取用户加入的聊天室列表
 - `POST /api/rooms` - 创建聊天室
 - `POST /api/rooms/private` - 创建私聊
-- `GET /api/rooms/search?keyword=xxx` - 搜索公开聊天室
-- `GET /api/rooms/:id` - 获取聊天室信息
+- `GET /api/search` - 搜索公开聊天室和用户
+- `GET /api/rooms/:roomId` - 获取聊天室信息
 - `GET /api/rooms/:roomId/members` - 获取聊天室成员列表
-- `DELETE /api/rooms/:roomId/members/:userId` - 踢出聊天室成员
-- `POST /api/rooms/:id/join-request` - 发送加入聊天室请求
-- `GET /api/rooms/:id/pending-requests` - 获取待处理的加入请求
-- `POST /api/rooms/:id/approve-join-request` - 批准/拒绝加入请求
-- `PUT /api/rooms/:id/settings` - 更新聊天室设置
+- `GET /api/rooms/:roomId/join` - 发送加入聊天室请求
+- `GET /api/rooms/:roomId/join/:userId` - 拉用户进入聊天室
+- `GET /api/rooms/:roomId/pending-requests` - 获取待处理的加入请求
+- `DELETE /api/rooms/:roomId/join-request/:userId` - 拒绝用户加入聊天室的请求
+- `PUT /api/rooms/:roomId/settings` - 更新聊天室设置
 - `PUT /api/rooms/:roomId/members/:userId/role` - 设置成员角色
+- `DELETE /api/rooms/:roomId/:userId` - 踢出聊天室成员
+- `DELETE /api/rooms/:roomId` - 解散聊天室
 
 ### 消息相关接口
 
 - `GET /api/messages/:roomId` - 获取聊天室消息
-- `GET /api/messages/history/:roomId` - 获取聊天室历史消息
-- `POST /api/messages` - 发送消息
-- `PUT /api/messages/:messageId/retract` - 撤回消息
+- `GET /api/messages/:roomId/history` - 获取聊天室历史消息
+- `POST /api/messages/:roomId/send` - 发送消息
+- `DELETE /api/messages/:messageId` - 撤回消息
 
 ### 文件上传相关接口
 
-- `POST /api/messages/image` - 上传图片
-- `POST /api/messages/video` - 上传视频
-- `POST /api/messages/file` - 上传文件
-- `POST /api/messages/chunked/initiate` - 初始化分块上传
-- `POST /api/messages/chunked/upload` - 上传文件块
-- `POST /api/messages/chunked/complete` - 完成分块上传
+- `POST /api/upload/initiate` - 初始化分块上传
+- `POST /api/upload/chunk` - 上传文件块
+- `POST /api/upload/complete` - 完成分块上传
+- `POST /api/upload/cleanup` - 清理分块上传
+- `GET /api/userdata/:type/:filename` - 访问用户文件
 
 ### 管理员接口
 
@@ -354,11 +355,16 @@
 - `DELETE /api/admin/users/:userId` - 删除用户
 - `PUT /api/admin/users/:userId/status` - 更新用户状态
 - `GET /api/admin/rooms` - 获取所有聊天室列表
-- `GET /api/admin/rooms/:id` - 获取聊天室详情
-- `GET /api/admin/rooms/:id/members` - 获取聊天室成员列表
 - `DELETE /api/admin/rooms/:id` - 删除聊天室
+- `GET /api/admin/rooms/statistics` - 获取聊天室统计信息
 - `GET /api/admin/config` - 获取系统配置
 - `PUT /api/admin/config` - 更新系统配置
+- `GET /api/system/settings` - 获取系统设置
+- `PUT /api/system/settings` - 更新系统设置
+- `POST /api/admin/messages/clear` - 清除所有消息记录
+- `GET /api/system/info` - 获取系统信息
+- `GET /api/system/metrics` - 获取实时系统指标（CPU、内存、磁盘等）
+- `GET /api/system/metrics/history` - 获取历史系统指标数据
 
 ### 自定义配置
 
@@ -384,11 +390,3 @@
 - 服务器端口
 - 加密密钥
 - 基础 URL
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request 来改进这个项目。
-
-## 许可证
-
-本项目采用 AGPL-3.0 许可证发布。详情请参见 [LICENSE](LICENSE) 文件。
