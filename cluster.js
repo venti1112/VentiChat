@@ -3,7 +3,19 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs').promises;
 const { spawn } = require('child_process');
+const si = require('systeminformation'); // 添加systeminformation库
 const configPath = path.join(__dirname, 'config', 'config.json');
+
+
+let systemMonitorInterval = null;
+let systemMetrics = {
+    cpu: 0,
+    memory: 0,
+    network: { received: 0, transmitted: 0 },
+    diskIO: { read: 0, write: 0 }, // 修改为磁盘IO速度而不是使用率
+    onlineUsers: 0,
+    history: []
+};
 
 // 检查配置文件是否存在，如果不存在则运行初始化脚本
 // 此函数必须放在最前面，因为它不依赖于其他自定义模块
@@ -31,12 +43,6 @@ async function checkAndInitialize() {
     }
 }
 
-// 优雅关闭服务器
-function shutdownServer() {
-    log('INFO', '正在关闭服务器...');
-    process.exit(1);
-}
-
 // 等待检查和可能的初始化完成后再继续
 (async () => {
     try {
@@ -49,6 +55,7 @@ function shutdownServer() {
         const { log, processIds } = require('./utils/logger');
         const startCleanupScheduler = require('./utils/cleanupScheduler');
         const { sequelize } = require('./utils/databaseClient');
+
 
         // 初始化进程编号
         if (cluster.isMaster || cluster.isPrimary) {
@@ -70,6 +77,9 @@ function shutdownServer() {
                 get: () => null // 主进程中不需要io实例
             };
             startCleanupScheduler(models, app);
+
+            // 启动系统监控
+            startSystemMonitoring();
 
             // 确定工作进程数量
             const numCPUs = config.workerCount && config.workerCount > 0 ? config.workerCount : os.cpus().length;
@@ -253,3 +263,69 @@ function shutdownServer() {
         process.exit(1);
     }
 })();
+// 优雅关闭服务器
+function shutdownServer() {
+    stopSystemMonitoring(); // 停止系统监控
+    log('INFO', '正在关闭服务器...');
+    process.exit(1);
+}
+const systemMonitor = require('./utils/systemMonitor');
+// 系统监控函数
+function startSystemMonitoring() {
+    // 启动系统监控工具
+    systemMonitor.startMonitoring(5000);
+    
+    // 每5秒收集一次数据，以匹配前端的更新频率
+    systemMonitorInterval = setInterval(async () => {
+        try {
+            // 获取最新的系统监控数据
+            const history = systemMonitor.getHistory();
+            if (history.length > 0) {
+                const latestData = history[history.length - 1];
+                
+                // 更新系统指标
+                systemMetrics.cpu = latestData.cpu;
+                systemMetrics.memory = latestData.memory;
+                systemMetrics.network = latestData.network;
+                systemMetrics.diskIO = latestData.diskIO; // 使用磁盘IO速度
+                
+                // 添加到历史记录
+                const dataPoint = {
+                    timestamp: latestData.timestamp,
+                    cpu: systemMetrics.cpu,
+                    memory: systemMetrics.memory,
+                    network: { ...systemMetrics.network },
+                    diskIO: { ...systemMetrics.diskIO } // 记录磁盘IO速度
+                };
+                
+                systemMetrics.history.push(dataPoint);
+                
+                // 保持历史记录在合理范围内（最多4320个点，即12小时的数据，每5秒一个数据点）
+                if (systemMetrics.history.length > 4320) {
+                    systemMetrics.history.shift();
+                }
+                
+                // 将系统指标广播给所有工作进程
+                Object.values(cluster.workers).forEach(worker => {
+                    if (worker.isConnected()) {
+                        worker.send({
+                            type: 'systemMetrics',
+                            data: systemMetrics
+                        });
+                    }
+                });
+            }
+        } catch (error) {
+            log('ERROR', `收集系统监控数据时出错: ${error.message}`);
+        }
+    }, 5000); // 每5秒收集一次数据
+}
+
+// 停止系统监控
+function stopSystemMonitoring() {
+    systemMonitor.stopMonitoring();
+    if (systemMonitorInterval) {
+        clearInterval(systemMonitorInterval);
+        systemMonitorInterval = null;
+    }
+}

@@ -107,8 +107,6 @@ const adminController = require('../controllers/adminController');
 const adminMiddleware = require('../middleware/authMiddleware').adminMiddleware;
 // 获取所有用户列表 - 管理员查看系统中所有用户的信息
 router.get('/admin/users', authMiddleware, adminMiddleware, adminController.getUsers);
-// 创建用户 - 管理员手动创建新用户
-router.post('/admin/users', authMiddleware, adminMiddleware, adminController.createUser);
 // 更新用户信息 - 管理员修改指定用户的信息
 router.put('/admin/users/:userId', authMiddleware, adminMiddleware, adminController.updateUser);
 // 删除用户 - 管理员删除指定用户
@@ -117,8 +115,6 @@ router.delete('/admin/users/:userId', authMiddleware, adminMiddleware, adminCont
 router.put('/admin/users/:userId/status', authMiddleware, adminMiddleware, adminController.updateUserStatus);
 // 获取所有聊天室列表 - 管理员查看系统中所有聊天室的信息
 router.get('/admin/rooms', authMiddleware, adminMiddleware, adminController.getRooms);
-// 获取聊天室详情 - 管理员查看指定聊天室的详细信息
-router.get('/admin/rooms/:id', authMiddleware, adminMiddleware, adminController.getRoom);
 // 删除聊天室 - 管理员删除指定聊天室
 router.delete('/admin/rooms/:id', authMiddleware, adminMiddleware, adminController.deleteRoom);
 
@@ -135,14 +131,17 @@ const systemSettingController = require('../controllers/systemSettingController'
 router.get('/system/settings', systemSettingController.getSettings);
 // 更新系统设置
 router.put('/system/settings', authMiddleware, adminMiddleware, systemSettingController.updateSettings);
-
 // 清除所有消息记录
 router.post('/admin/messages/clear', authMiddleware, adminMiddleware, systemSettingController.clearAllMessages);
-
-// 系统信息路由
+// 获取系统信息路由
 const systemInfoController = require('../controllers/systemInfoController');
+router.get('/system/info', authMiddleware, adminMiddleware, systemInfoController.getSystemInfo);
 
-// 获取系统信息
-router.get('/system/info', systemInfoController.getSystemInfo);
+// 系统监控相关路由
+const systemMonitorController = require('../controllers/systemMonitorController');
+// 获取实时系统指标（CPU、内存、磁盘等）
+router.get('/system/metrics', authMiddleware, adminMiddleware, systemMonitorController.getSystemMetrics);
+// 获取历史系统指标数据
+router.get('/system/metrics/history', authMiddleware, adminMiddleware, systemMonitorController.getSystemMetricsHistory);
 
 module.exports = router;

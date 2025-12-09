@@ -12,6 +12,8 @@ const config = require('./config/config.json');
 const { log, processIds } = require('./utils/logger');
 const redisClient = require('./utils/redisClient');
 const { sequelize } = require('./utils/databaseClient');
+// 只在主进程中导入systemMonitor
+const systemMonitor = cluster.isMaster || cluster.isPrimary ? require('./utils/systemMonitor') : null;
 
 // 处理来自主进程的转发消息
 if (cluster.isWorker) {
@@ -401,6 +403,22 @@ async function startServer(httpServer) {
         process.exit(1);
     }
 }
+
+// 启动服务器
+const PORT = process.env.PORT || config.serverPort || 3000;
+server.listen(PORT, () => {
+    log('INFO', `服务器 worker#${processIds.get(process.pid)} 正在监听端口 ${PORT}`);
+    
+    // 只有主进程才启动系统监控
+    if ((cluster.isMaster || cluster.isPrimary) && systemMonitor) {
+        systemMonitor.startMonitoring(5000);
+    }
+    
+    // 发送消息给主进程报告端口
+    if (cluster.isWorker) {
+        process.send({ type: 'listening', port: PORT });
+    }
+});
 
 // 导出应用实例和模型
 module.exports = { 

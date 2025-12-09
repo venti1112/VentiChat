@@ -28,7 +28,8 @@
     "node-cron": "^4.2.1",
     "redis": "^5.10.0",
     "sequelize": "^6.37.7",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "systeminformation": "^5.27.12"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

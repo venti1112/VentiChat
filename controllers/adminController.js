@@ -25,36 +25,6 @@ exports.getUsers = async (req, res) => {
     }
 };
 
-// 创建用户（管理员）
-exports.createUser = async (req, res) => {
-    try {
-        const { username, nickname, password } = req.body;
-        
-        // 检查用户名是否已存在
-        const existingUser = await models.User.findOne({ where: { username } });
-        if (existingUser) {
-            return res.status(400).json({ error: '用户名已存在' });
-        }
-        
-        // 密码加密
-        const bcrypt = require('bcrypt');
-        const saltRounds = 10;
-        const passwordHash = await bcrypt.hash(password, saltRounds);
-        
-        // 创建用户
-        const user = await models.User.create({
-            username,
-            nickname,
-            passwordHash
-        });
-        
-        res.json({ message: '用户创建成功', user: { id: user.userId, username: user.username, nickname: user.nickname } });
-    } catch (error) {
-        log('ERROR', `创建用户失败: ${error.message}`);
-        res.status(500).json({ error: error.message });
-    }
-};
-
 // 更新用户信息（管理员）
 exports.updateUser = async (req, res) => {
     try {
@@ -146,53 +116,6 @@ exports.getRooms = async (req, res) => {
         res.json(roomsWithMemberCount);
     } catch (error) {
         log('ERROR', `获取聊天室列表失败: ${error.message}`);
-        res.status(500).json({ error: error.message });
-    }
-};
-
-// 获取聊天室详情（管理员）
-exports.getRoom = async (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        const room = await models.Room.findByPk(id);
-        if (!room) {
-            return res.status(404).json({ error: '聊天室不存在' });
-        }
-        
-        res.json(room);
-    } catch (error) {
-        log('ERROR', `获取聊天室详情失败: ${error.message}`);
-        res.status(500).json({ error: error.message });
-    }
-};
-
-// 获取聊天室成员（管理员）
-exports.getRoomMembers = async (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        // 获取房间成员
-        const roomMembers = await models.RoomMember.findAll({
-            where: { roomId: id },
-            include: [{
-                model: models.User,
-                attributes: ['userId', 'username', 'nickname', 'avatarUrl']
-            }]
-        });
-        
-        // 格式化成员信息
-        const members = roomMembers.map(rm => ({
-            uid: rm.User.id,
-            username: rm.User.username,
-            nickname: rm.User.nickname,
-            avatarUrl: rm.User.avatarUrl,
-            isModerator: rm.isModerator
-        }));
-        
-        res.json(members);
-    } catch (error) {
-        log('ERROR', `获取聊天室成员失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };
