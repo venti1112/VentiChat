@@ -4,6 +4,7 @@ const { log } = require('../utils/logger');
 let systemMetrics = {
     cpu: 0,
     memory: 0,
+    memoryDetails: { total: 0, active: 0, available: 0 }, // 添加内存详细信息
     network: { received: 0, transmitted: 0 },
     diskIO: { read: 0, write: 0 }, // 更新为磁盘IO速度
     onlineUsers: 0,

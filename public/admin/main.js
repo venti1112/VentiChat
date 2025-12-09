@@ -100,6 +100,17 @@ async function updateRealTimeSystemMetrics() {
             // 更新图表数据
             updateResourceChartsWithLatest(metricsData.data);
         }
+        
+        // 实时更新系统信息（包括运行时间）
+        try {
+            const sysInfoResponse = await fetch('/api/system/info');
+            if (sysInfoResponse.ok) {
+                const sysInfo = await sysInfoResponse.json();
+                document.getElementById('uptime-info').textContent = sysInfo.uptime || '-';
+            }
+        } catch (error) {
+            console.error('获取系统信息失败:', error);
+        }
     } catch (error) {
         console.error('获取实时系统指标失败:', error);
     }
@@ -113,6 +124,13 @@ function updateCurrentMetrics(metrics) {
         `↓${metrics.network.received} KB/s ↑${metrics.network.transmitted} KB/s`;
     document.getElementById('current-disk').textContent = 
         `R:${metrics.diskIO.read} KB/s W:${metrics.diskIO.write} KB/s`;
+    
+    // 更新内存详情信息
+    if (metrics.memoryDetails) {
+        document.getElementById('current-memory-used').textContent = metrics.memoryDetails.active + ' MB';
+        document.getElementById('current-memory-available').textContent = metrics.memoryDetails.available + ' MB';
+        document.getElementById('current-memory-total').textContent = metrics.memoryDetails.total + ' MB';
+    }
 }
 
 // 使用最新数据更新资源图表
@@ -125,6 +143,10 @@ function updateResourceChartsWithLatest(latestMetrics) {
         resourceChart.data.labels.shift();
         resourceChart.data.datasets[0].data.shift();
         resourceChart.data.datasets[1].data.shift();
+        // 同时移除内存详细信息
+        if (resourceChart.memoryDetails && resourceChart.memoryDetails.length > 0) {
+            resourceChart.memoryDetails.shift();
+        }
     }
     
     // 添加新的时间标签
@@ -135,6 +157,15 @@ function updateResourceChartsWithLatest(latestMetrics) {
     // 添加新的数据点
     resourceChart.data.datasets[0].data.push(latestMetrics.cpu);
     resourceChart.data.datasets[1].data.push(latestMetrics.memory);
+    // 添加内存详细信息到图表实例
+    if (!resourceChart.memoryDetails) {
+        resourceChart.memoryDetails = [];
+    }
+    resourceChart.memoryDetails.push(latestMetrics.memoryDetails || {
+        total: 0,
+        active: 0,
+        available: 0
+    });
     resourceChart.update();
     
     // 更新网络和磁盘IO图表
@@ -198,9 +229,39 @@ function initDashboardCharts() {
                     beginAtZero: true,
                     max: 100
                 }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        // 自定义tooltip显示内容
+                        afterLabel: function(context) {
+                            // 只对内存数据集进行特殊处理
+                            if (context.datasetIndex === 1) {
+                                // 获取当前数据点的索引
+                                const index = context.dataIndex;
+                                // 获取对应的内存详细信息（如果有的话）
+                                const chart = context.chart;
+                                if (chart.memoryDetails && chart.memoryDetails[index]) {
+                                    const memDetail = chart.memoryDetails[index];
+                                    // 确保数值有效再显示
+                                    if (memDetail.total > 0) {
+                                        return [
+                                            `总内存: ${memDetail.total} MB`,
+                                            `已用内存: ${memDetail.active} MB`,
+                                            `可用内存: ${memDetail.available} MB`
+                                        ];
+                                    }
+                                }
+                            }
+                            return '';
+                        }
+                    }
+                }
             }
         }
     });
+    // 初始化memoryDetails数组
+    resourceChart.memoryDetails = [];
     
     const ctx2 = document.getElementById('networkDiskChart').getContext('2d');
     networkDiskChart = new Chart(ctx2, {
@@ -278,6 +339,13 @@ function updateResourceCharts(metricsHistory) {
     
     const cpuData = dataToUse.map(point => point.cpu);
     const memoryData = dataToUse.map(point => point.memory);
+    // 提取内存详细信息
+    const memoryDetails = dataToUse.map(point => point.memoryDetails || {
+        total: 0,
+        active: 0,
+        available: 0
+    });
+    
     const networkReceivedData = dataToUse.map(point => point.network.received);
     const networkTransmittedData = dataToUse.map(point => point.network.transmitted);
     const diskReadData = dataToUse.map(point => point.diskIO.read);
@@ -287,6 +355,8 @@ function updateResourceCharts(metricsHistory) {
     resourceChart.data.labels = labels;
     resourceChart.data.datasets[0].data = cpuData;
     resourceChart.data.datasets[1].data = memoryData;
+    // 附加内存详细信息到图表对象
+    resourceChart.memoryDetails = memoryDetails;
     resourceChart.update();
     
     // 更新网络和磁盘IO图表
@@ -465,7 +535,6 @@ async function loadDashboardData() {
                 document.getElementById('arch-info').textContent = sysInfo.arch || '-';
                 document.getElementById('cpu-info').textContent = sysInfo.cpus || '-';
                 document.getElementById('total-mem-info').textContent = sysInfo.totalmem || '-';
-                document.getElementById('free-mem-info').textContent = sysInfo.freemem || '-';
                 document.getElementById('uptime-info').textContent = sysInfo.uptime || '-';
             } else {
                 document.getElementById('node-version').textContent = '未知';
@@ -473,7 +542,6 @@ async function loadDashboardData() {
                 document.getElementById('arch-info').textContent = '未知';
                 document.getElementById('cpu-info').textContent = '未知';
                 document.getElementById('total-mem-info').textContent = '未知';
-                document.getElementById('free-mem-info').textContent = '未知';
                 document.getElementById('uptime-info').textContent = '未知';
             }
         } catch (error) {
@@ -482,7 +550,6 @@ async function loadDashboardData() {
             document.getElementById('arch-info').textContent = '获取失败';
             document.getElementById('cpu-info').textContent = '获取失败';
             document.getElementById('total-mem-info').textContent = '获取失败';
-            document.getElementById('free-mem-info').textContent = '获取失败';
             document.getElementById('uptime-info').textContent = '获取失败';
         }
         

@@ -62,7 +62,7 @@ class SystemMonitor {
             const cpuData = await si.currentLoad();
             const cpuUsage = cpuData.currentLoad;
             
-            // 收集内存使用率
+            // 收集内存使用率和详细信息
             const memData = await si.mem();
             const memoryUsage = (memData.active / memData.total) * 100;
             
@@ -127,6 +127,12 @@ class SystemMonitor {
                 timestamp,
                 cpu: Math.round(cpuUsage * 100) / 100,
                 memory: Math.round(memoryUsage * 100) / 100,
+                // 添加详细的内存信息（以MB为单位）
+                memoryDetails: {
+                    total: Math.round(memData.total / (1024 * 1024)), // 转换为MB
+                    active: Math.round(memData.active / (1024 * 1024)), // 转换为MB
+                    available: Math.round(memData.available / (1024 * 1024)) // 转换为MB
+                },
                 network: {
                     received: Math.round(networkUsage.received * 100) / 100,
                     transmitted: Math.round(networkUsage.transmitted * 100) / 100

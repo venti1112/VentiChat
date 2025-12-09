@@ -288,12 +288,16 @@ function startSystemMonitoring() {
                 systemMetrics.memory = latestData.memory;
                 systemMetrics.network = latestData.network;
                 systemMetrics.diskIO = latestData.diskIO; // 使用磁盘IO速度
+                // 添加内存详情数据
+                systemMetrics.memoryDetails = latestData.memoryDetails;
                 
                 // 添加到历史记录
                 const dataPoint = {
                     timestamp: latestData.timestamp,
                     cpu: systemMetrics.cpu,
                     memory: systemMetrics.memory,
+                    // 添加内存详细信息
+                    memoryDetails: systemMetrics.memoryDetails,
                     network: { ...systemMetrics.network },
                     diskIO: { ...systemMetrics.diskIO } // 记录磁盘IO速度
                 };
