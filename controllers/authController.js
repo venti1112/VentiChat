@@ -296,8 +296,8 @@ exports.logout = async (req, res) => {
 // 验证token
 exports.verifyToken = async (req, res) => {
     try {
-        // 优先从Authorization头部获取token，其次从cookie
-        const token = req.headers.authorization?.split(' ')[1] || req.cookies.token;
+        // 获取token
+        const token = req.cookies.token;
         
         if (!token) {
             return res.status(401).json({ message: '未提供认证令牌' });

@@ -140,9 +140,9 @@ async function uploadFile(file, options = {}) {
                     await fetch('/api/upload/cleanup', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
+                            'Content-Type': 'application/json'
                         },
+                        credentials: 'same-origin',
                         body: JSON.stringify({ uploadId })
                     });
                 } catch (e) {
@@ -171,9 +171,9 @@ async function uploadFile(file, options = {}) {
         const initResponse = await fetch('/api/upload/initiate', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
+            credentials: 'include',
             body: JSON.stringify(initBody)
         });
         
@@ -272,7 +272,7 @@ async function uploadFile(file, options = {}) {
                 
                 // 发送请求
                 xhr.open('POST', '/api/upload/chunk', true);
-                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                xhr.withCredentials = true;
                 xhr.send(chunkFormData);
             });
             
@@ -297,9 +297,9 @@ async function uploadFile(file, options = {}) {
         const finalizeResponse = await fetch('/api/upload/complete', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
+            credentials: 'include',
             body: JSON.stringify(finalizeBody)
         });
         
@@ -336,9 +336,9 @@ async function uploadFile(file, options = {}) {
                 await fetch('/api/upload/cleanup', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
+                        'Content-Type': 'application/json'
                     },
+                    credentials: 'same-origin',
                     body: JSON.stringify({ uploadId })
                 });
             } catch (e) {
@@ -386,7 +386,6 @@ function sendFileMessage(fileUrl, fileName, fileType, thumbnailUrl = null) {
     
     // 构建消息数据
     const messageData = {
-        roomId: parseInt(currentRoomId),
         content: fileName,
         fileUrl: correctedFileUrl,
         type: messageType
@@ -398,18 +397,18 @@ function sendFileMessage(fileUrl, fileName, fileType, thumbnailUrl = null) {
     }
     
     // 发送文件消息到服务器
-    fetch('/api/messages', {
+    fetch(`/api/messages/${parseInt(currentRoomId)}/send`, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Content-Type': 'application/json'
         },
+        credentials: 'same-origin',
         body: JSON.stringify(messageData)
     })
     .then(response => {
         if (!response.ok) {
             return response.json().then(data => {
-                throw new Error(data.error || '发送文件消息失败');
+                throw new Error(data.error || data.message || '发送文件消息失败');
             });
         }
         return response.json();

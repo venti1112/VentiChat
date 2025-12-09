@@ -53,9 +53,7 @@ export function checkLoginStatus() {
         
         // 获取用户信息
         fetch('/api/auth/verify', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            credentials: 'same-origin'
         })
         .then(response => {
             console.info('验证Token响应状态:', response.status);
@@ -147,6 +145,7 @@ export function bindFormEvents() {
                 headers: {
                     'Content-Type': 'application/json'
                 },
+                credentials: 'same-origin',
                 body: JSON.stringify({ username, password, rememberMe })
             })
             .then(response => {
@@ -281,6 +280,7 @@ export function bindFormEvents() {
             headers: {
                 'Content-Type': 'application/json'
             },
+            credentials: 'same-origin',
             body: JSON.stringify({ username: userData.username })
         })
         .then(response => response.json())
@@ -302,6 +302,7 @@ export function bindFormEvents() {
                 headers: {
                     'Content-Type': 'application/json'
                 },
+                credentials: 'same-origin',
                 body: JSON.stringify(userData)
             })
             .then(response => response.json())
@@ -387,15 +388,7 @@ export function getUserPreferences() {
         themeColor: '#4cd8b8'
     };
     
-    return fetch('/api/users/preferences', {
-        method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        // 添加请求超时处理
-        signal: AbortSignal.timeout(10000) // 10秒超时
-    })
+    return fetch('/api/users/preferences')
     .then(response => {
         if (!response) {
             throw new Error('网络连接失败，请检查网络连接');

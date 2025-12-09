@@ -9,8 +9,13 @@ export function showMessage(message, type = 'success', title = null) {
     const messageTitle = document.getElementById('messageTitle');
     
     if (messageModal && messageOverlay && messageContent) {
-        // 设置消息内容
-        messageContent.textContent = message;
+        // 设置消息内容，如果message是一个对象且包含message字段，则使用该字段
+        if (typeof message === 'object' && message.message) {
+            messageContent.textContent = message.message;
+        } else {
+            messageContent.textContent = message;
+        }
+        
         // 如果提供了自定义标题，则使用自定义标题，否则使用默认标题
         if (title) {
             messageTitle.textContent = title;

@@ -76,8 +76,7 @@ async function updateProfile(event) {
             const passwordResponse = await fetch('/api/users/password', {
                 method: 'PUT',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     currentPassword,
@@ -95,8 +94,7 @@ async function updateProfile(event) {
         const profileResponse = await fetch('/api/users/profile', {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(profileData)
         });
@@ -109,8 +107,7 @@ async function updateProfile(event) {
         const preferencesResponse = await fetch('/api/users/preferences', {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(preferencesData)
         });
@@ -200,7 +197,6 @@ export function bindProfileForm() {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify(profileData)
             })

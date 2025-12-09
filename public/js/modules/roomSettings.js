@@ -77,11 +77,7 @@ export async function showRoomSettings(roomId) {
         }
 
         // 获取房间信息
-        const response = await fetch(`/api/rooms/${roomId}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
+        const response = await fetch(`/api/rooms/${roomId}`);
 
         if (!response.ok) {
             throw new Error('获取房间信息失败');
@@ -140,7 +136,6 @@ export async function saveRoomSettings() {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
                 name,
@@ -154,7 +149,7 @@ export async function saveRoomSettings() {
 
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.error || '更新失败');
+            throw new Error(errorData.error || errorData.message || '更新失败');
         }
 
         const updatedRoom = await response.json();
@@ -183,7 +178,7 @@ export async function saveRoomSettings() {
         window.dispatchEvent(new CustomEvent('roomSettingsUpdated', { detail: updatedRoom }));
     } catch (error) {
         console.error('保存设置失败:', error);
-        showMessage('保存失败: ' + error.message, 'danger');
+        showMessage('保存失败: ' + (error.message || '未知错误'), 'danger');
     }
 }
 
@@ -208,17 +203,12 @@ async function deleteRoom() {
             return;
         }
 
-        const response = await fetch(`/api/rooms/${currentRoomId}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
+        const response = await fetch(`/api/rooms/${currentRoomId}`);
 
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.error || '解散聊天室失败');
+            // 修改这里，同时检查error和message字段
+            throw new Error(errorData.error || errorData.message || '解散聊天室失败');
         }
 
         const result = await response.json();
@@ -241,6 +231,7 @@ async function deleteRoom() {
         window.location.reload();
     } catch (error) {
         console.error('删除房间失败:', error);
+        // 修改这里，确保错误信息能正确显示
         showMessage(error.message || '解散聊天室失败', 'danger');
     }
 }

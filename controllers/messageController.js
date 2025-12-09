@@ -32,7 +32,8 @@ const calculateTotalUnreadCount = async (userId) => {
 // 发送消息
 exports.sendMessage = async (req, res) => {
     try {
-        const { roomId, content, type, fileUrl } = req.body;
+        const { content, type, fileUrl } = req.body;
+        const { roomId } = req.params;
         
         // 检查用户是否在聊天室中
         const roomMember = await RoomMember.findOne({
@@ -408,6 +409,8 @@ exports.getRoomMessages = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+
 
 
 

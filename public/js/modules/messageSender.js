@@ -114,14 +114,13 @@ export function sendMessage() {
     
     // 如果WebSocket不可用，使用HTTP请求发送消息
     // 发送消息到服务器
-    fetch('/api/messages', {
+    fetch(`/api/messages/${parseInt(currentRoomId)}/send`, {
         method: 'POST',
         headers: {
-            'Authorization': 'Bearer ' + token,
             'Content-Type': 'application/json'
         },
+        credentials: 'same-origin',
         body: JSON.stringify({
-            roomId: parseInt(currentRoomId),
             content: content,
             type: 'text'
         })
@@ -130,6 +129,9 @@ export function sendMessage() {
     .then(data => {
         if (data.error) {
             throw new Error(data.error);
+        }
+        if (data.message) {
+            throw new Error(data.message);
         }
         
         // 用服务器返回的真实消息替换临时消息

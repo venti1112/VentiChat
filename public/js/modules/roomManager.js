@@ -146,15 +146,13 @@ async function loadMoreHistory(roomId) {
         const beforeId = firstMessage ? firstMessage.dataset.messageId : null;
         
         // 构造请求URL
-        let url = `/api/messages/history/${roomId}?limit=20`;
+        let url = `/api/messages/${roomId}/history?limit=20`;
         if (beforeId) {
             url += `&beforeId=${beforeId}`;
         }
         
         const response = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            credentials: 'same-origin'
         });
         
         if (!response.ok) {
@@ -222,15 +220,11 @@ export function loadMessageHistory(roomId) {
     // 显示加载中提示
     chatMessages.innerHTML = '<div class="text-center text-muted my-3"><p>加载消息中...</p></div>';
     
-    fetch(`/api/messages/history/${roomIdInt}`, {
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
-    })
+    fetch(`/api/messages/${roomIdInt}/history`)
     .then(response => {
         if (!response.ok) {
             return response.json().then(data => {
-                throw new Error(data.error || '加载消息历史失败');
+                throw new Error(data.error || data.message || '加载消息历史失败');
             });
         }
         return response.json();
@@ -250,16 +244,8 @@ export function loadMessageHistory(roomId) {
 
 // 加载聊天室列表
 export function loadRooms() {
-    const token = localStorage.getItem('token');
-    if (!token) {
-        console.warn('未登录，无法加载聊天室列表');
-        return;
-    }
-    
     fetch('/api/rooms', {
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
+        credentials: 'same-origin'
     })
     .then(response => {
         if (!response.ok) {
@@ -280,9 +266,7 @@ export function loadRooms() {
 export async function loadPendingRequests(roomId, token) {
     try {
         const response = await fetch(`/api/rooms/${roomId}/pending-requests`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            credentials: 'same-origin'
         });
 
         if (!response.ok) {
@@ -389,21 +373,13 @@ export async function handleJoinRequest(roomId, userId, action) {
     }
 
     try {
-        const response = await fetch(`/api/rooms/${roomId}/approve-join-request`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                userId: parseInt(userId),
-                action: action
-            })
+        const response = await fetch(`/api/rooms/${roomId}/join/${userId}`, {
+            credentials: 'same-origin'
         });
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            throw new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`);
         }
 
         // 显示成功消息
@@ -568,8 +544,10 @@ function searchRoomsAndUsers(keyword) {
     // 显示加载状态
     searchResultsContainer.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">加载中...</span></div></div>';
     
-    // 搜索聊天室和用户
-    fetch(`/api/search?q=${encodeURIComponent(keyword)}`)
+    // 搜索聊天室和用户 - 修复参数名称与后端一致
+    fetch(`/api/search?q=${encodeURIComponent(keyword)}`, {
+        credentials: 'same-origin'
+    })
     .then(response => {
         if (!response.ok) {
             throw new Error('搜索失败');
@@ -721,15 +699,15 @@ export function startPrivateChat(userId) {
     fetch('/api/rooms/private', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}` // 注意：根据规范，这里应该使用cookie传输，但前端代码中仍使用Authorization header
+            'Content-Type': 'application/json'
         },
+        credentials: 'same-origin',
         body: JSON.stringify({ targetUserId: parseInt(userId) })
     })
     .then(response => {
         if (!response.ok) {
             return response.json().then(err => {
-                throw new Error(err.error || '创建私聊失败');
+                throw new Error(err.error || err.message || '创建私聊失败');
             });
         }
         return response.json();
@@ -781,9 +759,7 @@ function loadRoomMembers() {
     }
     
     fetch(`/api/rooms/${currentRoomId}/members`, {
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
+        credentials: 'same-origin'
     })
     .then(response => {
         if (!response.ok) {
@@ -879,15 +855,15 @@ window.setMemberRole = function(userId, role) {
     fetch(`/api/rooms/${currentRoomId}/members/${userId}/role`, {
         method: 'PUT',
         headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Content-Type': 'application/json'
         },
+        credentials: 'same-origin',
         body: JSON.stringify({ role: mappedRole })
     })
     .then(response => {
         if (!response.ok) {
             return response.json().then(data => {
-                throw new Error(data.error || '操作失败');
+                throw new Error(data.error || data.message || '操作失败');
             });
         }
         return response.json();
@@ -922,16 +898,17 @@ window.kickMember = function(userId) {
         return;
     }
     
-    fetch(`/api/rooms/${currentRoomId}/members/${userId}`, {
+    fetch(`/api/rooms/${currentRoomId}/${userId}`, {
         method: 'DELETE',
         headers: {
-            'Authorization': `Bearer ${token}`
-        }
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin'
     })
     .then(response => {
         if (!response.ok) {
             return response.json().then(data => {
-                throw new Error(data.error || '操作失败');
+                throw new Error(data.error || data.message || '操作失败');
             });
         }
         return response.json();
@@ -955,29 +932,23 @@ async function requestToJoinRoom(roomId) {
     }
 
     try {
-        const response = await fetch(`/api/rooms/${roomId}/join-request`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
+        const response = await fetch(`/api/rooms/${roomId}/join`);
 
         const data = await response.json();
         
         if (response.ok) {
             // 检查响应内容判断是否需要审核
-            if (data.requiresApproval) {
+            if (data.joined === false) {
                 // 需要审核
-                window.showMessage('加入请求已发送，等待房主审批', 'success');
+                window.showMessage(data.message || '加入请求已发送，等待房主审批', 'success');
             } else {
                 // 不需要审核，直接加入成功
-                window.showMessage('成功加入聊天室', 'success');
+                window.showMessage(data.message || '成功加入聊天室', 'success');
                 // 刷新聊天室列表以显示新加入的房间
                 loadRooms();
             }
         } else {
-            window.showMessage(data.error || '发送加入请求失败', 'danger');
+            window.showMessage(data.error || data.message || '发送加入请求失败', 'danger');
         }
     } catch (error) {
         console.error('申请加入房间失败:', error);
@@ -1000,9 +971,9 @@ export async function createRoom(roomData) {
         const response = await fetch('/api/rooms', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
+            credentials: 'same-origin',
             body: JSON.stringify(roomData)
         });
 
@@ -1018,7 +989,7 @@ export async function createRoom(roomData) {
             const modal = bootstrap.Modal.getInstance(document.getElementById('createRoomModal'));
             if (modal) modal.hide();
         } else {
-            window.showMessage(data.error || '聊天室创建失败', 'danger');
+            window.showMessage(data.error || data.message || '聊天室创建失败', 'danger');
         }
     } catch (error) {
         console.error('创建聊天室错误:', error);

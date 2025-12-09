@@ -87,8 +87,7 @@ exports.authMiddleware = async (req, res, next) => {
         
         // 获取用户名（如果有）
         let username = '未知用户';
-        const token = req.cookies.token || (req.headers.authorization && req.headers.authorization.startsWith('Bearer ') ? 
-                      req.headers.authorization.substring(7) : null);
+        const token = req.cookies.token;
         
         if (token) {
             try {

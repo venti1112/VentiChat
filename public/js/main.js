@@ -140,27 +140,17 @@ let allMessages = [];
 // 申请加入房间函数
 async function requestToJoinRoom(roomId, message = '') {
     console.log('申请加入房间:', roomId); // 添加调试日志
-    const token = localStorage.getItem('token');
-    if (!token) {
-        showMessage('请先登录', 'danger');
-        showLoginModal();
-        return;
-    }
 
     try {
-        console.log('发送请求到: ', `/api/rooms/${roomId}/join-request`); // 添加调试日志
-        const requestData = {};
+        console.log('发送请求到: ', `/api/rooms/${roomId}/join`); // 添加调试日志
+        const url = new URL(`/api/rooms/${roomId}/join`, window.location.origin);
         if (message) {
-            requestData.message = message;
+            url.searchParams.append('message', message);
         }
         
-        const response = await fetch(`/api/rooms/${roomId}/join-request`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(requestData)
+        const response = await fetch(url, {
+            method: 'GET',
+            credentials: 'same-origin'
         });
         
         console.log('收到响应:', response); // 添加调试日志
@@ -176,10 +166,9 @@ async function requestToJoinRoom(roomId, message = '') {
                 loadRooms();
             }
         } else {
-            showMessage(data.error || '发送加入请求失败', 'danger');
+            showMessage(data.error || data.message || '发送加入请求失败', 'danger');
         }
     } catch (error) {
-        console.error('发送加入请求失败:', error); // 添加调试日志
         console.error('发送加入请求失败:', error);
         showMessage('发送加入请求失败: ' + error.message, 'danger');
     }

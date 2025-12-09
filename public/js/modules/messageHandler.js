@@ -96,9 +96,7 @@ export async function getUserInfoById(userId) {
         }
         
         const response = await fetch(`/api/users/profile/${userIdStr}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            credentials: 'same-origin'
         });
         
         if (!response.ok) {
