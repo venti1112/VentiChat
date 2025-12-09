@@ -407,9 +407,8 @@ async function startServer(httpServer) {
 // 启动服务器
 const PORT = process.env.PORT || config.serverPort || 3000;
 server.listen(PORT, () => {
-    log('INFO', `服务器 worker#${processIds.get(process.pid)} 正在监听端口 ${PORT}`);
     
-    // 只有主进程才启动系统监控
+    // 启动系统监控
     if ((cluster.isMaster || cluster.isPrimary) && systemMonitor) {
         systemMonitor.startMonitoring(5000);
     }

@@ -450,7 +450,7 @@
                                     <div class="col-md-3">
                                         <div class="text-center">
                                             <h4 id="avg-members-per-room">0</h4>
-                                            <p>平均成员数</p>
+                                            <p>最大成员数</p>
                                         </div>
                                     </div>
                                     <div class="col-md-3">
@@ -485,6 +485,22 @@
                                             <div class="mb-3">
                                                 <label for="max-file-size" class="form-label">最大文件大小 (bytes)</label>
                                                 <input type="number" class="form-control" id="max-file-size">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="max-room-members" class="form-label">单个聊天室最大成员数量</label>
+                                                <input type="number" class="form-control" id="max-room-members">
+                                            </div>
+                                            <div class="mb-3 form-check">
+                                                <input type="checkbox" class="form-check-input" id="allow-user-registration">
+                                                <label class="form-check-label" for="allow-user-registration">允许新用户注册</label>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="max-login-attempts" class="form-label">最大登录尝试次数</label>
+                                                <input type="number" class="form-control" id="max-login-attempts">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="login-lock-time" class="form-label">登录失败锁定时间(分钟)</label>
+                                                <input type="number" class="form-control" id="login-lock-time">
                                             </div>
                                             <button type="submit" class="btn btn-primary">保存设置</button>
                                         </form>

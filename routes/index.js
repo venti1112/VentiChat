@@ -107,6 +107,8 @@ const adminController = require('../controllers/adminController');
 const adminMiddleware = require('../middleware/authMiddleware').adminMiddleware;
 // 获取所有用户列表 - 管理员查看系统中所有用户的信息
 router.get('/admin/users', authMiddleware, adminMiddleware, adminController.getUsers);
+// 创建用户 - 管理员创建新用户
+router.post('/admin/users', authMiddleware, adminMiddleware, adminController.createUser);
 // 更新用户信息 - 管理员修改指定用户的信息
 router.put('/admin/users/:userId', authMiddleware, adminMiddleware, adminController.updateUser);
 // 删除用户 - 管理员删除指定用户
@@ -117,6 +119,8 @@ router.put('/admin/users/:userId/status', authMiddleware, adminMiddleware, admin
 router.get('/admin/rooms', authMiddleware, adminMiddleware, adminController.getRooms);
 // 删除聊天室 - 管理员删除指定聊天室
 router.delete('/admin/rooms/:id', authMiddleware, adminMiddleware, adminController.deleteRoom);
+// 获取聊天室统计信息 - 管理员查看聊天室统计数据
+router.get('/admin/rooms/statistics', authMiddleware, adminMiddleware, adminController.getRoomStatistics);
 
 // 配置管理路由
 const configController = require('../controllers/configController');

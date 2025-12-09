@@ -1,5 +1,6 @@
 const models = require('../models');
 const { log } = require('../utils/logger');
+const bcrypt = require('bcrypt');
 
 // 获取所有用户（管理员）
 exports.getUsers = async (req, res) => {
@@ -21,6 +22,46 @@ exports.getUsers = async (req, res) => {
         res.json(formattedUsers);
     } catch (error) {
         log('ERROR', `获取用户列表失败: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 创建用户（管理员）
+exports.createUser = async (req, res) => {
+    try {
+        const { username, nickname, password, status, isAdmin } = req.body;
+        
+        // 检查用户名是否已存在
+        const existingUser = await models.User.findOne({ where: { username } });
+        if (existingUser) {
+            return res.status(400).json({ error: '用户名已存在' });
+        }
+        
+        // 密码加密
+        const saltRounds = 10;
+        const passwordHash = await bcrypt.hash(password, saltRounds);
+        
+        // 创建用户
+        const user = await models.User.create({
+            username,
+            nickname,
+            passwordHash,
+            status: status || 'active',
+            isAdmin: isAdmin || false
+        });
+        
+        res.status(201).json({ 
+            message: '用户创建成功',
+            user: {
+                id: user.userId,
+                username: user.username,
+                nickname: user.nickname,
+                status: user.status,
+                isAdmin: user.isAdmin
+            }
+        });
+    } catch (error) {
+        log('ERROR', `创建用户失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };
@@ -101,19 +142,39 @@ exports.getRooms = async (req, res) => {
     try {
         const rooms = await models.Room.findAll();
         
-        // 为每个房间添加成员数量
-        const roomsWithMemberCount = await Promise.all(rooms.map(async (room) => {
+        // 获取所有唯一的创建者ID
+        const creatorIds = [...new Set(rooms.map(room => room.creatorId))];
+        
+        // 批量获取创建者信息
+        const creators = await models.User.findAll({
+            where: {
+                userId: {
+                    [models.Sequelize.Op.in]: creatorIds
+                }
+            },
+            attributes: ['userId', 'username']
+        });
+        
+        // 创建ID到用户名的映射
+        const creatorMap = {};
+        creators.forEach(creator => {
+            creatorMap[creator.userId] = creator.username;
+        });
+        
+        // 为每个房间添加成员数量和创建者用户名
+        const roomsWithDetails = await Promise.all(rooms.map(async (room) => {
             const memberCount = await models.RoomMember.count({
                 where: { roomId: room.roomId }
             });
             
             return {
                 ...room.toJSON(),
-                memberCount: memberCount
+                memberCount: memberCount,
+                creatorName: creatorMap[room.creatorId] || '未知用户'
             };
         }));
         
-        res.json(roomsWithMemberCount);
+        res.json(roomsWithDetails);
     } catch (error) {
         log('ERROR', `获取聊天室列表失败: ${error.message}`);
         res.status(500).json({ error: error.message });
@@ -137,6 +198,75 @@ exports.deleteRoom = async (req, res) => {
         res.json({ message: '聊天室删除成功' });
     } catch (error) {
         log('ERROR', `删除聊天室失败: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+/**
+ * 获取聊天室统计数据
+ * @param {import('express').Request} req - 请求对象
+ * @param {import('express').Response} res - 响应对象
+ */
+exports.getRoomStatistics = async (req, res) => {
+    try {
+        // 获取公共和私人聊天室的数量
+        const publicRoomsCount = await models.Room.count({
+            where: { isPrivate: false }
+        });
+        
+        const privateRoomsCount = await models.Room.count({
+            where: { isPrivate: true }
+        });
+        
+        // 计算最大成员数
+        const rooms = await models.Room.findAll({
+            attributes: ['roomId']
+        });
+        
+        let maxMembers = 0;
+        if (rooms.length > 0) {
+            // 使用 Promise.all 并行计算每个房间的成员数
+            const memberCounts = await Promise.all(
+                rooms.map(room => models.RoomMember.count({ where: { roomId: room.roomId } }))
+            );
+            
+            // 找到最大成员数
+            maxMembers = Math.max(...memberCounts);
+        }
+        
+        // 查找最活跃的聊天室（基于消息数量）
+        const roomMessageCounts = await models.Message.findAll({
+            attributes: [
+                'roomId',
+                [models.sequelize.fn('COUNT', models.sequelize.col('message_id')), 'messageCount']
+            ],
+            group: ['roomId'],
+            order: [[models.sequelize.fn('COUNT', models.sequelize.col('message_id')), 'DESC']],
+            limit: 1
+        });
+        
+        let mostActiveRoom = null;
+        if (roomMessageCounts.length > 0) {
+            const roomId = roomMessageCounts[0].roomId;
+            const room = await models.Room.findByPk(roomId, {
+                attributes: ['name']
+            });
+            if (room) {
+                mostActiveRoom = {
+                    name: room.name,
+                    messageCount: roomMessageCounts[0].toJSON().messageCount
+                };
+            }
+        }
+        
+        res.json({
+            totalPublicRooms: publicRoomsCount,
+            totalPrivateRooms: privateRoomsCount,
+            maxMembersInRoom: maxMembers,
+            mostActiveRoom: mostActiveRoom
+        });
+    } catch (error) {
+        log('ERROR', `获取聊天室统计数据失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };

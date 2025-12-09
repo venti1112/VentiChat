@@ -262,19 +262,26 @@ function updateResourceCharts(metricsHistory) {
     // 过滤出最近12小时的数据
     const recentMetrics = metricsHistory.filter(point => new Date(point.timestamp) >= twelveHoursAgo);
     
-    // 如果没有数据，则使用原始数据（避免空图表）
-    const dataToUse = recentMetrics.length > 0 ? recentMetrics : metricsHistory;
+    // 如果没有近期数据但有历史数据，则使用最后100个数据点
+    let dataToUse = recentMetrics;
+    if (recentMetrics.length === 0 && metricsHistory.length > 0) {
+        // 使用最后100个数据点或全部数据（取较小值）
+        const startIndex = Math.max(0, metricsHistory.length - 100);
+        dataToUse = metricsHistory.slice(startIndex);
+    }
     
     // 准备数据
     const labels = dataToUse.map(point => {
         const date = new Date(point.timestamp);
-        return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+        return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`;
     });
     
     const cpuData = dataToUse.map(point => point.cpu);
     const memoryData = dataToUse.map(point => point.memory);
     const networkReceivedData = dataToUse.map(point => point.network.received);
     const networkTransmittedData = dataToUse.map(point => point.network.transmitted);
+    const diskReadData = dataToUse.map(point => point.diskIO.read);
+    const diskWriteData = dataToUse.map(point => point.diskIO.write);
     
     // 更新CPU和内存图表
     resourceChart.data.labels = labels;
@@ -282,10 +289,14 @@ function updateResourceCharts(metricsHistory) {
     resourceChart.data.datasets[1].data = memoryData;
     resourceChart.update();
     
-    // 更新网络图表
+    // 更新网络和磁盘IO图表
     networkDiskChart.data.labels = labels;
     networkDiskChart.data.datasets[0].data = networkReceivedData;
     networkDiskChart.data.datasets[1].data = networkTransmittedData;
+    if (networkDiskChart.data.datasets.length >= 4) {
+        networkDiskChart.data.datasets[2].data = diskReadData;
+        networkDiskChart.data.datasets[3].data = diskWriteData;
+    }
     networkDiskChart.update();
 }
 
@@ -595,9 +606,10 @@ async function loadRoomsData() {
             row.innerHTML = `
                 <td>${room.roomId}</td>
                 <td>${room.name}</td>
-                <td>${room.isPrivate ? '私有' : '公共'}</td>
-                <td>${room.creatorId || '未知'}</td>
-                <td>${room.memberCount >= 0 ? room.memberCount : 0}</td>
+                <td>${room.isPrivate ? '私人' : '公共'}</td>
+                <td>${room.creatorName || room.creatorId}</td>
+                <td>${room.memberCount}</td>
+                <td>${new Date(room.createdAt).toLocaleString()}</td>
                 <td>
                     <button class="btn btn-sm btn-info view-members-btn" data-room-id="${room.roomId}">成员</button>
                     <button class="btn btn-sm btn-danger delete-room-btn" data-room-id="${room.roomId}">删除</button>
@@ -621,8 +633,39 @@ async function loadRoomsData() {
                 deleteRoom(roomId);
             });
         });
+        
+        // 获取并显示聊天室统计信息
+        await loadRoomStatistics();
     } catch (error) {
         console.error('加载聊天室数据失败:', error);
+    }
+}
+
+// 获取并显示聊天室统计信息
+async function loadRoomStatistics() {
+    try {
+        const response = await fetch('/api/admin/rooms/statistics');
+        const stats = await response.json();
+        
+        // 更新统计数据显示
+        document.getElementById('total-public-rooms').textContent = stats.totalPublicRooms;
+        document.getElementById('total-private-rooms').textContent = stats.totalPrivateRooms;
+        document.getElementById('avg-members-per-room').textContent = stats.maxMembersInRoom;
+        
+        // 显示最活跃聊天室信息
+        if (stats.mostActiveRoom) {
+            document.getElementById('most-active-room').textContent = 
+                `${stats.mostActiveRoom.name} (${stats.mostActiveRoom.messageCount} 条消息)`;
+        } else {
+            document.getElementById('most-active-room').textContent = '-';
+        }
+    } catch (error) {
+        console.error('加载聊天室统计信息失败:', error);
+        // 出错时显示默认值
+        document.getElementById('total-public-rooms').textContent = '0';
+        document.getElementById('total-private-rooms').textContent = '0';
+        document.getElementById('avg-members-per-room').textContent = '0';
+        document.getElementById('most-active-room').textContent = '-';
     }
 }
 
@@ -688,6 +731,10 @@ async function loadSettingsData() {
             document.getElementById('site-name').value = settings.data.siteName || '';
             document.getElementById('message-retention-days').value = settings.data.messageRetentionDays || 180;
             document.getElementById('max-file-size').value = settings.data.maxFileSize || 10485760;
+            document.getElementById('max-room-members').value = settings.data.maxRoomMembers || 1000;
+            document.getElementById('allow-user-registration').checked = settings.data.allowUserRegistration !== false; // 默认为true
+            document.getElementById('max-login-attempts').value = settings.data.maxLoginAttempts || 5;
+            document.getElementById('login-lock-time').value = settings.data.loginLockTime || 120;
         }
         
         // 获取系统配置
@@ -722,7 +769,11 @@ document.getElementById('basic-settings-form').addEventListener('submit', async 
         const settings = {
             siteName: document.getElementById('site-name').value,
             messageRetentionDays: parseInt(document.getElementById('message-retention-days').value),
-            maxFileSize: parseInt(document.getElementById('max-file-size').value)
+            maxFileSize: parseInt(document.getElementById('max-file-size').value),
+            maxRoomMembers: parseInt(document.getElementById('max-room-members').value),
+            allowUserRegistration: document.getElementById('allow-user-registration').checked,
+            maxLoginAttempts: parseInt(document.getElementById('max-login-attempts').value),
+            loginLockTime: parseInt(document.getElementById('login-lock-time').value)
         };
         
         const response = await fetch('/api/system/settings', {
@@ -833,33 +884,57 @@ document.getElementById('save-user-btn').addEventListener('click', async functio
         const status = document.getElementById('edit-status').value;
         const isAdmin = document.getElementById('edit-is-admin').checked;
         
-        // 构造要更新的数据
-        const userData = { username, nickname, status };
-        if (password) {
-            userData.password = password;
+        // 验证必填字段
+        if (!username || !nickname) {
+            alert('用户名和昵称不能为空');
+            return;
         }
-        userData.isAdmin = isAdmin;
         
-        const response = await fetch(`/api/admin/users/${userId}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(userData)
-        });
+        let response;
+        if (userId) {
+            // 编辑现有用户
+            const userData = { username, nickname, status, isAdmin };
+            if (password) {
+                userData.password = password;
+            }
+            
+            response = await fetch(`/api/admin/users/${userId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(userData)
+            });
+        } else {
+            // 添加新用户
+            if (!password) {
+                alert('密码不能为空');
+                return;
+            }
+            
+            const userData = { username, nickname, password, status, isAdmin };
+            
+            response = await fetch(`/api/admin/users`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(userData)
+            });
+        }
         
         if (response.ok) {
-            alert('用户信息更新成功');
+            alert(userId ? '用户信息更新成功' : '用户创建成功');
             const modal = bootstrap.Modal.getInstance(document.getElementById('userModal'));
             modal.hide();
             loadUsersData(); // 重新加载用户列表
         } else {
             const result = await response.json();
-            alert('更新用户信息失败: ' + result.error);
+            alert((userId ? '更新用户信息失败: ' : '创建用户失败: ') + result.error);
         }
     } catch (error) {
-        console.error('更新用户信息失败:', error);
-        alert('更新用户信息失败: ' + error.message);
+        console.error('保存用户信息失败:', error);
+        alert('保存用户信息失败: ' + error.message);
     }
 });
 

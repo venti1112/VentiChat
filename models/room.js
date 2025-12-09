@@ -60,6 +60,10 @@ module.exports = (sequelize) => {
 
     Room.associate = function(models) {
         // 根据新要求，移除所有外键关联
+        Room.belongsTo(models.User, {
+            foreignKey: 'creator_id',
+            as: 'creator'
+        });
     };
 
     return Room;

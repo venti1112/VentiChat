@@ -14,7 +14,7 @@ class SystemMonitor {
             this.maxHistoryLength = 4320; // 保存最近4320个数据点（12小时的数据，每5秒一个点）
             this.previousNetworkStats = {}; // 保存上一次的网络统计数据
             this.previousDiskIOStats = {};  // 保存上一次的磁盘IO统计数据
-            this.loadHistory();
+            // 移除历史数据加载功能
         }
     }
 
@@ -145,8 +145,8 @@ class SystemMonitor {
                 this.history.shift();
             }
 
-            // 保存历史记录到文件
-            this.saveHistory();
+            // 移除历史记录保存到文件的功能
+            // this.saveHistory();
 
             log('DEBUG', `系统监控数据已收集: CPU=${dataPoint.cpu}% MEM=${dataPoint.memory}% NET_RX=${dataPoint.network.received}KB/s NET_TX=${dataPoint.network.transmitted}KB/s DISK_R=${dataPoint.diskIO.read}KB/s DISK_W=${dataPoint.diskIO.write}KB/s`);
         } catch (error) {
@@ -175,7 +175,8 @@ class SystemMonitor {
         return [...this.history]; // 返回副本
     }
 
-    // 保存历史数据到文件
+    // 移除保存历史数据到文件的功能
+    /*
     saveHistory() {
         // 只有主进程才能保存历史数据
         if (!(cluster.isMaster || cluster.isPrimary)) return;
@@ -187,8 +188,10 @@ class SystemMonitor {
             log('ERROR', `保存系统监控历史数据时出错: ${error.message}`);
         }
     }
+    */
 
-    // 从文件加载历史数据
+    // 移除从文件加载历史数据的功能
+    /*
     loadHistory() {
         // 只有主进程才能加载历史数据
         if (!(cluster.isMaster || cluster.isPrimary)) return;
@@ -204,6 +207,7 @@ class SystemMonitor {
             log('ERROR', `加载系统监控历史数据时出错: ${error.message}`);
         }
     }
+    */
 
     // 清除历史数据
     clearHistory() {
@@ -211,7 +215,8 @@ class SystemMonitor {
         if (!(cluster.isMaster || cluster.isPrimary)) return;
         
         this.history = [];
-        this.saveHistory();
+        // 移除历史记录保存功能
+        // this.saveHistory();
     }
 }
 

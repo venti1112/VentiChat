@@ -46,7 +46,7 @@ exports.getSystemMetricsHistory = async (req, res) => {
     try {
         res.json({
             success: true,
-            data: systemMetrics.history
+            data: systemMetrics.history || []
         });
     } catch (error) {
         log('ERROR', `获取系统监控历史数据失败: ${error.message}`);
