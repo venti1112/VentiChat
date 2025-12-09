@@ -1,5 +1,5 @@
 const models = require('../models');
-const { log, LOG_LEVELS } = require('../utils/logger');
+const { log } = require('../utils/logger');
 
 // 获取所有用户（管理员）
 exports.getUsers = async (req, res) => {

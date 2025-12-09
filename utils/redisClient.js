@@ -1,6 +1,6 @@
 const redis = require('redis');
 const config = require('../config/config.json');
-const { log, LOG_LEVELS } = require('./logger');
+const { log } = require('./logger');
 
 // 创建Redis连接池配置
 const redisConfig = {
@@ -30,27 +30,27 @@ redisClient.setQuiet = function(q) {
 // Redis连接事件处理
 redisClient.on('connect', () => {
     if (!quiet) {
-        log(LOG_LEVELS.DEBUG, 'Redis客户端已连接');
+        log('DEBUG', 'Redis客户端已连接');
     }
 });
 
 redisClient.on('ready', () => {
     if (!quiet) {
-        log(LOG_LEVELS.DEBUG, 'Redis客户端准备就绪');
+        log('DEBUG', 'Redis客户端准备就绪');
     }
     redisClient.isRedisConnected = true;
 });
 
 redisClient.on('error', (err) => {
-    log(LOG_LEVELS.ERROR, `Redis错误: ${err.message}`);
+    log('ERROR', `Redis错误: ${err.message}`);
 });
 
 redisClient.on('reconnecting', () => {
-    log(LOG_LEVELS.INFO, 'Redis客户端重新连接中...');
+    log('INFO', 'Redis客户端重新连接中...');
 });
 
 redisClient.on('end', () => {
-    log(LOG_LEVELS.INFO, 'Redis客户端连接已关闭，开始重试连接...');
+    log('INFO', 'Redis客户端连接已关闭，开始重试连接...');
     redisClient.isRedisConnected = false;
     // 当连接关闭时，启动我们的重试机制
     retryRedisConnection();
@@ -58,7 +58,7 @@ redisClient.on('end', () => {
 
 // 连接Redis
 redisClient.connect().catch(err => {
-    log(LOG_LEVELS.ERROR, `Redis初次连接失败: ${err.message}`);
+    log('ERROR', `Redis初次连接失败: ${err.message}`);
     redisClient.isRedisConnected = false;
     // 启动重试机制
     retryRedisConnection();
@@ -81,17 +81,17 @@ async function retryRedisConnection() {
     
     // 先尝试立即重连一次
     if (!quiet) {
-        log(LOG_LEVELS.INFO, '尝试重新连接Redis...');
+        log('INFO', '尝试重新连接Redis...');
     }
     
     try {
         await redisClient.connect();
-        log(LOG_LEVELS.INFO, 'Redis连接已恢复');
+        log('INFO', 'Redis连接已恢复');
         isRedisConnected = true;
         redisClient.isRedisConnected = isRedisConnected; // 更新属性值
         return;
     } catch (err) {
-        log(LOG_LEVELS.ERROR, `Redis重连失败: ${err.message}`);
+        log('ERROR', `Redis重连失败: ${err.message}`);
         isRedisConnected = false;
         redisClient.isRedisConnected = isRedisConnected; // 更新属性值
     }
@@ -100,13 +100,13 @@ async function retryRedisConnection() {
     redisRetryInterval = setInterval(async () => {
         try {
             await redisClient.connect();
-            log(LOG_LEVELS.INFO, 'Redis连接已恢复');
+            log('INFO', 'Redis连接已恢复');
             isRedisConnected = true;
             redisClient.isRedisConnected = isRedisConnected; // 更新属性值
             clearInterval(redisRetryInterval);
             redisRetryInterval = null;
         } catch (err) {
-            log(LOG_LEVELS.ERROR, `Redis重连失败: ${err.message}`);
+            log('ERROR', `Redis重连失败: ${err.message}`);
         }
     }, 5000);
 }
@@ -130,7 +130,7 @@ redisClient.storeUserToken = async function(tokenStr, userId, expiresAt) {
         // 在用户Tokens集合中添加此Token
         await this.sAdd(`user_tokens:${userId}`, tokenStr);
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `存储用户Token失败: ${error.message}`);
+        log('ERROR', `存储用户Token失败: ${error.message}`);
         throw error;
     }
 };
@@ -162,7 +162,7 @@ redisClient.validateToken = async function(tokenStr) {
             expiresAt: expiresAt
         };
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `验证Token失败: ${error.message}`);
+        log('ERROR', `验证Token失败: ${error.message}`);
         return null;
     }
 };
@@ -182,7 +182,7 @@ redisClient.removeToken = async function(tokenStr) {
         // 删除Token
         await this.del(`token:${tokenStr}`);
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `移除Token失败: ${error.message}`);
+        log('ERROR', `移除Token失败: ${error.message}`);
         throw error;
     }
 };
@@ -211,7 +211,7 @@ redisClient.getUserTokens = async function(userId) {
         
         return validTokens;
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `获取用户Tokens失败: ${error.message}`);
+        log('ERROR', `获取用户Tokens失败: ${error.message}`);
         return [];
     }
 };
@@ -235,7 +235,7 @@ redisClient.removeAllUserTokens = async function(userId) {
         
         await pipeline.exec();
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `移除用户所有Tokens失败: ${error.message}`);
+        log('ERROR', `移除用户所有Tokens失败: ${error.message}`);
         throw error;
     }
 };
@@ -263,7 +263,7 @@ redisClient.addBannedIP = async function(ip, unbanTime, failedAttempts = 1) {
             JSON.stringify(banData)
         );
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `添加封禁IP失败: ${error.message}`);
+        log('ERROR', `添加封禁IP失败: ${error.message}`);
         throw error;
     }
 };
@@ -296,7 +296,7 @@ redisClient.checkBannedIP = async function(ip) {
             failedAttempts: banData.failedAttempts
         };
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `检查封禁IP失败: ${error.message}`);
+        log('ERROR', `检查封禁IP失败: ${error.message}`);
         return null;
     }
 };
@@ -309,7 +309,7 @@ redisClient.removeBannedIP = async function(ip) {
     try {
         await this.del(`banned_ip:${ip}`);
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `移除封禁IP失败: ${error.message}`);
+        log('ERROR', `移除封禁IP失败: ${error.message}`);
         throw error;
     }
 };
@@ -322,7 +322,7 @@ redisClient.clearIPFailures = async function(ip) {
     try {
         await this.del(`banned_ip:${ip}`);
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `清除IP失败记录失败: ${error.message}`);
+        log('ERROR', `清除IP失败记录失败: ${error.message}`);
         throw error;
     }
 };
@@ -364,7 +364,7 @@ redisClient.incrementIPFailures = async function(ip, maxAttempts, lockTimeMinute
             };
         }
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `增加IP失败尝试次数失败: ${error.message}`);
+        log('ERROR', `增加IP失败尝试次数失败: ${error.message}`);
         throw error;
     }
 };

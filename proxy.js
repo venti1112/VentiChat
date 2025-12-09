@@ -1,7 +1,7 @@
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const config = require('./config/config.json');
-const { log, LOG_LEVELS } = require('./utils/logger');
+const { log } = require('./utils/logger');
 const http = require('http');
 
 // 设置进程标题以标识代理进程
@@ -33,10 +33,10 @@ const proxyMiddleware = createProxyMiddleware({
     },
     onProxyReq: (proxyReq, req, res) => {
         // 添加日志记录
-        log(LOG_LEVELS.DEBUG, `代理HTTP请求: ${req.method} ${req.url} -> 端口 ${new URL(proxyReq.path, 'http://' + proxyReq.getHeader('host')).port}`);
+        log('DEBUG', `代理HTTP请求: ${req.method} ${req.url} -> 端口 ${new URL(proxyReq.path, 'http://' + proxyReq.getHeader('host')).port}`);
     },
     onError: function(err, req, res) {
-        log(LOG_LEVELS.ERROR, '代理错误: ' + err.message);
+        log('ERROR', '代理错误: ' + err.message);
         res.writeHead(500, {
             'Content-Type': 'text/plain',
         });
@@ -64,11 +64,11 @@ server.on('upgrade', (req, socket, head) => {
         target: targetUrl,
         changeOrigin: true
     }, (err) => {
-        log(LOG_LEVELS.ERROR, 'WebSocket代理错误: ' + err.message);
+        log('ERROR', 'WebSocket代理错误: ' + err.message);
         socket.destroy();
     });
 });
 
 server.listen(parseInt(config.port), () => {
-    log(LOG_LEVELS.INFO, `代理服务已监听端口 ${config.port}`);
+    log('INFO', `代理服务已监听端口 ${config.port}`);
 });

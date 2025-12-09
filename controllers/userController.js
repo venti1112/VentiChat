@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const path = require('path');
 const fs = require('fs');
 const { generateToken, removeToken, removeAllUserTokens } = require('../utils/auth');
-const { logUserLogin, logUserLogout, LOG_LEVELS, log } = require('../utils/logger');
+const { logUserLogin, logUserLogout, log } = require('../utils/logger');
 const redisClient = require('../utils/redisClient');
 const config = require('../config/config.json');
 
@@ -94,7 +94,7 @@ exports.login = async (req, res) => {
             }
         });
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `用户登录错误: ${error.message}`);
+        log('ERROR', `用户登录错误: ${error.message}`);
         res.status(500).json({ error: '服务器内部错误' });
     }
 };
@@ -208,7 +208,7 @@ exports.logout = async (req, res) => {
         
         res.json({ message: '退出登录成功' });
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `用户退出登录错误: ${error.message}`);
+        log('ERROR', `用户退出登录错误: ${error.message}`);
         res.status(500).json({ error: '服务器内部错误' });
     }
 };
@@ -222,11 +222,11 @@ exports.forceLogout = async (req, res) => {
         // 移除用户的所有Tokens
         await removeAllUserTokens(userId);
         
-        log(LOG_LEVELS.INFO, `管理员 ${req.user.username} 强制用户 ${userId} 退出登录 - IP: ${clientIP}`);
+        log('INFO', `管理员 ${req.user.username} 强制用户 ${userId} 退出登录 - IP: ${clientIP}`);
         
         res.json({ message: '用户已强制退出登录' });
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `强制用户退出登录错误: ${error.message}`);
+        log('ERROR', `强制用户退出登录错误: ${error.message}`);
         res.status(500).json({ error: '服务器内部错误' });
     }
 };

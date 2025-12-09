@@ -164,11 +164,20 @@
                 <h2>服务器配置</h2>
                 <div class="form-group">
                     <label for="baseUrl">基础URL:</label>
-                    <input type="text" id="baseUrl" name="baseUrl" value="http://localhost" required>
+                    <input type="text" id="baseUrl" name="baseUrl" value="http://localhost:3012" required>
                 </div>
                 <div class="form-group">
                     <label for="port">服务端口:</label>
                     <input type="number" id="port" name="port" value="3012" required>
+                </div>
+                <div class="form-group">
+                    <label for="logLevel">日志级别:</label>
+                    <select id="logLevel" name="logLevel">
+                        <option value="ERROR">ERROR</option>
+                        <option value="WARN">WARN</option>
+                        <option value="INFO" selected>INFO</option>
+                        <option value="DEBUG">DEBUG</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="workerCount">工作进程数量 (0表示使用CPU核心数):</label>

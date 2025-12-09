@@ -9,7 +9,7 @@ try {
 } catch (error) {
     // 如果配置文件不存在，则使用默认配置
     config = {
-        logLevel: 2 // 默认为INFO级别
+        logLevel: 'INFO' // 默认为INFO级别
     };
 }
 
@@ -55,37 +55,9 @@ const colors = {
     }
 };
 
-// 日志级别枚举（数值型，便于比较）
-const LOG_LEVELS = {
-    ERROR: 0,
-    WARN: 1,
-    INFO: 2,
-    DEBUG: 3
-};
-
 // 获取当前时间戳
 function getTimestamp() {
     return new Date().toISOString().replace('T', ' ').substring(0, 19);
-}
-
-// 获取日志级别名称
-function getLevelName(level) {
-    switch (level) {
-        case 'ERROR': 
-        case 0: 
-            return 'ERROR';
-        case 'WARN': 
-        case 1: 
-            return 'WARN';
-        case 'INFO': 
-        case 2: 
-            return 'INFO';
-        case 'DEBUG': 
-        case 3: 
-            return 'DEBUG';
-        default: 
-            return 'UNKNOWN';
-    }
 }
 
 // 日志级别颜色映射
@@ -126,13 +98,13 @@ function colorizeConsoleMessage(message) {
 
 /**
  * 格式化日志消息
- * @param {number} level 日志级别
+ * @param {string} level 日志级别
  * @param {string} message 日志消息
  * @returns {string} 格式化后的日志消息
  */
 function formatMessage(level, message) {
     const timestamp = getTimestamp();
-    const levelName = getLevelName(level);
+    const levelName = level; // 使用传入的实际日志级别而不是配置的日志级别
     const processInternalId = processIds.has(process.pid) ? processIds.get(process.pid) : process.pid;
     
     // 确定进程类型
@@ -162,28 +134,25 @@ function formatMessage(level, message) {
 
 /**
  * 主日志函数
- * @param {number} level 日志级别
+ * @param {string} level 日志级别
  * @param {string} message 日志消息
  */
 function log(level, message) {
     // 从配置中获取日志级别，如果未设置则默认为 INFO
-    const configLogLevel = config.logLevel !== undefined ? config.logLevel : LOG_LEVELS.INFO;
+    let configLogLevel = config.logLevel !== undefined ? config.logLevel : 'INFO';
     
-    // 只有当日志级别小于等于配置的日志级别时才输出
-    // 注意：这里的level是LOG_LEVELS中的数值，比如WARN是1，INFO是2
-    if (typeof level === 'string') {
-        // 如果传入的是字符串形式的日志级别，转换为对应数值
-        const levelValue = LOG_LEVELS[level];
-        if (levelValue === undefined || levelValue > configLogLevel) {
-            return;
-        }
-    } else if (level > configLogLevel) {
+    if(configLogLevel === 'INFO' && level === 'DEBUG'){
+        return;
+    } else if(configLogLevel === 'WARN' && (level === 'DEBUG' || level === 'INFO')){
+        return;
+    } else if(configLogLevel === 'ERROR' && (level === 'DEBUG' || level === 'INFO' || level === 'WARN')){
         return;
     }
+
     
     const formattedMessage = formatMessage(level, message);
-    const coloredLevel = `${levelColors[getLevelName(level)] || ''}[${getLevelName(level)}]${colors.reset}`;
-    const coloredMessage = formattedMessage.replace(`[${getLevelName(level)}]`, coloredLevel);
+    const coloredLevel = `${levelColors[config.logLevel] || ''}[${config.logLevel}]${colors.reset}`;
+    const coloredMessage = formattedMessage.replace(`[${config.logLevel}]`, coloredLevel);
     
     // 输出到控制台（带颜色）
     console.log(colorizeConsoleMessage(coloredMessage));
@@ -191,7 +160,7 @@ function log(level, message) {
     // 异步写入文件（不带颜色）
     const logFileName = `${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}.log`;
     const logFilePath = path.join(logDir, logFileName);
-    const fileLogMessage = `[${getTimestamp()}] [${getLevelName(level)}] ${message}\n`;
+    const fileLogMessage = `[${getTimestamp()}] [${config.logLevel}] ${message}\n`;
     
     fs.appendFile(logFilePath, fileLogMessage, { encoding: 'utf8' }, (err) => {
         if (err) {
@@ -209,9 +178,9 @@ function log(level, message) {
  */
 function logUserLogin(ip, username, success, errorMessage = null) {
     if (success) {
-        log(LOG_LEVELS.INFO, `用户登录 - IP: ${ip}, 用户名: ${username}, 结果: 成功`);
+        log('INFO', `用户登录 - IP: ${ip}, 用户名: ${username}, 结果: 成功`);
     } else {
-        log(LOG_LEVELS.WARN, `用户登录 - IP: ${ip}, 用户名: ${username}, 结果: 失败, 原因: ${errorMessage}`);
+        log('WARN', `用户登录 - IP: ${ip}, 用户名: ${username}, 结果: 失败, 原因: ${errorMessage}`);
     }
 }
 
@@ -224,9 +193,9 @@ function logUserLogin(ip, username, success, errorMessage = null) {
  */
 function logUserLogout(ip, username, success, errorMessage = null) {
     if (success) {
-        log(LOG_LEVELS.INFO, `用户退出登录 - IP: ${ip}, 用户名: ${username}, 结果: 成功`);
+        log('INFO', `用户退出登录 - IP: ${ip}, 用户名: ${username}, 结果: 成功`);
     } else {
-        log(LOG_LEVELS.WARN, `用户退出登录 - IP: ${ip}, 用户名: ${username}, 结果: 失败, 原因: ${errorMessage}`);
+        log('WARN', `用户退出登录 - IP: ${ip}, 用户名: ${username}, 结果: 失败, 原因: ${errorMessage}`);
     }
 }
 
@@ -239,9 +208,9 @@ function logUserLogout(ip, username, success, errorMessage = null) {
  */
 function logSocketConnect(ip, username, success, errorMessage = null) {
     if (success) {
-        log(LOG_LEVELS.INFO, `用户连接Socket.IO - IP: ${ip}, 用户名: ${username}, 结果: 成功`);
+        log('INFO', `用户连接Socket.IO - IP: ${ip}, 用户名: ${username}, 结果: 成功`);
     } else {
-        log(LOG_LEVELS.WARN, `用户连接Socket.IO - IP: ${ip}, 用户名: ${username}, 结果: 失败, 原因: ${errorMessage}`);
+        log('WARN', `用户连接Socket.IO - IP: ${ip}, 用户名: ${username}, 结果: 失败, 原因: ${errorMessage}`);
     }
 }
 
@@ -254,9 +223,9 @@ function logSocketConnect(ip, username, success, errorMessage = null) {
  */
 function logSocketDisconnect(ip, username, success, errorMessage = null) {
     if (success) {
-        log(LOG_LEVELS.INFO, `用户断开Socket.IO - IP: ${ip}, 用户名: ${username}, 结果: 成功`);
+        log('INFO', `用户断开Socket.IO - IP: ${ip}, 用户名: ${username}, 结果: 成功`);
     } else {
-        log(LOG_LEVELS.WARN, `用户断开Socket.IO - IP: ${ip}, 用户名: ${username}, 结果: 失败, 原因: ${errorMessage}`);
+        log('WARN', `用户断开Socket.IO - IP: ${ip}, 用户名: ${username}, 结果: 失败, 原因: ${errorMessage}`);
     }
 }
 
@@ -270,7 +239,7 @@ function logSocketDisconnect(ip, username, success, errorMessage = null) {
  * @param {string} errorMessage 错误信息
  */
 function logUnauthorizedAccess(ip, username, method, path, statusCode, errorMessage) {
-    log(LOG_LEVELS.WARN, `异常访问 - IP: ${ip}, 用户名: ${username}, 方法: ${method}, 路径: ${path}, 状态码: ${statusCode}, 原因: ${errorMessage}`);
+    log('WARN', `异常访问 - IP: ${ip}, 用户名: ${username}, 方法: ${method}, 路径: ${path}, 状态码: ${statusCode}, 原因: ${errorMessage}`);
 }
 
 /**
@@ -283,9 +252,9 @@ function logUnauthorizedAccess(ip, username, method, path, statusCode, errorMess
  * @param {string} errorMessage 错误信息
  */
 function logHttpError(ip, username, method, url, statusCode, errorMessage) {
-    let level = LOG_LEVELS.INFO;
-    if (statusCode >= 500) level = LOG_LEVELS.ERROR;
-    else if (statusCode >= 400) level = LOG_LEVELS.WARN;
+    let level = 'INFO';
+    if (statusCode >= 500) level = 'ERROR';
+    else if (statusCode >= 400) level = 'WARN';
     
     log(level, `HTTP ${statusCode} - IP: ${ip}, 用户: ${username || '未知用户'}, 方法: ${method}, URL: ${url}, 错误: ${errorMessage}`);
 }
@@ -296,8 +265,8 @@ function logHttpError(ip, username, method, url, statusCode, errorMessage) {
  */
 function logDatabaseQuery(message) {
     // 仅在DEBUG级别时记录数据库查询
-    if (config.logLevel >= LOG_LEVELS.DEBUG) {
-        log(LOG_LEVELS.DEBUG, `数据库查询: ${message}`);
+    if (config.logLevel >= 'DEBUG') {
+        log('DEBUG', `数据库查询: ${message}`);
     }
 }
 
@@ -305,7 +274,7 @@ function logDatabaseQuery(message) {
  * 数据库重试日志记录函数
  */
 function logDatabaseRetry() {
-    log(LOG_LEVELS.INFO, '数据库连接重试中...');
+    log('INFO', '数据库连接重试中...');
 }
 
 /**
@@ -314,7 +283,7 @@ function logDatabaseRetry() {
  * @param {string} username 用户名
  */
 function logBrowserDevToolsWarning(ip, username) {
-    log(LOG_LEVELS.DEBUG, `浏览器开发者工具探测 - IP: ${ip}, 用户: ${username}`);
+    log('DEBUG', `浏览器开发者工具探测 - IP: ${ip}, 用户: ${username}`);
 }
 
 
@@ -342,6 +311,5 @@ module.exports = {
     logDatabaseQuery,
     logDatabaseRetry,
     logBrowserDevToolsWarning,
-    LOG_LEVELS,
     processIds
 };

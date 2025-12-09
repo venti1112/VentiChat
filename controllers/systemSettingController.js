@@ -1,5 +1,5 @@
 const models = require('../models');
-const { log, LOG_LEVELS } = require('../utils/logger');
+const { log } = require('../utils/logger');
 
 /**
  * 获取系统设置
@@ -24,7 +24,7 @@ exports.getSettings = async (req, res) => {
             data: settings
         });
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `获取系统设置失败: ${error.message}`);
+        log('ERROR', `获取系统设置失败: ${error.message}`);
         res.status(500).json({ error: '获取系统设置失败: ' + error.message });
     }
 };
@@ -52,7 +52,7 @@ exports.updateSettings = async (req, res) => {
             data: settings
         });
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `更新系统设置失败: ${error.message}`);
+        log('ERROR', `更新系统设置失败: ${error.message}`);
         res.status(500).json({ error: '更新系统设置失败: ' + error.message });
     }
 };
@@ -69,14 +69,14 @@ exports.clearAllMessages = async (req, res) => {
             where: {}
         });
         
-        log(LOG_LEVELS.INFO, '管理员清除了所有消息记录');
+        log('INFO', '管理员清除了所有消息记录');
         
         res.json({
             success: true,
             message: '所有消息记录已清除'
         });
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `清除所有消息记录失败: ${error.message}`);
+        log('ERROR', `清除所有消息记录失败: ${error.message}`);
         res.status(500).json({ error: '清除所有消息记录失败: ' + error.message });
     }
 };

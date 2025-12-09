@@ -1,6 +1,6 @@
 const { Sequelize } = require('sequelize');
 const config = require('../config/config.json');
-const { log, LOG_LEVELS } = require('./logger');
+const { log } = require('./logger');
 
 // 创建Sequelize实例
 const sequelize = new Sequelize(
@@ -34,11 +34,11 @@ const retryDelay = 5000; // 重试延迟时间，5秒
 async function connectToDatabase() {
     try {
         await sequelize.authenticate();
-        log(LOG_LEVELS.DEBUG, '数据库连接成功');
+        log('DEBUG', '数据库连接成功');
         isDatabaseConnected = true;
         return true;
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `数据库连接失败: ${error.message}`);
+        log('ERROR', `数据库连接失败: ${error.message}`);
         isDatabaseConnected = false;
         return false;
     }
@@ -49,15 +49,15 @@ async function checkDatabaseConnection() {
     try {
         await sequelize.query('SELECT 1');
         if (!isDatabaseConnected) {
-            log(LOG_LEVELS.INFO, '数据库连接已恢复');
+            log('INFO', '数据库连接已恢复');
             isDatabaseConnected = true;
         }
         return true;
     } catch (error) {
         if (isDatabaseConnected) {
-            log(LOG_LEVELS.ERROR, `数据库连接丢失: ${error.message}`);
+            log('ERROR', `数据库连接丢失: ${error.message}`);
             isDatabaseConnected = false;
-            log(LOG_LEVELS.INFO, '启动数据库重连机制...');
+            log('INFO', '启动数据库重连机制...');
             retryDatabaseConnection();
         }
         return false;
@@ -75,14 +75,14 @@ async function retryDatabaseConnection() {
     }
     
     // 先尝试立即重连一次
-    log(LOG_LEVELS.INFO, '尝试重新连接数据库...');
+    log('INFO', '尝试重新连接数据库...');
     let connected = await connectToDatabase();
     if (connected) {
-        log(LOG_LEVELS.INFO, '数据库连接已恢复');
+        log('INFO', '数据库连接已恢复');
         return;
     }
     
-    log(LOG_LEVELS.INFO, `将在 ${retryDelay/1000} 秒后继续重试...`);
+    log('INFO', `将在 ${retryDelay/1000} 秒后继续重试...`);
     
     // 每5秒重试一次
     retryIntervalId = setInterval(async () => {
@@ -90,9 +90,9 @@ async function retryDatabaseConnection() {
         if (connected) {
             clearInterval(retryIntervalId);
             retryIntervalId = null;
-            log(LOG_LEVELS.INFO, '数据库连接已恢复');
+            log('INFO', '数据库连接已恢复');
         } else {
-            log(LOG_LEVELS.INFO, `将在 ${retryDelay/1000} 秒后继续重试...`);
+            log('INFO', `将在 ${retryDelay/1000} 秒后继续重试...`);
         }
     }, retryDelay);
 }
@@ -107,7 +107,7 @@ function startDatabaseHealthCheck() {
 
 // 初始化数据库连接
 connectToDatabase().catch(err => {
-    log(LOG_LEVELS.ERROR, `数据库初次连接失败: ${err.message}`);
+    log('ERROR', `数据库初次连接失败: ${err.message}`);
     // 启动重试机制
     retryDatabaseConnection();
 });

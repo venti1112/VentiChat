@@ -1,5 +1,5 @@
 const os = require('os');
-const { log, LOG_LEVELS } = require('../utils/logger');
+const { log } = require('../utils/logger');
 
 /**
  * 获取系统信息
@@ -19,7 +19,7 @@ exports.getSystemInfo = async (req, res) => {
 
         res.json(sysInfo);
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `获取系统信息失败: ${error.message}`);
+        log('ERROR', `获取系统信息失败: ${error.message}`);
         res.status(500).json({ error: '获取系统信息失败' });
     }
 };

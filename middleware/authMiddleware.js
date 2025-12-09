@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const models = require('../models');
 const { verifyToken } = require('../utils/jwt'); // 正确导入verifyToken函数
 const redisClient = require('../utils/redisClient');
-const { logUnauthorizedAccess, log, LOG_LEVELS } = require('../utils/logger');
+const { logUnauthorizedAccess, log } = require('../utils/logger');
 
 // 获取客户端IP地址的辅助函数
 function getClientIP(req) {

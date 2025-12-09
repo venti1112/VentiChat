@@ -1,5 +1,5 @@
 const { isDatabaseConnected } = require('../utils/databaseClient');
-const { log, LOG_LEVELS } = require('../utils/logger');
+const { log } = require('../utils/logger');
 
 /**
  * 数据库连接状态检查中间件
@@ -27,7 +27,7 @@ async function databaseStatusMiddleware(req, res, next) {
                 }
             }
             
-            log(LOG_LEVELS.ERROR, `数据库连接失败: ${method} ${url}`, {
+            log('ERROR', `数据库连接失败: ${method} ${url}`, {
                 clientIP,
                 username,
                 method,
@@ -41,7 +41,7 @@ async function databaseStatusMiddleware(req, res, next) {
         }
         next();
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `数据库状态检查中间件错误: ${error.message}`);
+        log('ERROR', `数据库状态检查中间件错误: ${error.message}`);
         // 出错时继续处理请求，避免因检查机制问题影响正常用户
         next();
     }

@@ -2,7 +2,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const config = require('../config/config.json');
 const redisClient = require('./redisClient');
-const { log, LOG_LEVELS } = require('./logger');
+const { log } = require('./logger');
 
 /**
  * 生成JWT Token并存储到Redis
@@ -24,7 +24,7 @@ async function generateToken(payload, userId) {
         
         return token;
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `生成Token失败: ${error.message}`);
+        log('ERROR', `生成Token失败: ${error.message}`);
         throw error;
     }
 }
@@ -65,7 +65,7 @@ async function removeToken(token) {
     try {
         await redisClient.removeToken(token);
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `移除Token失败: ${error.message}`);
+        log('ERROR', `移除Token失败: ${error.message}`);
         throw error;
     }
 }
@@ -78,7 +78,7 @@ async function removeAllUserTokens(userId) {
     try {
         await redisClient.removeAllUserTokens(userId);
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `移除用户所有Tokens失败: ${error.message}`);
+        log('ERROR', `移除用户所有Tokens失败: ${error.message}`);
         throw error;
     }
 }

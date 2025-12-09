@@ -9,21 +9,21 @@ const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const cluster = require('cluster');
 const config = require('./config/config.json');
-const { log, LOG_LEVELS, processIds } = require('./utils/logger');
+const { log, processIds } = require('./utils/logger');
 const redisClient = require('./utils/redisClient');
 const { sequelize } = require('./utils/databaseClient');
 
 // 处理来自主进程的转发消息
 if (cluster.isWorker) {
     process.on('message', (msg) => {
-        log(LOG_LEVELS.DEBUG, `工作进程收到主进程消息: ${JSON.stringify(msg)}`);
+        log('DEBUG', `工作进程收到主进程消息: ${JSON.stringify(msg)}`);
         if (msg.type === 'emitToSocket') {
             const io = app.get('io');
             const WebSocketManager = require('./utils/websocketManager');
             WebSocketManager.emitToSocket(msg.socketId, msg.event, msg.data, io);
         } else if (msg.type === 'assignId') {
             // 不再使用assignId消息设置ID，而是直接从端口号推导
-            log(LOG_LEVELS.DEBUG, `忽略assignId消息，将从端口号推导ID`);
+            log('DEBUG', `忽略assignId消息，将从端口号推导ID`);
         }
     });
 }
@@ -117,7 +117,7 @@ app.use((req, res, next) => {
                     req.connection.remoteAddress || 
                     '未知IP');
     
-    log(LOG_LEVELS.WARN, `404 Not Found - IP: ${clientIP} - Method: ${req.method} - URL: ${req.originalUrl}`);
+    log('WARN', `404 Not Found - IP: ${clientIP} - Method: ${req.method} - URL: ${req.originalUrl}`);
     
     // 如果是API请求，返回JSON格式错误
     if (req.originalUrl.startsWith('/api')) {
@@ -170,7 +170,7 @@ app.use((req, res, next) => {
         // 设置进程ID映射
         processIds.set(process.pid, workerId);
         
-        log(LOG_LEVELS.INFO, `工作进程 ${workerId} 已监听端口 ${parseInt(port)}`);
+        log('INFO', `工作进程 ${workerId} 已监听端口 ${parseInt(port)}`);
     });
     
     io.on('connection', async (socket) => {
@@ -194,19 +194,19 @@ app.use((req, res, next) => {
                     userId = user.userId;
                     username = user.username;
                 } else {
-                    log(LOG_LEVELS.WARN, `用户不存在 [用户ID: ${decoded.id || decoded.userId}]`);
+                    log('WARN', `用户不存在 [用户ID: ${decoded.id || decoded.userId}]`);
                     socket.emit('unauthorized', { message: '用户不存在' });
                     socket.disconnect(true);
                     return;
                 }
             } catch (error) {
-                log(LOG_LEVELS.WARN, `令牌验证失败: ${error.message}`);
+                log('WARN', `令牌验证失败: ${error.message}`);
                 socket.emit('unauthorized', { message: '令牌无效' });
                 socket.disconnect(true);
                 return;
             }
         } else {
-            log(LOG_LEVELS.WARN, '缺少访问令牌');
+            log('WARN', '缺少访问令牌');
             socket.emit('unauthorized', { message: '缺少访问令牌' });
             socket.disconnect(true);
             return;
@@ -218,7 +218,7 @@ app.use((req, res, next) => {
         await WebSocketManager.storeUserSocket(userId, socket.id, workerId);
         
         // 输出WebSocket连接建立日志
-        log(LOG_LEVELS.DEBUG, `WebSocket连接已建立 [用户: ${username}(${userId})] [Socket ID: ${socket.id}]`);
+        log('DEBUG', `WebSocket连接已建立 [用户: ${username}(${userId})] [Socket ID: ${socket.id}]`);
         
         // 发送连接成功的事件给客户端
         socket.emit('connected', { message: '连接成功', userId: userId });
@@ -227,7 +227,7 @@ app.use((req, res, next) => {
         socket.on('disconnect', async (reason) => {
             await WebSocketManager.removeUserSocket(userId, socket.id, workerId);
             // 输出WebSocket连接断开日志
-            log(LOG_LEVELS.DEBUG, `WebSocket连接已断开 [用户: ${username}(${userId})] [Socket ID: ${socket.id}] [原因: ${reason}]`);
+            log('DEBUG', `WebSocket连接已断开 [用户: ${username}(${userId})] [Socket ID: ${socket.id}] [原因: ${reason}]`);
         });
 
         // 加入聊天室
@@ -238,7 +238,7 @@ app.use((req, res, next) => {
                 socket.join(`room_${roomId}`);
                 socket.emit('joinedRoom', { roomId: roomId }); // 确认加入房间
                 // 输出加入聊天室日志
-                log(LOG_LEVELS.DEBUG, `用户加入聊天室 [用户: ${username}(${userId})] [房间ID: ${roomId}]`);
+                log('DEBUG', `用户加入聊天室 [用户: ${username}(${userId})] [房间ID: ${roomId}]`);
             }
         });
         
@@ -250,26 +250,26 @@ app.use((req, res, next) => {
                 socket.leave(`room_${roomId}`);
                 socket.emit('leftRoom', { roomId: roomId }); // 确认离开房间
                 // 输出离开聊天室日志
-                log(LOG_LEVELS.INFO, `用户离开聊天室 [用户: ${username}(${userId})] [房间ID: ${roomId}]`);
+                log('INFO', `用户离开聊天室 [用户: ${username}(${userId})] [房间ID: ${roomId}]`);
             }
         });
         
         // 处理错误
         socket.on('error', (error) => {
-            log(LOG_LEVELS.ERROR, `Socket错误 [用户: ${username}(${userId})]: ${error.message}`);
+            log('ERROR', `Socket错误 [用户: ${username}(${userId})]: ${error.message}`);
         });
         
         // 处理发送消息事件
         socket.on('sendMessage', async (data) => {
             try {
                 
-                log(LOG_LEVELS.DEBUG, `收到发送消息请求 [用户: ${username}(${userId})] [数据: ${JSON.stringify(data)}]`);
+                log('DEBUG', `收到发送消息请求 [用户: ${username}(${userId})] [数据: ${JSON.stringify(data)}]`);
                 
                 const { rid, content, type } = data;
                 
                 // 检查必要参数
                 if (!rid || !content) {
-                    log(LOG_LEVELS.WARN, `缺少必要参数 [用户: ${username}(${userId})] [rid: ${rid}, content: ${content}]`);
+                    log('WARN', `缺少必要参数 [用户: ${username}(${userId})] [rid: ${rid}, content: ${content}]`);
                     socket.emit('errorMessage', { message: '缺少必要参数' });
                     return;
                 }
@@ -283,7 +283,7 @@ app.use((req, res, next) => {
                 });
                 
                 if (!roomMember) {
-                    log(LOG_LEVELS.WARN, `用户不是聊天室成员 [用户: ${username}(${userId})] [房间ID: ${rid}]`);
+                    log('WARN', `用户不是聊天室成员 [用户: ${username}(${userId})] [房间ID: ${rid}]`);
                     socket.emit('errorMessage', { message: '您不是该聊天室的成员' });
                     return;
                 }
@@ -296,7 +296,7 @@ app.use((req, res, next) => {
                     type: type || 'text'
                 });
                 
-                log(LOG_LEVELS.DEBUG, `消息创建成功 [消息ID: ${message.messageId}] [用户: ${username}(${userId})] [房间ID: ${rid}]`);
+                log('DEBUG', `消息创建成功 [消息ID: ${message.messageId}] [用户: ${username}(${userId})] [房间ID: ${rid}]`);
                 
                 // 获取发送者信息
                 const sender = await models.User.findByPk(userId, {
@@ -328,7 +328,7 @@ app.use((req, res, next) => {
                     }
                 }
                 
-                log(LOG_LEVELS.INFO, `消息已广播到房间 [消息ID: ${message.messageId}] [用户: ${username}(${userId})] [房间ID: ${rid}]`);
+                log('INFO', `消息已广播到房间 [消息ID: ${message.messageId}] [用户: ${username}(${userId})] [房间ID: ${rid}]`);
                 
                 // 向发送者确认消息已发送
                 socket.emit('messageSent', { 
@@ -336,9 +336,9 @@ app.use((req, res, next) => {
                     ...messageData
                 });
                 
-                log(LOG_LEVELS.INFO, `用户发送消息 [工作进程: ${workerId}] [用户: ${username}(${userId})] [房间ID: ${rid}] [消息ID: ${message.messageId}]`);
+                log('INFO', `用户发送消息 [工作进程: ${workerId}] [用户: ${username}(${userId})] [房间ID: ${rid}] [消息ID: ${message.messageId}]`);
             } catch (error) {
-                log(LOG_LEVELS.ERROR, `发送消息失败: ${error.message}`);
+                log('ERROR', `发送消息失败: ${error.message}`);
                 socket.emit('errorMessage', { message: '发送消息失败: ' + error.message });
             }
         });
@@ -347,7 +347,7 @@ app.use((req, res, next) => {
 
 // 处理未捕获的异常
 process.on('uncaughtException', (err) => {
-    log(LOG_LEVELS.ERROR, `未捕获的异常: ${err.message}\n${err.stack}`);
+    log('ERROR', `未捕获的异常: ${err.message}\n${err.stack}`);
     
     // 向主进程发送错误信息
     if (process.send) {
@@ -362,7 +362,7 @@ process.on('uncaughtException', (err) => {
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-    log(LOG_LEVELS.ERROR, `未处理的Promise拒绝: ${reason}\n${reason instanceof Error ? reason.stack : ''}`);
+    log('ERROR', `未处理的Promise拒绝: ${reason}\n${reason instanceof Error ? reason.stack : ''}`);
     
     // 向主进程发送错误信息
     if (process.send) {
@@ -387,7 +387,7 @@ async function startServer(httpServer) {
             const workerId = processIds.get(process.pid) !== undefined ? processIds.get(process.pid) : 'unknown';
         });
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `启动服务器时发生错误: ${error.message}\n${error.stack}`);
+        log('ERROR', `启动服务器时发生错误: ${error.message}\n${error.stack}`);
         
         // 向主进程发送错误信息
         if (process.send) {

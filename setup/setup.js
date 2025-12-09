@@ -27,6 +27,7 @@ async function init() {
     // 处理初始化表单提交
     app.post('/setup', async (req, res) => {
         try {
+            // 直接使用req.body而不是FormData
             const answers = req.body;
             
             // 发送响应头，准备流式传输
@@ -54,18 +55,19 @@ async function init() {
             });
 
             // Check and drop existing database (if exists)
+            res.write('data: ' + JSON.stringify({status: 'initializing', message: '正在删除现有数据库（如果存在）' }) + '\n\n');
             await connection.query(`DROP DATABASE IF EXISTS \`${answers.dbName}\`;`);
-            res.write('data: ' + JSON.stringify({status: 'initializing', message: '已删除现有数据库（如果存在）' }) + '\n\n');
             log('INFO', `已删除现有数据库 ${answers.dbName}（如果存在）`);
 
             // Create new database
+            res.write('data: ' + JSON.stringify({status: 'initializing', message: '正在创建新数据库' }) + '\n\n');
             await connection.query(`CREATE DATABASE \`${answers.dbName}\`;`);
-            res.write('data: ' + JSON.stringify({status: 'initializing', message: '已创建新数据库' }) + '\n\n');
             log('INFO', `已创建新数据库 ${answers.dbName}`);
 
             await connection.changeUser({ database: answers.dbName });
 
             // Create users table
+            res.write('data: ' + JSON.stringify({status: 'initializing', message: '正在创建用户表' }) + '\n\n');
             await connection.query(`
                 CREATE TABLE IF NOT EXISTS users (
                     user_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -82,9 +84,10 @@ async function init() {
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB;
             `);
-            res.write('data: ' + JSON.stringify({status: 'initializing', message: '已创建用户表' }) + '\n\n');
+
 
             // Create rooms table
+            res.write('data: ' + JSON.stringify({status: 'initializing', message: '正在创建房间表' }) + '\n\n');
             await connection.query(`
                 CREATE TABLE IF NOT EXISTS rooms (
                     room_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -99,9 +102,9 @@ async function init() {
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB;
             `);
-            res.write('data: ' + JSON.stringify({status: 'initializing', message: '已创建房间表' }) + '\n\n');
 
             // Create room members table
+            res.write('data: ' + JSON.stringify({status: 'initializing', message: '正在创建房间成员表' }) + '\n\n');
             await connection.query(`
                 CREATE TABLE IF NOT EXISTS room_members (
                     user_id INT NOT NULL,
@@ -113,9 +116,9 @@ async function init() {
                     PRIMARY KEY (user_id, room_id)
                 ) ENGINE=InnoDB;
             `);
-            res.write('data: ' + JSON.stringify({status: 'initializing', message: '已创建房间成员表' }) + '\n\n');
 
             // Create messages table
+            res.write('data: ' + JSON.stringify({status: 'initializing', message: '正在创建消息表' }) + '\n\n');
             await connection.query(`
                 CREATE TABLE IF NOT EXISTS messages (
                     message_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -129,9 +132,9 @@ async function init() {
                     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB;
             `);
-            res.write('data: ' + JSON.stringify({status: 'initializing', message: '已创建消息表' }) + '\n\n');
 
             // Create join requests table
+            res.write('data: ' + JSON.stringify({status: 'initializing', message: '正在创建加入聊天室请求表' }) + '\n\n');
             await connection.query(`
                 CREATE TABLE IF NOT EXISTS join_requests (
                     request_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -142,9 +145,9 @@ async function init() {
                     request_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB;
             `);
-            res.write('data: ' + JSON.stringify({status: 'initializing', message: '已创建加入请求表' }) + '\n\n');
 
             // Create system settings table
+            res.write('data: ' + JSON.stringify({status: 'initializing', message: '正在创建系统设置表' }) + '\n\n');
             await connection.query(`
                 CREATE TABLE IF NOT EXISTS system_settings (
                     setting_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -157,18 +160,18 @@ async function init() {
                     login_lock_time INT DEFAULT 30
                 ) ENGINE=InnoDB;
             `);
-            res.write('data: ' + JSON.stringify({status: 'initializing', message: '已创建系统设置表' }) + '\n\n');
 
             // Insert default system settings
+            res.write('data: ' + JSON.stringify({status: 'initializing', message: '正在配置系统设置' }) + '\n\n');
             await connection.query(`
                 INSERT INTO system_settings (
                     setting_id, message_retention_days, max_file_size, site_name, 
                     allow_user_registration, max_login_attempts, max_room_members, login_lock_time
                 ) VALUES (1, 180, 10485760, 'VentiChat', true, 5, 1000, 30)
             `);
-            res.write('data: ' + JSON.stringify({status: 'initializing', message: '已插入默认系统设置' }) + '\n\n');
 
             // Create default admin user
+            res.write('data: ' + JSON.stringify({status: 'initializing', message: '正在创建默认管理员用户' }) + '\n\n');
             const hashedPassword = bcrypt.hashSync(answers.adminPassword, 10);
             await connection.query(
                 `INSERT INTO users (
@@ -176,7 +179,7 @@ async function init() {
                 ) VALUES (?, ?, ?, true, 'active')`,
                 [answers.adminUsername, answers.adminUsername, hashedPassword]
             );
-            res.write('data: ' + JSON.stringify({status: 'initializing', message: '已创建默认管理员用户' }) + '\n\n');
+            
 
             // Get admin user ID
             const [adminRows] = await connection.query(
@@ -186,13 +189,14 @@ async function init() {
             const adminId = adminRows[0].user_id;
 
             // Create default main room
+            res.write('data: ' + JSON.stringify({status: 'initializing', message: '正在创建默认房间' }) + '\n\n');
             await connection.query(
                 `INSERT INTO rooms (
                     name, creator_id, is_private, require_approval
                 ) VALUES (?, ?, false, false)`,
                 ['VentiChat大厅', adminId]
             );
-            res.write('data: ' + JSON.stringify({status: 'initializing', message: '已创建默认大厅房间' }) + '\n\n');
+            
 
             // Get main room ID
             const [hallRows] = await connection.query(
@@ -202,11 +206,11 @@ async function init() {
             const hallId = hallRows[0].room_id;
 
             // Add admin user to main room (as moderator)
+            res.write('data: ' + JSON.stringify({status: 'initializing', message: '正在添加管理员到默认房间' }) + '\n\n');
             await connection.query(
                 `INSERT INTO room_members (user_id, room_id, is_moderator) VALUES (?, ?, true)`,
                 [adminId, hallId]
             );
-            res.write('data: ' + JSON.stringify({status: 'initializing', message: '已添加管理员到大厅房间' }) + '\n\n');
 
             // Save configuration
             const config = {
@@ -225,7 +229,7 @@ async function init() {
                 encryptionKey,
                 baseUrl: answers.baseUrl,
                 port: answers.port,
-                logLevel: 2,
+                logLevel: answers.logLevel || "INFO",
                 workerCount: parseInt(answers.workerCount, 10) || 0
             };
 
@@ -269,9 +273,6 @@ async function init() {
     const server = app.listen(port, () => {
         log('INFO', `初始化服务器已在端口 ${port} 上启动，请访问以进行初始化！`);
     });
-    
-    // 导出server变量，以便在其他地方可以关闭它
-    return server;
 }
 
 init();

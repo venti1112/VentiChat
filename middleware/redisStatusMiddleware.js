@@ -1,5 +1,5 @@
 const redisClient = require('../utils/redisClient');
-const { log, LOG_LEVELS } = require('../utils/logger');
+const { log } = require('../utils/logger');
 
 /**
  * Redis连接状态检查中间件
@@ -27,7 +27,7 @@ async function redisStatusMiddleware(req, res, next) {
                 }
             }
             
-            log(LOG_LEVELS.ERROR, `Redis连接失败: ${method} ${url}`, {
+            log('ERROR', `Redis连接失败: ${method} ${url}`, {
                 clientIP,
                 username,
                 method,
@@ -41,7 +41,7 @@ async function redisStatusMiddleware(req, res, next) {
         }
         next();
     } catch (error) {
-        log(LOG_LEVELS.ERROR, `Redis状态检查中间件错误: ${error.message}`);
+        log('ERROR', `Redis状态检查中间件错误: ${error.message}`);
         // 出错时继续处理请求，避免因检查机制问题影响正常用户
         next();
     }

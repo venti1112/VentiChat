@@ -3,6 +3,7 @@ const cron = require('node-cron');
 const path = require('path');
 const fs = require('fs');
 const { log } = require('./logger');
+const { Op } = require('sequelize');
 
 // 默认保存期限（天）
 const DEFAULT_RETENTION_DAYS = 180;
@@ -20,9 +21,9 @@ const cleanupExpiredData = async (models, app) => {
         // 查找需要删除的消息
         const expiredMessages = await models.Message.findAll({
             where: {
-                createdAt: { $lt: cutoffDate }
+                sentAt: { [Op.lt]: cutoffDate }
             },
-            attributes: ['id', 'type', 'fileUrl']
+            attributes: ['messageId', 'type', 'fileUrl']
         });
         
         if (expiredMessages.length === 0) {
@@ -37,7 +38,7 @@ const cleanupExpiredData = async (models, app) => {
                 // 将URL转换为本地文件路径
                 const filePath = path.join(__dirname, '..', 'public', message.fileUrl);
                 filesToDelete.push({
-                    messageId: message.id,
+                    messageId: message.messageId,
                     filePath
                 });
             }
@@ -59,15 +60,8 @@ const cleanupExpiredData = async (models, app) => {
         // 再删除消息记录
         const messagesDeleted = await models.Message.destroy({
             where: {
-                id: expiredMessages.map(m => m.id)
+                messageId: expiredMessages.map(m => m.messageId)
             }
-        });
-        
-        // 清理过期的token
-        const tokensDeleted = await models.Token.destroy({
-          where: {
-            expiresAt: { $lt: cutoffDate }
-          }
         });
         
         log('INFO', `清理完成：删除了 ${messagesDeleted} 条消息，${filesDeleted} 个文件`);
