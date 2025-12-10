@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const cluster = require('cluster');
 const { log } = require('./logger');
+const redisClient = require('./redisClient');
 
 class SystemMonitor {
     constructor() {
@@ -150,6 +151,12 @@ class SystemMonitor {
             if (this.history.length > this.maxHistoryLength) {
                 this.history.shift();
             }
+            
+            // 将最新数据存储到Redis中，供工作进程获取
+            await redisClient.setEx('system_metrics:latest', 300, JSON.stringify(dataPoint)); // 5分钟过期
+            
+            // 将历史数据也存储到Redis中
+            await redisClient.setEx('system_metrics:history', 300, JSON.stringify(this.history)); // 5分钟过期
 
             log('DEBUG', `系统监控数据已收集: CPU=${dataPoint.cpu}% MEM=${dataPoint.memory}% NET_RX=${dataPoint.network.received}KB/s NET_TX=${dataPoint.network.transmitted}KB/s DISK_R=${dataPoint.diskIO.read}KB/s DISK_W=${dataPoint.diskIO.write}KB/s`);
         } catch (error) {
@@ -184,6 +191,34 @@ class SystemMonitor {
         if (!(cluster.isMaster || cluster.isPrimary)) return;
         
         this.history = [];
+    }
+    
+    // 从Redis获取最新监控数据（供工作进程使用）
+    async getLatestMetricsFromRedis() {
+        try {
+            const metricsStr = await redisClient.get('system_metrics:latest');
+            if (metricsStr) {
+                return JSON.parse(metricsStr);
+            }
+            return null;
+        } catch (error) {
+            log('ERROR', `从Redis获取系统监控数据失败: ${error.message}`);
+            return null;
+        }
+    }
+    
+    // 从Redis获取历史监控数据（供工作进程使用）
+    async getHistoryFromRedis() {
+        try {
+            const historyStr = await redisClient.get('system_metrics:history');
+            if (historyStr) {
+                return JSON.parse(historyStr);
+            }
+            return [];
+        } catch (error) {
+            log('ERROR', `从Redis获取系统监控历史数据失败: ${error.message}`);
+            return [];
+        }
     }
 }
 

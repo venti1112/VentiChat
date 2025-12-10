@@ -309,15 +309,7 @@ function startSystemMonitoring() {
                     systemMetrics.history.shift();
                 }
                 
-                // 将系统指标广播给所有工作进程
-                Object.values(cluster.workers).forEach(worker => {
-                    if (worker.isConnected()) {
-                        worker.send({
-                            type: 'systemMetrics',
-                            data: systemMetrics
-                        });
-                    }
-                });
+                // 数据已经存储到Redis中，不再需要广播给工作进程
             }
         } catch (error) {
             log('ERROR', `收集系统监控数据时出错: ${error.message}`);
