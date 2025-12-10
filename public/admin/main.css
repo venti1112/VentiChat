@@ -18,6 +18,23 @@
   max-width: 250px; /* 限制侧边栏最大宽度 */
 }
 
+/* 侧边栏导航链接样式 */
+.sidebar .nav-link {
+  color: white; /* 设置侧边栏链接文字为白色 */
+  transition: color 0.2s ease-in-out;
+}
+
+/* 侧边栏导航链接悬停效果 */
+.sidebar .nav-link:hover {
+  color: #aaa; /* 悬停时文字变为浅灰色 */
+}
+
+/* 侧边栏当前活动链接样式 */
+.sidebar .nav-link.active {
+  color: #4cd8b8; /* 当前活动链接文字为绿色 */
+  border-right: 3px solid #4cd8b8; /* 添加绿色右边框以突出显示 */
+}
+
 /* 移动端汉堡菜单样式调整 */
 .navbar {
   z-index: 101; /* 确保导航栏在侧边栏之上 */
@@ -86,21 +103,24 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 120px; /* 设置较小的最小高度 */
-  padding: 1rem; /* 减少内边距 */
+  min-height: 100px;
+  padding: 1rem;
 }
 
-/* 图表容器样式 */
-.card:not(.dashboard-cards .card) .card-body,
-.card-body:not(.dashboard-cards .card-body) {
-  position: relative;
-  min-height: 300px;
+/* 图表容器样式 - 只针对包含combinedChart的卡片 */
+#combinedChart {
+  min-height: 700px; /* 最小高度 */
 }
 
 .card-body canvas {
   width: 100% !important;
   height: 100% !important;
-  min-height: 300px;
+}
+
+/* 固定高度图表容器 */
+.chart-container {
+  height: 700px; /* 高度 */
+  position: relative;
 }
 
 /* 表格样式 */

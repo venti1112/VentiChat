@@ -15,7 +15,7 @@ module.exports = (sequelize) => {
         },
         maxFileSize: { 
             type: DataTypes.INTEGER, 
-            defaultValue: 10485760,
+            defaultValue: 10,
             field: 'max_file_size'
         },
         siteName: { 

@@ -107,7 +107,9 @@ const adminController = require('../controllers/adminController');
 const adminMiddleware = require('../middleware/authMiddleware').adminMiddleware;
 // 获取所有用户列表 - 管理员查看系统中所有用户的信息
 router.get('/admin/users', authMiddleware, adminMiddleware, adminController.getUsers);
-// 创建用户 - 管理员创建新用户
+// 获取单个用户信息 - 管理员查看指定用户的信息
+router.get('/admin/users/:userId', authMiddleware, adminMiddleware, adminController.getUserById);
+// 创建用户 - 管理员手动创建新用户
 router.post('/admin/users', authMiddleware, adminMiddleware, adminController.createUser);
 // 更新用户信息 - 管理员修改指定用户的信息
 router.put('/admin/users/:userId', authMiddleware, adminMiddleware, adminController.updateUser);

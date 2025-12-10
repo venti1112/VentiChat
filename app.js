@@ -83,23 +83,6 @@ app.use(ipBanMiddleware);
 const redisStatusMiddleware = require('./middleware/redisStatusMiddleware');
 app.use(redisStatusMiddleware);
 
-
-
-// 文件上传配置
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'public/uploads');
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
-const upload = multer({ storage });
-
-// 将upload实例挂载到app上
-app.set('upload', upload);
-
 // 用户Socket映射
 const userSocketMap = new Map();
 // 将userSocketMap挂载到app上
@@ -131,7 +114,6 @@ app.use((req, res, next) => {
     }
     
     // 对于其他请求，尝试发送首页或返回简单HTML
-    const indexPath = path.join(__dirname, 'public', 'index.html');
     res.status(404).send('<h1>404 页面未找到</h1><p>您请求的页面不存在。</p>');
 });
 

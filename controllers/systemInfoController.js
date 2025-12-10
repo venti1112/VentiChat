@@ -41,11 +41,6 @@ function getBootTime() {
  */
 exports.getSystemInfo = async (req, res) => {
     try {
-        // 实时计算运行时间
-        const bootTime = getBootTime();
-        const currentTime = Date.now();
-        const uptimeSeconds = Math.floor((currentTime - bootTime) / 1000);
-        
         const sysInfo = {
             nodeVersion: process.version,
             osInfo: `${os.type()} ${os.release()} (${os.platform()})`,
@@ -53,7 +48,7 @@ exports.getSystemInfo = async (req, res) => {
             cpus: os.cpus().length,
             totalmem: Math.round(os.totalmem() / (1024 * 1024)) + ' MB',
             freemem: Math.round(os.freemem() / (1024 * 1024)) + ' MB',
-            uptime: formatUptime(uptimeSeconds) // 实时计算运行时间
+            bootTime: getBootTime()
         };
 
         res.json(sysInfo);

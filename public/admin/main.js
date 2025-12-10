@@ -1,8 +1,9 @@
 // 当前活动页面
 let currentPage = 'dashboard';
-let resourceChart = null;
-let networkDiskChart = null;
+let combinedChart = null;
 let systemMetricsInterval = null; // 用于定期更新系统指标
+let systemBootTime = null; // 系统启动时间
+let uptimeInterval = null; // 用于每秒更新运行时间
 
 // 监听侧边栏折叠事件，移动端点击菜单项后自动收起侧边栏
 document.addEventListener('DOMContentLoaded', function() {
@@ -47,9 +48,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化仪表盘图表
     initDashboardCharts();
     
-    // 绑定快捷操作按钮事件
-    bindQuickActionButtons();
-    
     // 绑定用户管理页面事件
     bindUserManagementEvents();
     
@@ -81,6 +79,12 @@ function stopRealTimeSystemMetrics() {
         clearInterval(systemMetricsInterval);
         systemMetricsInterval = null;
     }
+    
+    // 停止更新运行时间
+    if (uptimeInterval) {
+        clearInterval(uptimeInterval);
+        uptimeInterval = null;
+    }
 }
 
 // 更新实时系统指标
@@ -101,15 +105,21 @@ async function updateRealTimeSystemMetrics() {
             updateResourceChartsWithLatest(metricsData.data);
         }
         
-        // 实时更新系统信息（包括运行时间）
-        try {
-            const sysInfoResponse = await fetch('/api/system/info');
-            if (sysInfoResponse.ok) {
-                const sysInfo = await sysInfoResponse.json();
-                document.getElementById('uptime-info').textContent = sysInfo.uptime || '-';
+        // 只在首次加载时获取系统启动时间，之后不再请求该接口
+        if (!systemBootTime) {
+            // 获取系统信息以获取启动时间
+            try {
+                const sysInfoResponse = await fetch('/api/system/info');
+                if (sysInfoResponse.ok) {
+                    const sysInfo = await sysInfoResponse.json();
+                    // 存储系统启动时间戳
+                    systemBootTime = new Date(sysInfo.bootTime).getTime();
+                    // 开始运行时间计数器
+                    startUptimeCounter();
+                }
+            } catch (error) {
+                console.error('获取系统信息失败:', error);
             }
-        } catch (error) {
-            console.error('获取系统信息失败:', error);
         }
     } catch (error) {
         console.error('获取实时系统指标失败:', error);
@@ -135,72 +145,73 @@ function updateCurrentMetrics(metrics) {
 
 // 使用最新数据更新资源图表
 function updateResourceChartsWithLatest(latestMetrics) {
-    if (!resourceChart || !networkDiskChart) return;
-    
-    // 更新CPU和内存图表
-    // 如果数据点超过30个，则移除最旧的数据点
-    if (resourceChart.data.labels.length >= 30) {
-        resourceChart.data.labels.shift();
-        resourceChart.data.datasets[0].data.shift();
-        resourceChart.data.datasets[1].data.shift();
-        // 同时移除内存详细信息
-        if (resourceChart.memoryDetails && resourceChart.memoryDetails.length > 0) {
-            resourceChart.memoryDetails.shift();
-        }
-    }
+    if (!combinedChart) return;
     
     // 添加新的时间标签
     const now = new Date();
     const timeLabel = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
-    resourceChart.data.labels.push(timeLabel);
+    combinedChart.data.labels.push(timeLabel);
     
     // 添加新的数据点
-    resourceChart.data.datasets[0].data.push(latestMetrics.cpu);
-    resourceChart.data.datasets[1].data.push(latestMetrics.memory);
+    combinedChart.data.datasets[0].data.push(latestMetrics.cpu);
+    combinedChart.data.datasets[1].data.push(latestMetrics.memory);
+    combinedChart.data.datasets[2].data.push(latestMetrics.network.received);
+    combinedChart.data.datasets[3].data.push(latestMetrics.network.transmitted);
+    combinedChart.data.datasets[4].data.push(latestMetrics.diskIO.read);
+    combinedChart.data.datasets[5].data.push(latestMetrics.diskIO.write);
+    
     // 添加内存详细信息到图表实例
-    if (!resourceChart.memoryDetails) {
-        resourceChart.memoryDetails = [];
+    if (!combinedChart.memoryDetails) {
+        combinedChart.memoryDetails = [];
     }
-    resourceChart.memoryDetails.push(latestMetrics.memoryDetails || {
+    combinedChart.memoryDetails.push(latestMetrics.memoryDetails || {
         total: 0,
         active: 0,
         available: 0
     });
-    resourceChart.update();
     
-    // 更新网络和磁盘IO图表
-    // 如果数据点超过30个，则移除最旧的数据点
-    if (networkDiskChart.data.labels.length >= 30) {
-        networkDiskChart.data.labels.shift();
-        networkDiskChart.data.datasets[0].data.shift();
-        networkDiskChart.data.datasets[1].data.shift();
-        // 如果有四个数据集（网络接收、网络发送、磁盘读取、磁盘写入）
-        if (networkDiskChart.data.datasets.length >= 4) {
-            networkDiskChart.data.datasets[2].data.shift();
-            networkDiskChart.data.datasets[3].data.shift();
+    combinedChart.update();
+}
+
+// 开始运行时间计数器
+function startUptimeCounter() {
+    // 如果已经有定时器在运行，则先清除
+    if (uptimeInterval) {
+        clearInterval(uptimeInterval);
+    }
+    
+    // 每秒更新一次运行时间
+    uptimeInterval = setInterval(() => {
+        if (systemBootTime) {
+            const now = new Date().getTime();
+            const uptimeMs = now - systemBootTime;
+            document.getElementById('uptime-info').textContent = formatDuration(uptimeMs);
         }
+    }, 1000);
+}
+
+// 格式化持续时间（毫秒）为易读的字符串
+function formatDuration(ms) {
+    const seconds = Math.floor((ms / 1000) % 60);
+    const minutes = Math.floor((ms / (1000 * 60)) % 60);
+    const hours = Math.floor((ms / (1000 * 60 * 60)) % 24);
+    const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+    
+    if (days > 0) {
+        return `${days}天 ${hours}小时 ${minutes}分钟 ${seconds}秒`;
+    } else if (hours > 0) {
+        return `${hours}小时 ${minutes}分钟 ${seconds}秒`;
+    } else if (minutes > 0) {
+        return `${minutes}分钟 ${seconds}秒`;
+    } else {
+        return `${seconds}秒`;
     }
-    
-    // 添加新的时间标签
-    networkDiskChart.data.labels.push(timeLabel);
-    
-    // 添加新的数据点（网络接收和发送）
-    networkDiskChart.data.datasets[0].data.push(latestMetrics.network.received);
-    networkDiskChart.data.datasets[1].data.push(latestMetrics.network.transmitted);
-    
-    // 如果有四个数据集，添加磁盘IO数据
-    if (networkDiskChart.data.datasets.length >= 4) {
-        networkDiskChart.data.datasets[2].data.push(latestMetrics.diskIO.read);
-        networkDiskChart.data.datasets[3].data.push(latestMetrics.diskIO.write);
-    }
-    
-    networkDiskChart.update();
 }
 
 // 初始化仪表盘图表
 function initDashboardCharts() {
-    const ctx1 = document.getElementById('resourceChart').getContext('2d');
-    resourceChart = new Chart(ctx1, {
+    const ctx = document.getElementById('combinedChart').getContext('2d');
+    combinedChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: [],
@@ -210,14 +221,48 @@ function initDashboardCharts() {
                     data: [],
                     borderColor: 'rgb(255, 99, 132)',
                     backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                    tension: 0.1
+                    tension: 0.1,
+                    yAxisID: 'y'
                 },
                 {
                     label: '内存使用率 (%)',
                     data: [],
                     borderColor: 'rgb(54, 162, 235)',
                     backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                    tension: 0.1
+                    tension: 0.1,
+                    yAxisID: 'y'
+                },
+                {
+                    label: '网络接收 (KB/s)',
+                    data: [],
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    tension: 0.1,
+                    yAxisID: 'y1'
+                },
+                {
+                    label: '网络发送 (KB/s)',
+                    data: [],
+                    borderColor: 'rgb(153, 102, 255)',
+                    backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                    tension: 0.1,
+                    yAxisID: 'y1'
+                },
+                {
+                    label: '磁盘读取 (KB/s)',
+                    data: [],
+                    borderColor: 'rgb(255, 159, 64)',
+                    backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                    tension: 0.1,
+                    yAxisID: 'y1'
+                },
+                {
+                    label: '磁盘写入 (KB/s)',
+                    data: [],
+                    borderColor: 'rgb(255, 205, 86)',
+                    backgroundColor: 'rgba(255, 205, 86, 0.2)',
+                    tension: 0.1,
+                    yAxisID: 'y1'
                 }
             ]
         },
@@ -227,30 +272,37 @@ function initDashboardCharts() {
             scales: {
                 y: {
                     beginAtZero: true,
-                    max: 100
+                    max: 100,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'CPU/内存 (%)'
+                    }
+                },
+                y1: {
+                    beginAtZero: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: '网络/磁盘 (KB/s)'
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    }
                 }
             },
             plugins: {
                 tooltip: {
                     callbacks: {
-                        // 自定义tooltip显示内容
                         afterLabel: function(context) {
-                            // 只对内存数据集进行特殊处理
-                            if (context.datasetIndex === 1) {
-                                // 获取当前数据点的索引
-                                const index = context.dataIndex;
-                                // 获取对应的内存详细信息（如果有的话）
-                                const chart = context.chart;
-                                if (chart.memoryDetails && chart.memoryDetails[index]) {
-                                    const memDetail = chart.memoryDetails[index];
-                                    // 确保数值有效再显示
-                                    if (memDetail.total > 0) {
-                                        return [
-                                            `总内存: ${memDetail.total} MB`,
-                                            `已用内存: ${memDetail.active} MB`,
-                                            `可用内存: ${memDetail.available} MB`
-                                        ];
-                                    }
+                            // 为CPU和内存数据添加额外的详细信息
+                            if (context.datasetIndex === 1 && combinedChart.memoryDetails) {
+                                const memDetail = combinedChart.memoryDetails[context.dataIndex];
+                                if (memDetail) {
+                                    return [
+                                        `已用内存: ${memDetail.active} MB`,
+                                        `可用内存: ${memDetail.available} MB`
+                                    ];
                                 }
                             }
                             return '';
@@ -261,75 +313,76 @@ function initDashboardCharts() {
         }
     });
     // 初始化memoryDetails数组
-    resourceChart.memoryDetails = [];
-    
-    const ctx2 = document.getElementById('networkDiskChart').getContext('2d');
-    networkDiskChart = new Chart(ctx2, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [
-                {
-                    label: '网络接收 (KB/s)',
-                    data: [],
-                    borderColor: 'rgb(75, 192, 192)',
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    tension: 0.1
-                },
-                {
-                    label: '网络发送 (KB/s)',
-                    data: [],
-                    borderColor: 'rgb(153, 102, 255)',
-                    backgroundColor: 'rgba(153, 102, 255, 0.2)',
-                    tension: 0.1
-                },
-                {
-                    label: '磁盘读取 (KB/s)',
-                    data: [],
-                    borderColor: 'rgb(255, 159, 64)',
-                    backgroundColor: 'rgba(255, 159, 64, 0.2)',
-                    tension: 0.1
-                },
-                {
-                    label: '磁盘写入 (KB/s)',
-                    data: [],
-                    borderColor: 'rgb(255, 205, 86)',
-                    backgroundColor: 'rgba(255, 205, 86, 0.2)',
-                    tension: 0.1
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
-            }
-        }
-    });
+    combinedChart.memoryDetails = [];
 }
 
 // 更新系统资源图表
 function updateResourceCharts(metricsHistory) {
-    if (!resourceChart || !networkDiskChart) return;
+    if (!combinedChart) return;
+    
+    // 获取当前选择的时间段
+    const combinedPeriodElement = document.getElementById('combinedPeriodDropdown');
+    
+    // 获取时间段文本内容并转换为标准格式
+    let period = '12h'; // 默认值
+    
+    if (combinedPeriodElement) {
+        const text = combinedPeriodElement.textContent.trim();
+        switch(text) {
+            case '最近30分钟':
+                period = '30m';
+                break;
+            case '最近1小时':
+                period = '1h';
+                break;
+            case '最近3小时':
+                period = '3h';
+                break;
+            case '最近6小时':
+                period = '6h';
+                break;
+            case '最近12小时':
+                period = '12h';
+                break;
+        }
+    }
     
     // 获取当前时间
     const now = new Date();
-    // 计算12小时前的时间戳
-    const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000);
     
-    // 过滤出最近12小时的数据
-    const recentMetrics = metricsHistory.filter(point => new Date(point.timestamp) >= twelveHoursAgo);
-    
-    // 如果没有近期数据但有历史数据，则使用最后100个数据点
-    let dataToUse = recentMetrics;
-    if (recentMetrics.length === 0 && metricsHistory.length > 0) {
-        // 使用最后100个数据点或全部数据（取较小值）
-        const startIndex = Math.max(0, metricsHistory.length - 100);
-        dataToUse = metricsHistory.slice(startIndex);
+    // 根据选择的周期计算时间范围
+    let timeAgo;
+    switch(period) {
+        case '30m':
+            timeAgo = new Date(now.getTime() - 30 * 60 * 1000);
+            break;
+        case '1h':
+            timeAgo = new Date(now.getTime() - 1 * 60 * 60 * 1000);
+            break;
+        case '3h':
+            timeAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+            break;
+        case '6h':
+            timeAgo = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+            break;
+        case '24h':
+            timeAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            break;
+        case '7d':
+            timeAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            break;
+        case '30d':
+            timeAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            break;
+        default: // 12h
+            timeAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000);
     }
+    
+    // 过滤出指定时间范围内的数据
+    const recentMetrics = metricsHistory.filter(point => new Date(point.timestamp) >= timeAgo);
+    
+    // 使用过滤后的数据（即使为空也正常显示）
+    const dataToUse = recentMetrics;
     
     // 准备数据
     const labels = dataToUse.map(point => {
@@ -351,77 +404,31 @@ function updateResourceCharts(metricsHistory) {
     const diskReadData = dataToUse.map(point => point.diskIO.read);
     const diskWriteData = dataToUse.map(point => point.diskIO.write);
     
-    // 更新CPU和内存图表
-    resourceChart.data.labels = labels;
-    resourceChart.data.datasets[0].data = cpuData;
-    resourceChart.data.datasets[1].data = memoryData;
-    // 附加内存详细信息到图表对象
-    resourceChart.memoryDetails = memoryDetails;
-    resourceChart.update();
+    // 更新图表
+    combinedChart.data.labels = labels;
+    combinedChart.data.datasets[0].data = cpuData;
+    combinedChart.data.datasets[1].data = memoryData;
+    combinedChart.data.datasets[2].data = networkReceivedData;
+    combinedChart.data.datasets[3].data = networkTransmittedData;
+    combinedChart.data.datasets[4].data = diskReadData;
+    combinedChart.data.datasets[5].data = diskWriteData;
     
-    // 更新网络和磁盘IO图表
-    networkDiskChart.data.labels = labels;
-    networkDiskChart.data.datasets[0].data = networkReceivedData;
-    networkDiskChart.data.datasets[1].data = networkTransmittedData;
-    if (networkDiskChart.data.datasets.length >= 4) {
-        networkDiskChart.data.datasets[2].data = diskReadData;
-        networkDiskChart.data.datasets[3].data = diskWriteData;
-    }
-    networkDiskChart.update();
+    // 附加内存详细信息到图表对象
+    combinedChart.memoryDetails = memoryDetails;
+    combinedChart.update();
 }
 
 // 绑定周期选择下拉菜单事件
 function bindPeriodDropdownEvents() {
-    // 资源周期选择
-    document.querySelectorAll('#resourcePeriodDropdown + .dropdown-menu .dropdown-item').forEach(item => {
+    // 合并后的图表周期选择
+    document.querySelectorAll('#combinedPeriodDropdown + .dropdown-menu .dropdown-item').forEach(item => {
         item.addEventListener('click', function(e) {
             e.preventDefault();
-            const period = this.getAttribute('data-period');
-            document.getElementById('resourcePeriodDropdown').textContent = this.textContent;
+            document.getElementById('combinedPeriodDropdown').textContent = this.textContent;
             // 重新加载仪表盘数据
             loadDashboardData();
         });
     });
-    
-    // 网络磁盘周期选择
-    document.querySelectorAll('#networkDiskPeriodDropdown + .dropdown-menu .dropdown-item').forEach(item => {
-        item.addEventListener('click', function(e) {
-            e.preventDefault();
-            const period = this.getAttribute('data-period');
-            document.getElementById('networkDiskPeriodDropdown').textContent = this.textContent;
-            // 重新加载仪表盘数据
-            loadDashboardData();
-        });
-    });
-}
-
-// 绑定快捷操作按钮事件
-function bindQuickActionButtons() {
-    // 刷新仪表盘数据
-    const refreshBtn = document.getElementById('refresh-dashboard');
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', function() {
-            loadDashboardData();
-        });
-    }
-    
-    // 查看所有用户
-    const viewAllUsersBtn = document.getElementById('view-all-users');
-    if (viewAllUsersBtn) {
-        viewAllUsersBtn.addEventListener('click', function() {
-            // 切换到用户管理页面
-            document.querySelector('.nav-link[data-page="users"]').click();
-        });
-    }
-    
-    // 查看所有聊天室
-    const viewAllRoomsBtn = document.getElementById('view-all-rooms');
-    if (viewAllRoomsBtn) {
-        viewAllRoomsBtn.addEventListener('click', function() {
-            // 切换到聊天室管理页面
-            document.querySelector('.nav-link[data-page="rooms"]').click();
-        });
-    }
 }
 
 // 绑定用户管理页面事件
@@ -518,8 +525,22 @@ async function loadDashboardData() {
         const rooms = await roomsResponse.json();
         document.getElementById('total-rooms').textContent = rooms.length;
         
-        // 获取在线用户数和实时系统指标
-        await updateRealTimeSystemMetrics();
+        // 获取在线用户数（暂时显示为0，后续需要实现WebSocket连接统计）
+        // 这里将通过系统监控API获取实际数据
+        try {
+            const metricsResponse = await fetch('/api/system/metrics');
+            if (metricsResponse.ok) {
+                const metricsData = await metricsResponse.json();
+                document.getElementById('online-users').textContent = metricsData.data.onlineUsers || 0;
+                
+                // 更新当前指标显示
+                updateCurrentMetrics(metricsData.data);
+            } else {
+                document.getElementById('online-users').textContent = '0';
+            }
+        } catch (error) {
+            document.getElementById('online-users').textContent = '0';
+        }
         
         // 服务器状态
         document.getElementById('server-status').innerHTML = '<span class="badge bg-success">正常运行</span>';
@@ -535,7 +556,21 @@ async function loadDashboardData() {
                 document.getElementById('arch-info').textContent = sysInfo.arch || '-';
                 document.getElementById('cpu-info').textContent = sysInfo.cpus || '-';
                 document.getElementById('total-mem-info').textContent = sysInfo.totalmem || '-';
-                document.getElementById('uptime-info').textContent = sysInfo.uptime || '-';
+                
+                // 获取系统启动时间
+                systemBootTime = sysInfo.bootTime;
+                
+                // 启动每秒更新运行时间的定时器
+                if (uptimeInterval) {
+                    clearInterval(uptimeInterval);
+                }
+                
+                uptimeInterval = setInterval(() => {
+                    if (systemBootTime) {
+                        const uptimeSeconds = Math.floor((Date.now() - systemBootTime) / 1000);
+                        document.getElementById('uptime-info').textContent = formatUptime(uptimeSeconds);
+                    }
+                }, 1000);
             } else {
                 document.getElementById('node-version').textContent = '未知';
                 document.getElementById('os-info').textContent = '未知';
@@ -568,6 +603,26 @@ async function loadDashboardData() {
     }
 }
 
+// 将秒数转换为易读的格式
+function formatUptime(seconds) {
+    const days = Math.floor(seconds / (24 * 3600));
+    seconds %= 24 * 3600;
+    const hours = Math.floor(seconds / 3600);
+    seconds %= 3600;
+    const minutes = Math.floor(seconds / 60);
+    seconds = Math.floor(seconds % 60);
+    
+    if (days > 0) {
+        return `${days}天${hours}小时${minutes}分钟${seconds}秒`;
+    } else if (hours > 0) {
+        return `${hours}小时${minutes}分钟${seconds}秒`;
+    } else if (minutes > 0) {
+        return `${minutes}分钟${seconds}秒`;
+    } else {
+        return `${seconds}秒`;
+    }
+}
+
 // 加载用户数据
 async function loadUsersData() {
     try {
@@ -584,6 +639,7 @@ async function loadUsersData() {
                 <td>${user.username}</td>
                 <td>${user.nickname}</td>
                 <td>${getUserStatusText(user.status)}</td>
+                <td>${user.isAdmin ? '管理员' : '普通用户'}</td>
                 <td>${new Date(user.createdAt).toLocaleDateString()}</td>
                 <td>
                     <button class="btn btn-sm btn-primary edit-user-btn" data-user-id="${user.id}">编辑</button>
@@ -615,19 +671,47 @@ async function loadUsersData() {
 
 // 获取用户状态文本
 function getUserStatusText(status) {
-    // 简化状态显示：只显示正常和封禁
-    return status === 'banned' ? '封禁' : '正常';
+    // 根据用户状态返回对应的中文文本
+    switch(status) {
+        case 'active':
+            return '正常';
+        case 'banned':
+            return '封禁';
+        default:
+            return '未知';
+    }
 }
 
 // 打开编辑用户模态框
 async function openEditUserModal(userId) {
     try {
-        // 这里应该获取用户详细信息，目前我们只是打开模态框
-        document.getElementById('edit-user-id').value = userId;
+        // 获取用户详细信息
+        const response = await fetch(`/api/admin/users/${userId}`);
+        if (!response.ok) {
+            throw new Error('获取用户信息失败');
+        }
+        
+        const user = await response.json();
+        
+        // 填充表单数据
+        document.getElementById('edit-user-id').value = user.id;
+        document.getElementById('edit-username').value = user.username;
+        document.getElementById('edit-nickname').value = user.nickname;
+        document.getElementById('edit-status').value = user.status;
+        document.getElementById('edit-is-admin').checked = user.isAdmin || false;
+        
+        // 更新模态框标题
+        document.getElementById('userModalLabel').textContent = '编辑用户';
+        
+        // 清空密码字段
+        document.getElementById('edit-password').value = '';
+        
+        // 显示模态框
         const modal = new bootstrap.Modal(document.getElementById('userModal'));
         modal.show();
     } catch (error) {
         console.error('打开编辑用户模态框失败:', error);
+        alert('获取用户信息失败: ' + error.message);
     }
 }
 
@@ -797,7 +881,8 @@ async function loadSettingsData() {
         if (settings.success) {
             document.getElementById('site-name').value = settings.data.siteName || '';
             document.getElementById('message-retention-days').value = settings.data.messageRetentionDays || 180;
-            document.getElementById('max-file-size').value = settings.data.maxFileSize || 10485760;
+            // 将字节转换为MB
+            document.getElementById('max-file-size').value = settings.data.maxFileSize ? Math.round(settings.data.maxFileSize / (1024 * 1024)) : 10;
             document.getElementById('max-room-members').value = settings.data.maxRoomMembers || 1000;
             document.getElementById('allow-user-registration').checked = settings.data.allowUserRegistration !== false; // 默认为true
             document.getElementById('max-login-attempts').value = settings.data.maxLoginAttempts || 5;
@@ -833,10 +918,14 @@ document.getElementById('basic-settings-form').addEventListener('submit', async 
     e.preventDefault();
     
     try {
+        // 将MB转换为字节
+        const maxFileSizeMB = parseInt(document.getElementById('max-file-size').value);
+        const maxFileSizeBytes = maxFileSizeMB * 1024 * 1024;
+        
         const settings = {
             siteName: document.getElementById('site-name').value,
             messageRetentionDays: parseInt(document.getElementById('message-retention-days').value),
-            maxFileSize: parseInt(document.getElementById('max-file-size').value),
+            maxFileSize: maxFileSizeBytes,
             maxRoomMembers: parseInt(document.getElementById('max-room-members').value),
             allowUserRegistration: document.getElementById('allow-user-registration').checked,
             maxLoginAttempts: parseInt(document.getElementById('max-login-attempts').value),

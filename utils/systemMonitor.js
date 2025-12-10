@@ -151,9 +151,6 @@ class SystemMonitor {
                 this.history.shift();
             }
 
-            // 移除历史记录保存到文件的功能
-            // this.saveHistory();
-
             log('DEBUG', `系统监控数据已收集: CPU=${dataPoint.cpu}% MEM=${dataPoint.memory}% NET_RX=${dataPoint.network.received}KB/s NET_TX=${dataPoint.network.transmitted}KB/s DISK_R=${dataPoint.diskIO.read}KB/s DISK_W=${dataPoint.diskIO.write}KB/s`);
         } catch (error) {
             log('ERROR', `收集系统监控数据时出错: ${error.message}`);
@@ -181,50 +178,13 @@ class SystemMonitor {
         return [...this.history]; // 返回副本
     }
 
-    // 移除保存历史数据到文件的功能
-    /*
-    saveHistory() {
-        // 只有主进程才能保存历史数据
-        if (!(cluster.isMaster || cluster.isPrimary)) return;
-        
-        try {
-            const historyPath = path.join(__dirname, '..', 'userdata', 'system_monitor_history.json');
-            fs.writeFileSync(historyPath, JSON.stringify(this.history));
-        } catch (error) {
-            log('ERROR', `保存系统监控历史数据时出错: ${error.message}`);
-        }
-    }
-    */
-
-    // 移除从文件加载历史数据的功能
-    /*
-    loadHistory() {
-        // 只有主进程才能加载历史数据
-        if (!(cluster.isMaster || cluster.isPrimary)) return;
-        
-        try {
-            const historyPath = path.join(__dirname, '..', 'userdata', 'system_monitor_history.json');
-            if (fs.existsSync(historyPath)) {
-                const data = fs.readFileSync(historyPath, 'utf8');
-                this.history = JSON.parse(data);
-                log('INFO', `已加载 ${this.history.length} 条系统监控历史数据`);
-            }
-        } catch (error) {
-            log('ERROR', `加载系统监控历史数据时出错: ${error.message}`);
-        }
-    }
-    */
-
     // 清除历史数据
     clearHistory() {
         // 只有主进程才能清除历史数据
         if (!(cluster.isMaster || cluster.isPrimary)) return;
         
         this.history = [];
-        // 移除历史记录保存功能
-        // this.saveHistory();
     }
 }
 
-// 导出单例实例
 module.exports = new SystemMonitor();

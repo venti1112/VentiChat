@@ -6,7 +6,7 @@ const bcrypt = require('bcrypt');
 exports.getUsers = async (req, res) => {
     try {
         const users = await models.User.findAll({
-            attributes: ['userId', 'username', 'nickname', 'status', 'createdAt']
+            attributes: ['userId', 'username', 'nickname', 'status', 'createdAt', 'isAdmin']
         });
         
         // 格式化返回数据，确保字段名与前端一致，并简化状态信息
@@ -14,7 +14,8 @@ exports.getUsers = async (req, res) => {
             id: user.userId,
             username: user.username,
             nickname: user.nickname,
-            status: user.status === 1 ? 'active' : 'inactive', // 将数字状态转换为可读的状态
+            status: user.status, // 直接使用字符串状态
+            isAdmin: user.isAdmin,
             createdAt: user.createdAt,
             avatarUrl: user.avatarUrl || '/default-avatar.png'
         }));
@@ -22,6 +23,36 @@ exports.getUsers = async (req, res) => {
         res.json(formattedUsers);
     } catch (error) {
         log('ERROR', `获取用户列表失败: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 获取单个用户信息（管理员）
+exports.getUserById = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        
+        // 查找用户
+        const user = await models.User.findByPk(userId, {
+            attributes: ['userId', 'username', 'nickname', 'status', 'isAdmin']
+        });
+        
+        if (!user) {
+            return res.status(404).json({ error: '用户不存在' });
+        }
+        
+        // 格式化返回数据
+        const formattedUser = {
+            id: user.userId,
+            username: user.username,
+            nickname: user.nickname,
+            status: user.status,
+            isAdmin: user.isAdmin
+        };
+        
+        res.json(formattedUser);
+    } catch (error) {
+        log('ERROR', `获取用户信息失败: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };
@@ -46,7 +77,7 @@ exports.createUser = async (req, res) => {
             username,
             nickname,
             passwordHash,
-            status: status || 'active',
+            status: typeof status !== 'undefined' ? status : 'active',
             isAdmin: isAdmin || false
         });
         
@@ -70,7 +101,7 @@ exports.createUser = async (req, res) => {
 exports.updateUser = async (req, res) => {
     try {
         const { userId } = req.params;
-        const { username, nickname, status } = req.body;
+        const { username, nickname, status, isAdmin } = req.body;
         
         // 查找用户
         const user = await models.User.findByPk(userId);
@@ -82,7 +113,8 @@ exports.updateUser = async (req, res) => {
         await user.update({
             username,
             nickname,
-            status
+            status,
+            isAdmin
         });
         
         res.json({ message: '用户信息更新成功' });
