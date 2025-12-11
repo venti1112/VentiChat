@@ -99,6 +99,11 @@ export function initializeWebSocket(token) {
         console.log('Received new message:', message);
         
         try {
+            // 尝试播放新消息提示音
+            if (typeof window.playNewMessageSound === 'function') {
+                window.playNewMessageSound();
+            }
+            
             // 将消息添加到所有消息列表中
             allMessages.push(message);
             // 更新本地存储

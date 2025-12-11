@@ -416,7 +416,8 @@ exports.sendJoinRequest = async (req, res) => {
     try {
         // 修复参数名称不一致的问题
         const { roomId } = req.params;
-        const { message } = req.body;
+        // 对于GET请求，从查询参数中获取message，对于POST请求，从body中获取
+        const { message } = req.method === 'GET' ? req.query : req.body;
         
         // 检查聊天室是否存在
         const room = await models.Room.findByPk(roomId);

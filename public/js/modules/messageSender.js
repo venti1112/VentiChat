@@ -191,11 +191,11 @@ function replaceTempMessage(tempMessageId, realMessage) {
                 const msgId = this.getAttribute('data-message-id');
                 
                 // 第一次确认
-                const firstConfirm = confirm('注意：即将解除此消息的HTML限制，可能会执行其中的脚本代码。\n\n您确定要继续吗？');
+                const firstConfirm = confirm('警告：他人发送的HTML消息可能包含恶意代码！！！解除限制后，消息中的HTML和脚本将会被执行！！！\n\n您确定要继续吗？');
                 if (!firstConfirm) return;
                 
                 // 第二次确认
-                const secondConfirm = confirm('警告：这是最后的确认！\n\n解除限制后，消息中的HTML和脚本将会被执行。\n\n是否确认解除限制？');
+                const secondConfirm = confirm('警告：这是最后的确认！他人发送的HTML消息可能包含恶意代码！！！\n\n解除限制后，消息中的HTML和脚本将会被执行！！！\n\n是否确认解除限制？');
                 if (!secondConfirm) return;
                 
                 // 添加到解除限制的消息集合
@@ -236,11 +236,13 @@ function replaceTempMessage(tempMessageId, realMessage) {
                                 // 为克隆的按钮添加事件监听器
                                 clonedButton.addEventListener('click', async function() {
                                     // 注意：这里不需要再次添加到unrestrictedMessages，因为它已经在上面添加过了
-                                    const confirm1 = confirm('注意：即将解除此消息的HTML限制，可能会执行其中的脚本代码。\n\n您确定要继续吗？');
-                                    if (!confirm1) return;
+                                    // 第一次确认
+                                    const firstConfirm = confirm('警告：他人发送的HTML消息可能包含恶意代码！！！解除限制后，消息中的HTML和脚本将会被执行！！！\n\n您确定要继续吗？');
+                                    if (!firstConfirm) return;
                                     
-                                    const confirm2 = confirm('警告：这是最后的确认！\n\n解除限制后，消息中的HTML和脚本将会被执行。\n\n是否确认解除限制？');
-                                    if (!confirm2) return;
+                                    // 第二次确认
+                                    const secondConfirm = confirm('警告：这是最后的确认！他人发送的HTML消息可能包含恶意代码！！！\n\n解除限制后，消息中的HTML和脚本将会被执行！！！\n\n是否确认解除限制？');
+                                    if (!secondConfirm) return;
                                     
                                     // 由于消息已经被标记为unrestricted，重新渲染即可
                                     const updatedMsgElement = this.closest('.message-item');

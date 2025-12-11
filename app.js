@@ -69,8 +69,6 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
-
 // IP处理中间件 - 从反向代理获取真实IP
 const realIpMiddleware = require('./middleware/realIpMiddleware');
 app.use(realIpMiddleware);
@@ -91,6 +89,13 @@ app.set('userSocketMap', userSocketMap);
 // 数据库状态检查中间件
 const databaseStatusMiddleware = require('./middleware/databaseStatusMiddleware');
 app.use(databaseStatusMiddleware);
+
+// Admin页面身份验证中间件
+const adminPageAuthMiddleware = require('./middleware/adminPageAuthMiddleware');
+app.use(adminPageAuthMiddleware);
+
+// 静态文件服务必须在身份验证之后
+app.use(express.static(path.join(__dirname, 'public')));
 
 // 路由
 app.use('/api', require('./routes/index'));

@@ -6,6 +6,41 @@ const displayedMessages = new Set();
 // 存储已解除限制的消息ID
 const unrestrictedMessages = new Set();
 
+// 新消息提示音
+let messageNotificationSound = null;
+
+// 初始化提示音
+function initNotificationSound() {
+    try {
+        // 创建音频对象
+        messageNotificationSound = new Audio('/new_message.mp3');
+        messageNotificationSound.preload = 'auto';
+    } catch (error) {
+        console.warn('无法初始化消息提示音:', error);
+    }
+}
+
+// 播放新消息提示音
+export function playNewMessageSound() {
+    // 检查浏览器是否支持Audio
+    if (!messageNotificationSound) {
+        console.warn('消息提示音未初始化');
+        return;
+    }
+
+    // 尝试播放提示音，无论页面是否可见
+    messageNotificationSound.play().catch(error => {
+        console.warn('播放消息提示音失败:', error);
+    });
+}
+
+// 在页面加载完成后初始化提示音
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initNotificationSound);
+} else {
+    initNotificationSound();
+}
+
 // HTML转义函数，防止XSS攻击
 function escapeHtml(text) {
     if (!text || typeof text !== 'string') {
@@ -220,7 +255,14 @@ export async function renderMessage(message) {
                 // fallback到content字段
                 imageUrl = message.content;
             }
-            content = `<img src="${escapeHtml(imageUrl)}" alt="图片" class="message-image" style="max-width: 200px; max-height: 200px;">`;
+            content = `
+                <div style="position: relative; display: inline-block;">
+                    <img src="${escapeHtml(imageUrl)}" alt="图片" class="message-image" style="max-width: 200px; max-height: 200px;">
+                    <a href="${escapeHtml(imageUrl)}" download class="btn btn-primary btn-sm" style="position: absolute; bottom: 5px; right: 5px; opacity: 0.8;">
+                        <i class="bi bi-download"></i>
+                    </a>
+                </div>
+            `;
             break;
         case 'video':
             // 改进视频URL处理逻辑 - 如果fileUrl为空则使用content字段
@@ -242,11 +284,14 @@ export async function renderMessage(message) {
                     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(0, 0, 0, 0.7); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
                         <i class="bi bi-play-fill" style="color: white; font-size: 20px;"></i>
                     </div>
+                    <a href="${escapeHtml(videoUrl)}" download class="btn btn-primary btn-sm" style="position: absolute; bottom: 5px; right: 5px; opacity: 0.8;">
+                        <i class="bi bi-download"></i>
+                    </a>
                 </div>
             `;
             break;
         case 'audio':
-            // 处理音频URL - 如果fileUrl为空则使用content字段
+            // 处理音频URL - 统一使用与提示音相同的路径格式
             let audioUrl = '';
             let audioFileName = message.content || '音频文件';
             
@@ -256,6 +301,9 @@ export async function renderMessage(message) {
                 audioUrl = message.dataValues.fileUrl;
             } else if (message.data && message.data.fileUrl) {
                 audioUrl = message.data.fileUrl;
+            } else if (message.content && !message.content.startsWith('/')) {
+                // 如果content不是以/开头，则认为是文件名，添加默认路径前缀
+                audioUrl = `/audio/${message.content}`;
             } else if (message.content) {
                 // fallback到content字段
                 audioUrl = message.content;
@@ -274,6 +322,9 @@ export async function renderMessage(message) {
                     <audio controls preload="metadata" style="width: 250px;">
                         <source src="${escapeHtml(audioUrl)}" type="${escapeHtml(message.fileType || 'audio/mpeg')}">
                     </audio>
+                    <a href="${escapeHtml(audioUrl)}" download="${escapeHtml(audioFileName)}" class="btn btn-primary btn-sm mt-1">
+                        <i class="bi bi-download"></i>
+                    </a>
                 </div>
             `;
             break;
@@ -415,11 +466,11 @@ export async function displayMessages(messages) {
                     const msgId = this.getAttribute('data-message-id');
                     
                     // 第一次确认
-                    const firstConfirm = confirm('注意：即将解除此消息的HTML限制，可能会执行其中的脚本代码。\n\n您确定要继续吗？');
+                    const firstConfirm = confirm('警告：他人发送的HTML消息可能包含恶意代码！！！解除限制后，消息中的HTML和脚本将会被执行！！！\n\n您确定要继续吗？');
                     if (!firstConfirm) return;
                     
                     // 第二次确认
-                    const secondConfirm = confirm('警告：这是最后的确认！\n\n解除限制后，消息中的HTML和脚本将会被执行。\n\n是否确认解除限制？');
+                    const secondConfirm = confirm('警告：这是最后的确认！他人发送的HTML消息可能包含恶意代码！！！\n\n解除限制后，消息中的HTML和脚本将会被执行！！！\n\n是否确认解除限制？');
                     if (!secondConfirm) return;
                     
                     // 添加到解除限制的消息集合
@@ -457,11 +508,11 @@ export async function displayMessages(messages) {
                 const msgId = this.getAttribute('data-message-id');
                 
                 // 第一次确认
-                const firstConfirm = confirm('注意：即将解除此消息的HTML限制，可能会执行其中的脚本代码。\n\n您确定要继续吗？');
+                const firstConfirm = confirm('警告：他人发送的HTML消息可能包含恶意代码！！！解除限制后，消息中的HTML和脚本将会被执行！！！\n\n您确定要继续吗？');
                 if (!firstConfirm) return;
                 
                 // 第二次确认
-                const secondConfirm = confirm('警告：这是最后的确认！\n\n解除限制后，消息中的HTML和脚本将会被执行。\n\n是否确认解除限制？');
+                const secondConfirm = confirm('警告：这是最后的确认！他人发送的HTML消息可能包含恶意代码！！！\n\n解除限制后，消息中的HTML和脚本将会被执行！！！\n\n是否确认解除限制？');
                 if (!secondConfirm) return;
                 
                 // 添加到解除限制的消息集合
@@ -521,11 +572,11 @@ export async function displayMessages(messages) {
                 const messageId = this.getAttribute('data-message-id');
                 
                 // 第一次确认
-                const firstConfirm = confirm('注意：即将解除此消息的HTML限制，可能会执行其中的脚本代码。\n\n您确定要继续吗？');
+                const firstConfirm = confirm('警告：他人发送的HTML消息可能包含恶意代码！！！解除限制后，消息中的HTML和脚本将会被执行！！！\n\n您确定要继续吗？');
                 if (!firstConfirm) return;
                 
                 // 第二次确认
-                const secondConfirm = confirm('警告：这是最后的确认！\n\n解除限制后，消息中的HTML和脚本将会被执行。\n\n是否确认解除限制？');
+                const secondConfirm = confirm('警告：这是最后的确认！他人发送的HTML消息可能包含恶意代码！！！\n\n解除限制后，消息中的HTML和脚本将会被执行！！！\n\n是否确认解除限制？');
                 if (!secondConfirm) return;
                 
                 // 添加到解除限制的消息集合
