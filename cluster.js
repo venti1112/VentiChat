@@ -3,7 +3,6 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs').promises;
 const { spawn } = require('child_process');
-const si = require('systeminformation'); // 添加systeminformation库
 const configPath = path.join(__dirname, 'config', 'config.json');
 
 
@@ -43,6 +42,7 @@ async function checkAndInitialize() {
     }
 }
 
+
 // 等待检查和可能的初始化完成后再继续
 (async () => {
     try {
@@ -55,7 +55,7 @@ async function checkAndInitialize() {
         const { log, processIds } = require('./utils/logger');
         const startCleanupScheduler = require('./utils/cleanupScheduler');
         const { sequelize } = require('./utils/databaseClient');
-
+        const redisClient = require('./utils/redisClient').default; 
 
         // 初始化进程编号
         if (cluster.isMaster || cluster.isPrimary) {
@@ -79,7 +79,7 @@ async function checkAndInitialize() {
             startCleanupScheduler(models, app);
 
             // 启动系统监控
-            startSystemMonitoring();
+            await startSystemMonitoring();
 
             // 确定工作进程数量
             const numCPUs = config.workerCount && config.workerCount > 0 ? config.workerCount : os.cpus().length;
@@ -266,12 +266,15 @@ async function checkAndInitialize() {
 // 优雅关闭服务器
 function shutdownServer() {
     stopSystemMonitoring(); // 停止系统监控
-    log('INFO', '正在关闭服务器...');
+    console.log('正在关闭服务器...');
     process.exit(1);
 }
-const systemMonitor = require('./utils/systemMonitor');
 // 系统监控函数
-function startSystemMonitoring() {
+async function startSystemMonitoring() {
+    // 动态导入systeminformation库
+    const si = require('systeminformation');
+    const systemMonitor = require('./utils/systemMonitor');
+    
     // 启动系统监控工具
     systemMonitor.startMonitoring(5000);
     
@@ -287,41 +290,29 @@ function startSystemMonitoring() {
                 systemMetrics.cpu = latestData.cpu;
                 systemMetrics.memory = latestData.memory;
                 systemMetrics.network = latestData.network;
-                systemMetrics.diskIO = latestData.diskIO; // 使用磁盘IO速度
-                // 添加内存详情数据
-                systemMetrics.memoryDetails = latestData.memoryDetails;
-                
-                // 添加到历史记录
-                const dataPoint = {
-                    timestamp: latestData.timestamp,
-                    cpu: systemMetrics.cpu,
-                    memory: systemMetrics.memory,
-                    // 添加内存详细信息
-                    memoryDetails: systemMetrics.memoryDetails,
-                    network: { ...systemMetrics.network },
-                    diskIO: { ...systemMetrics.diskIO } // 记录磁盘IO速度
-                };
-                
-                systemMetrics.history.push(dataPoint);
-                
-                // 保持历史记录在合理范围内（最多4320个点，即12小时的数据，每5秒一个数据点）
-                if (systemMetrics.history.length > 4320) {
-                    systemMetrics.history.shift();
-                }
-                
-                // 数据已经存储到Redis中，不再需要广播给工作进程
+                systemMetrics.diskIO = latestData.diskIO;
             }
         } catch (error) {
-            log('ERROR', `收集系统监控数据时出错: ${error.message}`);
+            console.error('获取系统监控数据时出错:', error);
         }
-    }, 5000); // 每5秒收集一次数据
+    }, 5000);
 }
 
-// 停止系统监控
-function stopSystemMonitoring() {
-    systemMonitor.stopMonitoring();
+// 停止系统监控函数
+async function stopSystemMonitoring() {
+    // 清除监控间隔
     if (systemMonitorInterval) {
         clearInterval(systemMonitorInterval);
         systemMonitorInterval = null;
     }
+
+    // 停止系统监控工具
+    const systemMonitor = require('./utils/systemMonitor');
+    systemMonitor.stopMonitoring();
+}
+
+// 获取系统指标的函数
+async function getSystemMetrics() {
+    // 返回当前系统指标
+    return systemMetrics;
 }
