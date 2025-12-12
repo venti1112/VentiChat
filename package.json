@@ -12,6 +12,10 @@
     "socket.io",
     "node.js"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/venti1112/VentiChat.git"
+  },
   "author": "Venti",
   "license": "AGPL-3.0-only",
   "dependencies": {

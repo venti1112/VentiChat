@@ -4,6 +4,7 @@ const path = require('path');
 const cluster = require('cluster');
 const { log } = require('./logger');
 const redisClient = require('./redisClient');
+const models = require('../models');
 
 class SystemMonitor {
     constructor() {
@@ -19,11 +20,46 @@ class SystemMonitor {
         }
     }
 
+    // 检查是否应该启用系统监控
+    async isMonitoringEnabled() {
+        try {
+            const settings = await models.SystemSetting.findOne();
+            return settings ? settings.enableSystemMonitor : true;
+        } catch (error) {
+            log('ERROR', `检查系统监控设置失败: ${error.message}`);
+            // 出错时默认启用监控
+            return true;
+        }
+    }
+
+    // 强制更新监控状态
+    async updateMonitoringState() {
+        // 只有主进程才能控制监控
+        if (!(cluster.isMaster || cluster.isPrimary)) return;
+
+        const shouldBeEnabled = await this.isMonitoringEnabled();
+        
+        if (shouldBeEnabled && !this.monitoring) {
+            // 应该启用但当前未启用，启动监控
+            await this.startMonitoring();
+        } else if (!shouldBeEnabled && this.monitoring) {
+            // 应该禁用但当前已启用，停止监控
+            await this.stopMonitoring();
+        }
+    }
+
     // 开始监控
-    startMonitoring(interval = 5000) { // 默认每5秒收集一次数据
+    async startMonitoring(interval = 5000) { // 默认每5秒收集一次数据
         // 只有主进程才能启动监控
         if (!(cluster.isMaster || cluster.isPrimary)) return;
         
+        // 检查是否启用了系统监控
+        const enabled = await this.isMonitoringEnabled();
+        if (!enabled) {
+            log('INFO', '系统监控未启用，跳过启动监控');
+            return;
+        }
+
         if (this.monitoring) return;
 
         this.monitoring = true;
@@ -36,25 +72,47 @@ class SystemMonitor {
     }
 
     // 停止监控
-    stopMonitoring() {
+    async stopMonitoring() {
         // 只有主进程才能停止监控
         if (!(cluster.isMaster || cluster.isPrimary)) return;
         
-        if (!this.monitoring) return;
-
-        this.monitoring = false;
-        if (this.monitorInterval) {
-            clearInterval(this.monitorInterval);
-            this.monitorInterval = null;
+        // 检查是否启用了系统监控
+        const enabled = await this.isMonitoringEnabled();
+        if (!enabled && this.monitoring) {
+            this.monitoring = false;
+            if (this.monitorInterval) {
+                clearInterval(this.monitorInterval);
+                this.monitorInterval = null;
+            }
+            
+            log('INFO', '系统监控已禁用，正在停止监控');
+        } else if (!this.monitoring) {
+            return;
+        } else {
+            this.monitoring = false;
+            if (this.monitorInterval) {
+                clearInterval(this.monitorInterval);
+                this.monitorInterval = null;
+            }
+            
+            log('INFO', '系统监控已停止');
         }
-
-        log('INFO', '系统监控已停止');
     }
 
     // 收集系统数据
     async collectData() {
         // 只有主进程才能收集数据
         if (!(cluster.isMaster || cluster.isPrimary)) return;
+        
+        // 检查是否启用了系统监控
+        const enabled = await this.isMonitoringEnabled();
+        if (!enabled) {
+            // 如果监控被禁用，但仍在运行，则停止监控
+            if (this.monitoring) {
+                this.stopMonitoring();
+            }
+            return;
+        }
         
         try {
             const timestamp = Date.now();

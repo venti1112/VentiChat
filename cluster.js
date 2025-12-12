@@ -189,6 +189,11 @@ async function checkAndInitialize() {
                             log('WARN', `目标工作进程 ${msg.targetWorkerId} 不存在`);
                         }
                     }
+                    // 处理更新系统监控状态的请求
+                    else if (msg.type === 'updateSystemMonitoringState') {
+                        log('INFO', '收到更新系统监控状态的请求');
+                        updateSystemMonitoringState();
+                    }
                 });
             });
             
@@ -296,6 +301,12 @@ async function startSystemMonitoring() {
             console.error('获取系统监控数据时出错:', error);
         }
     }, 5000);
+}
+
+// 更新系统监控状态函数
+async function updateSystemMonitoringState() {
+    const systemMonitor = require('./utils/systemMonitor');
+    await systemMonitor.updateMonitoringState();
 }
 
 // 停止系统监控函数

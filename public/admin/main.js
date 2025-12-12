@@ -525,6 +525,32 @@ async function loadDashboardData() {
         const rooms = await roomsResponse.json();
         document.getElementById('total-rooms').textContent = rooms.length;
         
+        // 获取系统设置以检查监控是否启用
+        let isMonitorEnabled = true;
+        try {
+            const settingsResponse = await fetch('/api/system/settings');
+            if (settingsResponse.ok) {
+                const settingsData = await settingsResponse.json();
+                isMonitorEnabled = settingsData.data.enableSystemMonitor !== false;
+            }
+        } catch (error) {
+            console.error('获取系统设置失败:', error);
+        }
+        
+        // 显示监控状态
+        const monitorStatusElement = document.getElementById('monitor-status');
+        if (monitorStatusElement) {
+            monitorStatusElement.innerHTML = isMonitorEnabled ? 
+                '<span class="badge bg-success">已启用</span>' : 
+                '<span class="badge bg-warning">已禁用</span>';
+        }
+        
+        // 控制系统资源监控卡片的显示/隐藏
+        const systemMonitorRow = document.getElementById('system-monitor-row');
+        if (systemMonitorRow) {
+            systemMonitorRow.style.display = isMonitorEnabled ? 'flex' : 'none';
+        }
+        
         // 获取在线用户数（暂时显示为0，后续需要实现WebSocket连接统计）
         // 这里将通过系统监控API获取实际数据
         try {
@@ -541,9 +567,6 @@ async function loadDashboardData() {
         } catch (error) {
             document.getElementById('online-users').textContent = '0';
         }
-        
-        // 服务器状态
-        document.getElementById('server-status').innerHTML = '<span class="badge bg-success">正常运行</span>';
         
         // 系统信息
         // 通过后端API获取Node.js版本和操作系统信息
@@ -887,6 +910,7 @@ async function loadSettingsData() {
             document.getElementById('allow-user-registration').checked = settings.data.allowUserRegistration !== false; // 默认为true
             document.getElementById('max-login-attempts').value = settings.data.maxLoginAttempts || 5;
             document.getElementById('login-lock-time').value = settings.data.loginLockTime || 120;
+            document.getElementById('enable-system-monitor').checked = settings.data.enableSystemMonitor !== false; // 默认为true
         }
         
         // 获取系统配置
@@ -929,7 +953,8 @@ document.getElementById('basic-settings-form').addEventListener('submit', async 
             maxRoomMembers: parseInt(document.getElementById('max-room-members').value),
             allowUserRegistration: document.getElementById('allow-user-registration').checked,
             maxLoginAttempts: parseInt(document.getElementById('max-login-attempts').value),
-            loginLockTime: parseInt(document.getElementById('login-lock-time').value)
+            loginLockTime: parseInt(document.getElementById('login-lock-time').value),
+            enableSystemMonitor: document.getElementById('enable-system-monitor').checked
         };
         
         const response = await fetch('/api/system/settings', {

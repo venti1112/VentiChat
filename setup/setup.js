@@ -157,7 +157,8 @@ async function init() {
                     allow_user_registration BOOLEAN DEFAULT true,
                     max_login_attempts INT DEFAULT 5,
                     max_room_members INT DEFAULT 1000,
-                    login_lock_time INT DEFAULT 30
+                    login_lock_time INT DEFAULT 30,
+                    enable_system_monitor BOOLEAN DEFAULT true
                 ) ENGINE=InnoDB;
             `);
 
@@ -166,8 +167,8 @@ async function init() {
             await connection.query(`
                 INSERT INTO system_settings (
                     setting_id, message_retention_days, max_file_size, site_name, 
-                    allow_user_registration, max_login_attempts, max_room_members, login_lock_time
-                ) VALUES (1, 180, 10485760, 'VentiChat', true, 5, 1000, 30)
+                    allow_user_registration, max_login_attempts, max_room_members, login_lock_time, enable_system_monitor
+                ) VALUES (1, 180, 10485760, 'VentiChat', true, 5, 1000, 30, true)
             `);
 
             // Create default admin user

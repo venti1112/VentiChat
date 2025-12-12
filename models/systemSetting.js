@@ -42,6 +42,11 @@ module.exports = (sequelize) => {
             type: DataTypes.INTEGER,
             defaultValue: 120,
             field: 'login_lock_time'
+        },
+        enableSystemMonitor: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true,
+            field: 'enable_system_monitor'
         }
     }, {
         tableName: 'system_settings',

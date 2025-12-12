@@ -1,5 +1,7 @@
 const models = require('../models');
 const { log } = require('../utils/logger');
+const systemMonitor = require('../utils/systemMonitor');
+const cluster = require('cluster');
 
 /**
  * 获取系统设置
@@ -44,6 +46,22 @@ exports.updateSettings = async (req, res) => {
             settings = await models.SystemSetting.create(updateData);
         } else {
             await settings.update(updateData);
+        }
+        
+        // 检查是否更新了监控设置
+        if ('enableSystemMonitor' in updateData) {
+            // 通知主进程更新监控状态
+            if (cluster.isMaster || cluster.isPrimary) {
+                // 在主进程中直接更新
+                await systemMonitor.updateMonitoringState();
+            } else {
+                // 在工作进程中通知主进程更新
+                if (process.send) {
+                    process.send({ 
+                        type: 'updateSystemMonitoringState'
+                    });
+                }
+            }
         }
         
         res.json({
