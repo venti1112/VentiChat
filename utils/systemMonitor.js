@@ -119,53 +119,57 @@ class SystemMonitor {
             
             // 收集CPU使用率
             const cpuData = await si.currentLoad();
-            const cpuUsage = cpuData.currentLoad;
+            const cpuUsage = cpuData.currentLoad || 0;
             
-            // 收集内存使用率和详细信息
+            // 收集内存使用情况
             const memData = await si.mem();
-            const memoryUsage = (memData.active / memData.total) * 100;
+            const memoryUsage = ((memData.active / memData.total) * 100) || 0;
             
-            // 收集网络IO数据
+            // 收集网络使用情况（计算每秒速率）
             const networkData = await si.networkStats();
             let networkUsage = { received: 0, transmitted: 0 };
             
             if (networkData && networkData.length > 0) {
-                // 获取主要网络接口的数据（排除回环接口）
-                const primaryInterface = networkData.find(iface => iface.iface !== 'lo') || networkData[0];
+                const primaryInterface = networkData[0];
+                const currentTime = timestamp;
                 
-                // 计算IO速度（B/s 转换为 KB/s）
-                if (this.previousNetworkStats[primaryInterface.iface]) {
-                    const timeDiff = (timestamp - this.previousNetworkStats[primaryInterface.iface].timestamp) / 1000; // 秒
+                if (this.previousNetworkStats.timestamp) {
+                    const timeDiff = (currentTime - this.previousNetworkStats.timestamp) / 1000; // 转换为秒
+                    
                     if (timeDiff > 0) {
-                        const rxBytes = primaryInterface.rx_bytes - this.previousNetworkStats[primaryInterface.iface].rx_bytes;
-                        const txBytes = primaryInterface.tx_bytes - this.previousNetworkStats[primaryInterface.iface].tx_bytes;
+                        // 计算每秒接收和发送的KB数
+                        const rxBytesPerSec = (primaryInterface.rx_bytes - this.previousNetworkStats.rx_bytes) / timeDiff;
+                        const txBytesPerSec = (primaryInterface.tx_bytes - this.previousNetworkStats.tx_bytes) / timeDiff;
                         
                         networkUsage = {
-                            received: Math.max(0, (rxBytes / timeDiff) / 1024), // 转换为KB/s
-                            transmitted: Math.max(0, (txBytes / timeDiff) / 1024) // 转换为KB/s
+                            received: Math.max(0, rxBytesPerSec / 1024), // 转换为KB/s
+                            transmitted: Math.max(0, txBytesPerSec / 1024) // 转换为KB/s
                         };
                     }
                 }
                 
                 // 保存当前数据用于下次计算
-                this.previousNetworkStats[primaryInterface.iface] = {
+                this.previousNetworkStats = {
                     rx_bytes: primaryInterface.rx_bytes,
                     tx_bytes: primaryInterface.tx_bytes,
-                    timestamp: timestamp
+                    timestamp: currentTime
                 };
             }
             
-            // 收集磁盘IO数据
+            // 收集磁盘IO使用情况（计算每秒速率）
             const diskIOData = await si.disksIO();
             let diskIOUsage = { read: 0, write: 0 };
             
             if (diskIOData) {
-                // 计算IO速度（数据传输速率）
-                if (Object.keys(this.previousDiskIOStats).length > 0) {
-                    const timeDiff = (timestamp - this.previousDiskIOStats.timestamp) / 1000; // 秒
+                const currentTime = timestamp;
+                
+                if (this.previousDiskIOStats.timestamp) {
+                    const timeDiff = (currentTime - this.previousDiskIOStats.timestamp) / 1000; // 转换为秒
+                    
                     if (timeDiff > 0) {
-                        const readBytes = diskIOData.rIO_sec; // systeminformation已经提供了每秒读取字节数
-                        const writeBytes = diskIOData.wIO_sec; // systeminformation已经提供了每秒写字节数
+                        // 计算每秒读写KB数
+                        const readBytes = ((diskIOData.rIO_sec - this.previousDiskIOStats.rIO_sec) * 512) / timeDiff; // 512字节扇区
+                        const writeBytes = ((diskIOData.wIO_sec - this.previousDiskIOStats.wIO_sec) * 512) / timeDiff; // 512字节扇区
                         
                         diskIOUsage = {
                             read: Math.max(0, readBytes / 1024), // 转换为KB/s
@@ -180,6 +184,16 @@ class SystemMonitor {
                     wIO_sec: diskIOData.wIO_sec,
                     timestamp: timestamp
                 };
+            }
+            
+            // 获取在线用户数
+            let onlineUsers = 0;
+            try {
+                // 通过Redis获取在线用户数
+                const redisKeys = await redisClient.keys('user:*');
+                onlineUsers = redisKeys.length;
+            } catch (error) {
+                log('ERROR', `获取在线用户数失败: ${error.message}`);
             }
             
             const dataPoint = {
@@ -199,7 +213,8 @@ class SystemMonitor {
                 diskIO: { // 使用磁盘IO速度而不是使用率
                     read: Math.round(diskIOUsage.read * 100) / 100,
                     write: Math.round(diskIOUsage.write * 100) / 100
-                }
+                },
+                onlineUsers: onlineUsers // 添加在线用户数
             };
 
             // 添加到历史记录
@@ -216,7 +231,7 @@ class SystemMonitor {
             // 将历史数据也存储到Redis中
             await redisClient.setEx('system_metrics:history', 300, JSON.stringify(this.history)); // 5分钟过期
 
-            log('DEBUG', `系统监控数据已收集: CPU=${dataPoint.cpu}% MEM=${dataPoint.memory}% NET_RX=${dataPoint.network.received}KB/s NET_TX=${dataPoint.network.transmitted}KB/s DISK_R=${dataPoint.diskIO.read}KB/s DISK_W=${dataPoint.diskIO.write}KB/s`);
+            log('DEBUG', `系统监控数据已收集: CPU=${dataPoint.cpu}% MEM=${dataPoint.memory}% NET_RX=${dataPoint.network.received}KB/s NET_TX=${dataPoint.network.transmitted}KB/s DISK_R=${dataPoint.diskIO.read}KB/s DISK_W=${dataPoint.diskIO.write}KB/s ONLINE_USERS=${dataPoint.onlineUsers}`);
         } catch (error) {
             log('ERROR', `收集系统监控数据时出错: ${error.message}`);
         }

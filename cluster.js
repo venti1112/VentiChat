@@ -196,7 +196,7 @@ async function checkAndInitialize() {
                     }
                 });
             });
-            
+
             cluster.on('exit', (worker, code, signal) => {
                 // 查找退出的工作进程ID
                 let workerId = null;
@@ -296,6 +296,7 @@ async function startSystemMonitoring() {
                 systemMetrics.memory = latestData.memory;
                 systemMetrics.network = latestData.network;
                 systemMetrics.diskIO = latestData.diskIO;
+                systemMetrics.onlineUsers = latestData.onlineUsers || 0; // 添加在线用户数
             }
         } catch (error) {
             console.error('获取系统监控数据时出错:', error);

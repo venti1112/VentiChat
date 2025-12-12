@@ -150,4 +150,8 @@ router.get('/system/metrics', authMiddleware, adminMiddleware, systemMonitorCont
 // 获取历史系统指标数据
 router.get('/system/metrics/history', authMiddleware, adminMiddleware, systemMonitorController.getSystemMetricsHistory);
 
+// 公开的系统监控路由（无需认证）
+router.get('/public/system/metrics', systemMonitorController.getPublicSystemMetrics);
+router.get('/public/system/metrics/history', systemMonitorController.getPublicSystemMetricsHistory);
+
 module.exports = router;
