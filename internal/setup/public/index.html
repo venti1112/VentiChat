@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VentiChat 安装向导</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/setup.css">
+</head>
+<body>
+    <div class="setup-container">
+        <div class="setup-card">
+            <div class="setup-header text-center">
+                <h2><i class="bi bi-chat-dots-fill me-2"></i>VentiChat 安装向导</h2>
+                <p class="mb-0">欢迎使用 VentiChat 实时聊天系统</p>
+            </div>
+            
+            <div class="setup-body">
+                <!-- 步骤指示器 -->
+                <div class="step-indicator">
+                    <div class="step active" id="step1-indicator">
+                        <div class="step-circle">1</div>
+                        <div class="step-label">欢迎</div>
+                    </div>
+                    <div class="step" id="step2-indicator">
+                        <div class="step-circle">2</div>
+                        <div class="step-label">服务器</div>
+                    </div>
+                    <div class="step" id="step3-indicator">
+                        <div class="step-circle">3</div>
+                        <div class="step-label">数据库</div>
+                    </div>
+                    <div class="step" id="step4-indicator">
+                        <div class="step-circle">4</div>
+                        <div class="step-label">Redis</div>
+                    </div>
+                    <div class="step" id="step5-indicator">
+                        <div class="step-circle">5</div>
+                        <div class="step-label">邮件</div>
+                    </div>
+                    <div class="step" id="step6-indicator">
+                        <div class="step-circle">6</div>
+                        <div class="step-label">安全</div>
+                    </div>
+                    <div class="step" id="step7-indicator">
+                        <div class="step-circle">7</div>
+                        <div class="step-label">管理员</div>
+                    </div>
+                    <div class="step" id="step8-indicator">
+                        <div class="step-circle">8</div>
+                        <div class="step-label">完成</div>
+                    </div>
+                </div>
+                
+                <!-- 表单步骤 -->
+                <form id="setup-form">
+                    <!-- 第一步：欢迎界面 -->
+                    <div class="setup-step text-center" id="step1">
+                        <div class="mb-4">
+                            <i class="bi bi-chat-heart welcome-icon"></i>
+                        </div>
+                        <h2 class="mb-3">欢迎使用 VentiChat</h2>
+                        <p class="lead mb-4">
+                            感谢您选择 VentiChat 实时聊天系统。<br>
+                            安装向导将引导您完成系统的初始化配置。
+                        </p>
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle-fill me-2"></i>
+                            安装过程需要几分钟时间，请准备好 MySQL 和 Redis 的连接信息。
+                        </div>
+                        <div class="d-flex justify-content-between mt-5">
+                            <div></div> <!-- 占位 -->
+                            <button type="button" class="btn btn-primary btn-lg" onclick="nextStep(1)">
+                                开始安装 <i class="bi bi-arrow-right ms-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 第二步：服务器配置 -->
+                    <div class="setup-step d-none" id="step2">
+                        <h4 class="mb-4"><i class="bi bi-server me-2"></i>服务器配置</h4>
+                        
+                        <div class="form-section">
+                            <div class="section-title">基础配置</div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="server_host" class="form-label">服务器地址</label>
+                                    <input type="text" class="form-control" id="server_host" name="server_host" value="http://localhost:3012" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="server_port" class="form-label">端口</label>
+                                    <input type="number" class="form-control" id="server_port" name="server_port" value="3012" required>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="server_level" class="form-label">日志级别</label>
+                                    <select class="form-select" id="server_level" name="server_level">
+                                        <option value="debug">Debug</option>
+                                        <option value="info" selected>Info</option>
+                                        <option value="warn">Warning</option>
+                                        <option value="error">Error</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="server_name" class="form-label">应用名称</label>
+                                    <input type="text" class="form-control" id="server_name" name="server_name" value="VentiChat" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="button" class="btn btn-secondary" onclick="prevStep(2)">
+                                <i class="bi bi-arrow-left"></i> 上一步
+                            </button>
+                            <button type="button" class="btn btn-primary" onclick="nextStep(2)">
+                                下一步 <i class="bi bi-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 第三步：数据库配置 -->
+                    <div class="setup-step d-none" id="step3">
+                        <h4 class="mb-4"><i class="bi bi-database me-2"></i>数据库配置</h4>
+                        
+                        <div class="form-section">
+                            <div class="section-title">MySQL 配置</div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="db_host" class="form-label">数据库主机</label>
+                                    <input type="text" class="form-control" id="db_host" name="db_host" value="localhost" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="db_port" class="form-label">端口</label>
+                                    <input type="number" class="form-control" id="db_port" name="db_port" value="3306" required>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="db_user" class="form-label">用户名</label>
+                                    <input type="text" class="form-control" id="db_user" name="db_user" value="root" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="db_password" class="form-label">密码</label>
+                                    <input type="password" class="form-control" id="db_password" name="db_password">
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="db_name" class="form-label">数据库名</label>
+                                <input type="text" class="form-control" id="db_name" name="db_name" value="ventichat" required>
+                                <div class="form-text">如果数据库已存在，将被删除并重新创建</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <button type="button" class="btn btn-outline-secondary" onclick="testMySQLConnection()">
+                                    <i class="bi bi-plug me-1"></i>测试 MySQL 连接
+                                </button>
+                                <span id="mysql-test-result" class="ms-2"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="button" class="btn btn-secondary" onclick="prevStep(3)">
+                                <i class="bi bi-arrow-left"></i> 上一步
+                            </button>
+                            <button type="button" class="btn btn-primary" onclick="nextStep(3)">
+                                下一步 <i class="bi bi-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 第四步：Redis配置 -->
+                    <div class="setup-step d-none" id="step4">
+                        <h4 class="mb-4"><i class="bi bi-lightning me-2"></i>Redis 配置</h4>
+                        
+                        <div class="form-section">
+                            <div class="section-title">Redis 配置</div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="redis_host" class="form-label">Redis 主机</label>
+                                    <input type="text" class="form-control" id="redis_host" name="redis_host" value="localhost" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="redis_port" class="form-label">端口</label>
+                                    <input type="number" class="form-control" id="redis_port" name="redis_port" value="6379" required>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="redis_password" class="form-label">密码</label>
+                                <input type="password" class="form-control" id="redis_password" name="redis_password">
+                                <div class="form-text">如果 Redis 未设置密码，请留空</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <button type="button" class="btn btn-outline-secondary" onclick="testRedisConnection()">
+                                    <i class="bi bi-plug me-1"></i>测试 Redis 连接
+                                </button>
+                                <span id="redis-test-result" class="ms-2"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="button" class="btn btn-secondary" onclick="prevStep(4)">
+                                <i class="bi bi-arrow-left"></i> 上一步
+                            </button>
+                            <button type="button" class="btn btn-primary" onclick="nextStep(4)">
+                                下一步 <i class="bi bi-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 第五步：邮件配置 -->
+                    <div class="setup-step d-none" id="step5">
+                        <h4 class="mb-4"><i class="bi bi-envelope me-2"></i>邮件配置</h4>
+                        
+                        <div class="form-section">
+                            <div class="section-title">邮件服务器配置</div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="email_enable" name="email_enable">
+                                <label class="form-check-label" for="email_enable">
+                                    启用邮件功能
+                                </label>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="email_host" class="form-label">SMTP 服务器</label>
+                                    <input type="text" class="form-control" id="email_host" name="email_host" value="smtp.gmail.com">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="email_port" class="form-label">端口</label>
+                                    <input type="number" class="form-control" id="email_port" name="email_port" value="587">
+                                </div>
+                            </div>
+                            
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="email_secure" name="email_secure">
+                                <label class="form-check-label" for="email_secure">
+                                    启用 SSL/TLS
+                                </label>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="email_user" class="form-label">用户名</label>
+                                    <input type="text" class="form-control" id="email_user" name="email_user">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="email_password" class="form-label">密码</label>
+                                    <input type="password" class="form-control" id="email_password" name="email_password">
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="email_from" class="form-label">发件人邮箱</label>
+                                <input type="email" class="form-control" id="email_from" name="email_from">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="test_email_address" class="form-label">测试邮箱地址</label>
+                                <input type="email" class="form-control" id="test_email_address" placeholder="输入用于测试的邮箱地址">
+                                <div class="form-text">输入一个邮箱地址以测试邮件发送功能</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <button type="button" class="btn btn-outline-secondary" onclick="testEmailConnection()">
+                                    <i class="bi bi-plug me-1"></i>测试邮件连接
+                                </button>
+                                <button type="button" class="btn btn-outline-primary ms-2" onclick="testSendEmail()">
+                                    <i class="bi bi-send me-1"></i>发送测试邮件
+                                </button>
+                                <span id="email-test-result" class="ms-2"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="button" class="btn btn-secondary" onclick="prevStep(5)">
+                                <i class="bi bi-arrow-left"></i> 上一步
+                            </button>
+                            <button type="button" class="btn btn-primary" onclick="nextStep(5)">
+                                下一步 <i class="bi bi-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 第六步：安全配置 -->
+                    <div class="setup-step d-none" id="step6">
+                        <h4 class="mb-4"><i class="bi bi-shield-lock me-2"></i>安全配置</h4>
+                        
+                        <div class="form-section">
+                            <div class="section-title">JWT 配置</div>
+                            <div class="mb-3">
+                                <label for="jwt_expiration" class="form-label">JWT 过期时间 (小时)</label>
+                                <input type="number" class="form-control" id="jwt_expiration" name="jwt_expiration" value="120">
+                                <div class="form-text">JWT 密钥将自动生成以确保安全性</div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-section">
+                            <div class="section-title">IP 封禁配置</div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="ip_ban_number" class="form-label">IP 封禁阈值</label>
+                                    <input type="number" class="form-control" id="ip_ban_number" name="ip_ban_number" value="5">
+                                    <div class="form-text">IP 被禁止登录的次数</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="ip_ban_time" class="form-label">IP 封禁时长 (分钟)</label>
+                                    <input type="number" class="form-control" id="ip_ban_time" name="ip_ban_time" value="60">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-section">
+                            <div class="section-title">消息频率限制</div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="send_frequency_time" class="form-label">发送频率限制时间 (秒)</label>
+                                    <input type="number" class="form-control" id="send_frequency_time" name="send_frequency_time" value="5">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="send_frequency_number" class="form-label">发送频率限制条数</label>
+                                    <input type="number" class="form-control" id="send_frequency_number" name="send_frequency_number" value="1">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="button" class="btn btn-secondary" onclick="prevStep(6)">
+                                <i class="bi bi-arrow-left"></i> 上一步
+                            </button>
+                            <button type="button" class="btn btn-primary" onclick="nextStep(6)">
+                                下一步 <i class="bi bi-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 第七步：初始管理员账户 -->
+                    <div class="setup-step d-none" id="step7">
+                        <h4 class="mb-4"><i class="bi bi-person-badge me-2"></i>初始管理员账户</h4>
+                        
+                        <div class="form-section">
+                            <div class="section-title">管理员账户信息</div>
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                请务必记住管理员账户信息，这是您管理系统的唯一凭证。
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="admin_username" class="form-label">管理员用户名</label>
+                                <input type="text" class="form-control" id="admin_username" name="admin_username" required>
+                                <div class="form-text">用于登录系统的用户名</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="admin_nickname" class="form-label">管理员昵称</label>
+                                <input type="text" class="form-control" id="admin_nickname" name="admin_nickname" required>
+                                <div class="form-text">在系统中显示的昵称</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="admin_password" class="form-label">密码</label>
+                                <input type="password" class="form-control" id="admin_password" name="admin_password" required onkeyup="checkPasswordStrength()">
+                                <div class="password-requirements mt-2">
+                                    <div class="requirement" id="length">• 至少8个字符</div>
+                                    <div class="requirement" id="uppercase">• 包含大写字母 (A-Z)</div>
+                                    <div class="requirement" id="lowercase">• 包含小写字母 (a-z)</div>
+                                    <div class="requirement" id="number">• 包含数字 (0-9)</div>
+                                    <div class="requirement" id="special">• 包含特殊符号 (!@#$%^&*等)</div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="admin_password_confirm" class="form-label">确认密码</label>
+                                <input type="password" class="form-control" id="admin_password_confirm" name="admin_password_confirm" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="admin_email" class="form-label">邮箱地址</label>
+                                <input type="email" class="form-control" id="admin_email" name="admin_email">
+                                <div class="form-text">用于接收系统通知（可选）</div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="button" class="btn btn-secondary" onclick="prevStep(7)">
+                                <i class="bi bi-arrow-left"></i> 上一步
+                            </button>
+                            <button type="button" class="btn btn-primary" onclick="validateAdminAccount()">
+                                下一步 <i class="bi bi-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 第八步：确认与安装 -->
+                    <div class="setup-step d-none" id="step8">
+                        <h4 class="mb-4"><i class="bi bi-check-circle me-2"></i>确认与安装</h4>
+                        
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle-fill me-2"></i>
+                            请检查以下配置信息，确认无误后点击"开始安装"按钮完成安装。
+                        </div>
+                        
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <strong>服务器配置</strong>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p class="mb-1"><strong>地址:</strong> <span id="preview-server-host">-</span></p>
+                                        <p class="mb-1"><strong>端口:</strong> <span id="preview-server-port">-</span></p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p class="mb-1"><strong>日志级别:</strong> <span id="preview-server-level">-</span></p>
+                                        <p class="mb-1"><strong>应用名称:</strong> <span id="preview-server-name">-</span></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <strong>数据库配置</strong>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p class="mb-1"><strong>主机:</strong> <span id="preview-db-host">-</span></p>
+                                        <p class="mb-1"><strong>端口:</strong> <span id="preview-db-port">-</span></p>
+                                        <p class="mb-1"><strong>用户名:</strong> <span id="preview-db-user">-</span></p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p class="mb-1"><strong>密码:</strong> <span id="preview-db-password">***</span></p>
+                                        <p class="mb-1"><strong>数据库名:</strong> <span id="preview-db-name">-</span></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <strong>Redis 配置</strong>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p class="mb-1"><strong>主机:</strong> <span id="preview-redis-host">-</span></p>
+                                        <p class="mb-1"><strong>端口:</strong> <span id="preview-redis-port">-</span></p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p class="mb-1"><strong>密码:</strong> <span id="preview-redis-password">***</span></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <strong>邮件配置</strong>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p class="mb-1"><strong>SMTP服务器:</strong> <span id="preview-email-host">-</span></p>
+                                        <p class="mb-1"><strong>端口:</strong> <span id="preview-email-port">-</span></p>
+                                        <p class="mb-1"><strong>用户名:</strong> <span id="preview-email-user">-</span></p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p class="mb-1"><strong>密码:</strong> <span id="preview-email-password">***</span></p>
+                                        <p class="mb-1"><strong>发件人:</strong> <span id="preview-email-from">-</span></p>
+                                        <p class="mb-1"><strong>启用SSL/TLS:</strong> <span id="preview-email-secure">否</span></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <strong>管理员账户</strong>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p class="mb-1"><strong>用户名:</strong> <span id="preview-admin-username">-</span></p>
+                                        <p class="mb-1"><strong>昵称:</strong> <span id="preview-admin-nickname">-</span></p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p class="mb-1"><strong>密码:</strong> <span>***</span></p>
+                                        <p class="mb-1"><strong>邮箱:</strong> <span id="preview-admin-email">-</span></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="button" class="btn btn-secondary" onclick="prevStep(8)">
+                                <i class="bi bi-arrow-left"></i> 上一步
+                            </button>
+                            <button type="button" class="btn btn-success" onclick="startInstallation()">
+                                <i class="bi bi-download me-1"></i> 开始安装
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 初始化进度 -->
+                    <div class="setup-step d-none" id="initializing">
+                        <div class="init-progress">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <h4 class="mt-3">正在初始化...</h4>
+                            <p class="text-muted">正在配置 VentiChat 系统，请稍候</p>
+                        </div>
+                    </div>
+                    
+                    <!-- 安装成功 -->
+                    <div class="setup-step d-none" id="success">
+                        <div class="text-center py-5">
+                            <div class="mb-4">
+                                <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
+                            </div>
+                            <h2 class="text-success mb-3">安装成功！</h2>
+                            <p class="lead">VentiChat 已经成功安装并配置完成。</p>
+                            <p>配置文件已保存，数据库已创建，管理员账户已设置。</p>
+                            <div class="mt-4">
+                                <a href="http://localhost:3012" class="btn btn-primary">
+                                    <i class="bi bi-arrow-right-circle me-1"></i> 开始使用 VentiChat
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="/static/js/setup.js"></script>
+</body>
+</html>

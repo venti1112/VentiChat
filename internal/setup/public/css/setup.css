@@ -1,0 +1,140 @@
+body {
+    background-color: #f8f9fa;
+}
+
+.setup-container {
+    max-width: 900px;
+    margin: 2rem auto;
+}
+
+.step-indicator {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    position: relative;
+}
+
+.step-indicator::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: #dee2e6;
+    z-index: 1;
+}
+
+.step {
+    text-align: center;
+    position: relative;
+    z-index: 2;
+}
+
+.step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 0.5rem;
+    font-weight: bold;
+    color: #6c757d;
+}
+
+.step.active .step-circle {
+    background-color: #4CD8B8;
+    color: white;
+}
+
+.step.completed .step-circle {
+    background-color: #198754;
+    color: white;
+}
+
+.step-label {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.step.active .step-label {
+    color: #4CD8B8;
+    font-weight: 500;
+}
+
+.step.completed .step-label {
+    color: #198754;
+}
+
+.setup-card {
+    border-radius: 10px;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.setup-header {
+    background-color: #4CD8B8;
+    color: white;
+    padding: 1rem;
+    border-radius: 10px 10px 0 0;
+}
+
+.setup-body {
+    padding: 2rem;
+}
+
+.form-section {
+    margin-bottom: 1.5rem;
+}
+
+.section-title {
+    border-left: 4px solid #4CD8B8;
+    padding-left: 0.75rem;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+.btn-primary {
+    background-color: #4CD8B8;
+    border-color: #4CD8B8;
+}
+
+.btn-primary:hover {
+    background-color: #3bc5a0;
+    border-color: #3bc5a0;
+}
+
+.init-progress {
+    text-align: center;
+    padding: 2rem;
+}
+
+.spinner-border {
+    width: 3rem;
+    height: 3rem;
+    border-width: 0.25em;
+}
+
+.welcome-icon {
+    font-size: 4rem;
+    color: #4CD8B8;
+}
+
+.password-requirements {
+    font-size: 0.875rem;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+}
+
+.requirement {
+    color: #6c757d;
+}
+
+.requirement.valid {
+    color: #198754;
+}
