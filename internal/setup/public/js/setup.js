@@ -12,7 +12,7 @@ function nextStep(step) {
     document.getElementById(`step${currentStep}-indicator`).classList.add('active');
     
     // 如果是最后一步，更新预览
-    if (currentStep === 8) {
+    if (currentStep === 9) {
         updatePreview();
     }
 }
@@ -101,6 +101,9 @@ function updatePreview() {
     document.getElementById('preview-admin-username').textContent = document.getElementById('admin_username').value;
     document.getElementById('preview-admin-nickname').textContent = document.getElementById('admin_nickname').value;
     document.getElementById('preview-admin-email').textContent = document.getElementById('admin_email').value;
+    
+    // 默认聊天室预览
+    document.getElementById('preview-default-group-name').textContent = document.getElementById('default_group_name').value;
 }
 
 // 测试MySQL连接
@@ -287,6 +290,30 @@ function startInstallation() {
             setTimeout(() => {
                 document.getElementById('initializing').classList.add('d-none');
                 document.getElementById('success').classList.remove('d-none');
+                // 设置开始使用按钮的链接地址为用户填写的服务器地址
+                const serverHost = document.getElementById('server_host').value;
+                const startUsingLink = document.getElementById('start-using-link');
+                startUsingLink.href = serverHost;
+                
+                // 添加点击事件监听器，确保即使URL相同也能跳转
+                startUsingLink.addEventListener('click', function(e) {
+                    // 创建URL对象来解析当前页面和目标页面
+                    const currentUrl = new URL(window.location.href);
+                    const targetUrl = new URL(serverHost, window.location.origin);
+                    
+                    // 移除hash和查询参数进行比较
+                    currentUrl.hash = '';
+                    currentUrl.search = '';
+                    targetUrl.hash = '';
+                    targetUrl.search = '';
+                    
+                    // 检查基本URL是否相同
+                    if (currentUrl.toString() === targetUrl.toString()) {
+                        e.preventDefault();
+                        // 强制刷新页面
+                        window.location.replace(serverHost);
+                    }
+                });
             }, 1000);
         }
     })

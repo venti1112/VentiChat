@@ -1,11 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
 	"ventichat/internal/setup"
 	"ventichat/internal/utils"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -27,16 +30,26 @@ func main() {
 	// 初始化日志
 	utils.InitLogger()
 
-	// 测试不同级别的日志
-	utils.Debug("这是一条调试日志")
-	utils.Infof("这是一条信息日志")
-	utils.Warn("这是一条警告日志")
-	utils.Error("这是一条错误日志")
-
 	// 确保日志被写入
 	utils.Sync()
-	
-	// TODO: 在这里添加正常的服务器启动逻辑
-	// 例如:
-	// server.Start()
+
+	// 启动Web服务器
+	startWebServer()
+}
+
+// startWebServer 启动Web服务器
+func startWebServer() {
+	// 创建Gin引擎
+	gin.SetMode(gin.ReleaseMode)
+	router := gin.Default()
+
+	// 挂载静态文件 - 只需要挂载根目录即可，子目录会自动映射
+	router.Static("/", "./web")
+
+	// 启动服务器
+	port := utils.AppConfig.Server.Port
+
+	addr := fmt.Sprintf(":%d", port)
+	utils.Infof("服务器启动，监听端口 %d", port)
+	router.Run(addr)
 }
