@@ -2,9 +2,36 @@ package utils
 
 import (
 	"log"
+	"math/rand"
+	"strconv"
+	"time"
 
 	"github.com/spf13/viper"
 )
+
+// StringToUint64 将字符串转换为uint64
+func StringToUint64(s string) uint64 {
+	if s == "" {
+		return 0
+	}
+	result, err := strconv.ParseUint(s, 10, 64)
+	if err != nil {
+		log.Printf("转换字符串到uint64失败: %v", err)
+		return 0
+	}
+	return result
+}
+
+// GenerateRandomString 生成指定长度的随机字符串
+func GenerateRandomString(length int) string {
+	rand.Seed(time.Now().UnixNano())
+	chars := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+	result := make([]byte, length)
+	for i := 0; i < length; i++ {
+		result[i] = chars[rand.Intn(len(chars))]
+	}
+	return string(result)
+}
 
 // ServerConfig 服务器配置
 type ServerConfig struct {

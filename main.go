@@ -1,14 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
+	"ventichat/internal/app"
 	"ventichat/internal/setup"
 	"ventichat/internal/utils"
-
-	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -31,25 +29,11 @@ func main() {
 	utils.InitLogger()
 
 	// 确保日志被写入
-	utils.Sync()
-
-	// 启动Web服务器
-	startWebServer()
-}
-
-// startWebServer 启动Web服务器
-func startWebServer() {
-	// 创建Gin引擎
-	gin.SetMode(gin.ReleaseMode)
-	router := gin.Default()
-
-	// 挂载静态文件 - 只需要挂载根目录即可，子目录会自动映射
-	router.Static("/", "./web")
+	defer utils.Sync()
 
 	// 启动服务器
-	port := utils.AppConfig.Server.Port
-
-	addr := fmt.Sprintf(":%d", port)
-	utils.Infof("服务器启动，监听端口 %d", port)
-	router.Run(addr)
+	if err := app.StartServer(); err != nil {
+		utils.Errorf("服务器启动失败: %v", err)
+		os.Exit(1)
+	}
 }

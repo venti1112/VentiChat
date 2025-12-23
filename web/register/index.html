@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户注册 - VentiChat</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .register-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+        }
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.25rem rgba(102, 126, 234, 0.25);
+        }
+        .password-toggle {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+        }
+        .strength-meter {
+            height: 5px;
+            margin-top: 5px;
+        }
+        .strength-meter-fill {
+            height: 100%;
+            transition: width 0.3s;
+        }
+        .btn-register {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 12px;
+            font-weight: 500;
+        }
+        .btn-register:hover {
+            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-lg-5">
+                <div class="register-card p-4">
+                    <div class="text-center mb-4">
+                        <h2 class="fw-bold">用户注册</h2>
+                        <p class="text-muted">创建您的VentiChat账户</p>
+                    </div>
+                    
+                    <form id="registerForm">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">用户名</label>
+                            <input type="text" class="form-control" id="username" name="username" required>
+                            <div class="invalid-feedback">请输入用户名</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="nickname" class="form-label">昵称</label>
+                            <input type="text" class="form-control" id="nickname" name="nickname" required>
+                            <div class="invalid-feedback">请输入昵称</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="email" class="form-label">邮箱</label>
+                            <input type="email" class="form-control" id="email" name="email" required>
+                            <div class="form-text">如果服务器启用邮箱验证，需要验证后才能登录</div>
+                            <div class="invalid-feedback">请输入有效的邮箱地址</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="mobile" class="form-label">手机号（可选）</label>
+                            <input type="tel" class="form-control" id="mobile" name="mobile">
+                        </div>
+                        
+                        <div class="mb-3 position-relative">
+                            <label for="password" class="form-label">密码</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                            <span class="password-toggle" id="togglePassword">
+                                <i class="bi bi-eye"></i>
+                            </span>
+                            <div class="invalid-feedback">请输入密码（至少8位，包含大小写字母、数字和特殊符号）</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">密码强度</label>
+                            <div class="strength-meter bg-light rounded">
+                                <div class="strength-meter-fill" style="width: 0%; background-color: #dc3545;"></div>
+                            </div>
+                            <div class="form-text">
+                                <small>密码要求：至少8位，包含小写字母、大写字母、数字和特殊符号</small>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="confirmPassword" class="form-label">确认密码</label>
+                            <input type="password" class="form-control" id="confirmPassword" name="confirmPassword" required>
+                            <span class="password-toggle" id="toggleConfirmPassword">
+                                <i class="bi bi-eye"></i>
+                            </span>
+                            <div class="invalid-feedback">请确认密码</div>
+                        </div>
+                        
+                        <div class="d-grid mt-4">
+                            <button type="submit" class="btn btn-primary btn-register" id="registerBtn">
+                                <span class="btn-text">注册</span>
+                                <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div class="text-center mt-3">
+                        <p class="mb-0">
+                            已有账户？<a href="/login">立即登录</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('registerForm');
+            const passwordInput = document.getElementById('password');
+            const confirmPasswordInput = document.getElementById('confirmPassword');
+            const strengthMeterFill = document.querySelector('.strength-meter-fill');
+            const togglePassword = document.getElementById('togglePassword');
+            const toggleConfirmPassword = document.getElementById('toggleConfirmPassword');
+            const registerBtn = document.getElementById('registerBtn');
+            const btnText = registerBtn.querySelector('.btn-text');
+            const spinner = registerBtn.querySelector('.spinner-border');
+            
+            // 密码显示/隐藏切换
+            togglePassword.addEventListener('click', function() {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                this.innerHTML = type === 'password' ? '<i class="bi bi-eye"></i>' : '<i class="bi bi-eye-slash"></i>';
+            });
+            
+            toggleConfirmPassword.addEventListener('click', function() {
+                const type = confirmPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                confirmPasswordInput.setAttribute('type', type);
+                this.innerHTML = type === 'password' ? '<i class="bi bi-eye"></i>' : '<i class="bi bi-eye-slash"></i>';
+            });
+            
+            // 密码强度检测
+            passwordInput.addEventListener('input', function() {
+                const password = this.value;
+                const strength = calculatePasswordStrength(password);
+                
+                let strengthColor, strengthWidth;
+                if (strength < 30) {
+                    strengthColor = '#dc3545'; // 红色 - 弱
+                    strengthWidth = '25%';
+                } else if (strength < 60) {
+                    strengthColor = '#ffc107'; // 黄色 - 中
+                    strengthWidth = '50%';
+                } else if (strength < 80) {
+                    strengthColor = '#20c997'; // 蓝色 - 强
+                    strengthWidth = '75%';
+                } else {
+                    strengthColor = '#28a745'; // 绿色 - 很强
+                    strengthWidth = '100%';
+                }
+                
+                strengthMeterFill.style.width = strengthWidth;
+                strengthMeterFill.style.backgroundColor = strengthColor;
+            });
+            
+            // 密码强度计算函数
+            function calculatePasswordStrength(password) {
+                let strength = 0;
+                
+                // 长度至少8位
+                if (password.length >= 8) strength += 25;
+                
+                // 包含小写字母
+                if (/[a-z]/.test(password)) strength += 15;
+                
+                // 包含大写字母
+                if (/[A-Z]/.test(password)) strength += 15;
+                
+                // 包含数字
+                if (/\d/.test(password)) strength += 15;
+                
+                // 包含特殊符号
+                if (/[^a-zA-Z0-9]/.test(password)) strength += 30;
+                
+                return Math.min(strength, 100);
+            }
+            
+            // 表单提交处理
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // 获取表单数据
+                const formData = {
+                    username: document.getElementById('username').value,
+                    nickname: document.getElementById('nickname').value,
+                    password: document.getElementById('password').value,
+                    email: document.getElementById('email').value,
+                    mobile: document.getElementById('mobile').value
+                };
+                
+                // 简单验证
+                if (!validateForm(formData)) {
+                    return;
+                }
+                
+                // 显示加载状态
+                btnText.textContent = '注册中...';
+                spinner.classList.remove('d-none');
+                registerBtn.disabled = true;
+                
+                // 发送注册请求
+                fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message && data.user_id) {
+                        // 注册成功
+                        alert(data.message);
+                        // 如果不需要邮箱验证，跳转到登录页
+                        if (!data.email_sent) {
+                            window.location.href = '/login';
+                        } else {
+                            // 如果需要邮箱验证，提示用户检查邮箱
+                            alert('请检查邮箱完成验证');
+                        }
+                    } else {
+                        // 注册失败
+                        alert(data.error || '注册失败，请重试');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('网络错误，请重试');
+                })
+                .finally(() => {
+                    // 恢复按钮状态
+                    btnText.textContent = '注册';
+                    spinner.classList.add('d-none');
+                    registerBtn.disabled = false;
+                });
+            });
+            
+            // 表单验证
+            function validateForm(data) {
+                // 验证用户名
+                if (!data.username || data.username.length < 3 || data.username.length > 50) {
+                    alert('用户名长度必须在3-50个字符之间');
+                    return false;
+                }
+                
+                // 验证昵称
+                if (!data.nickname || data.nickname.length < 2 || data.nickname.length > 100) {
+                    alert('昵称长度必须在2-100个字符之间');
+                    return false;
+                }
+                
+                // 验证邮箱
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(data.email)) {
+                    alert('请输入有效的邮箱地址');
+                    return false;
+                }
+                
+                // 验证手机号（如果提供了）
+                if (data.mobile && !/^1[3-9]\d{9}$/.test(data.mobile)) {
+                    alert('请输入有效的手机号');
+                    return false;
+                }
+                
+                // 验证密码强度
+                if (calculatePasswordStrength(data.password) < 80) {
+                    alert('密码强度不够，请使用包含大小写字母、数字和特殊符号的强密码');
+                    return false;
+                }
+                
+                // 验证密码确认
+                if (data.password !== document.getElementById('confirmPassword').value) {
+                    alert('两次输入的密码不一致');
+                    return false;
+                }
+                
+                return true;
+            }
+        });
+    </script>
+</body>
+</html>
