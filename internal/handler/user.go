@@ -180,3 +180,58 @@ func validatePassword(password string) bool {
 	return hasLower && hasUpper && hasDigit && hasSpecial
 }
 
+// GetUserByID 根据用户ID获取用户信息
+func GetUserByID(c *gin.Context) {
+	// 从路径参数获取用户ID
+	userIDStr := c.Param("id")
+	
+	// 检查是否为"null"或空值
+	if userIDStr == "" || userIDStr == "null" {
+		c.JSON(400, gin.H{
+			"error": "用户ID无效",
+		})
+		return
+	}
+	
+	userID := utils.StringToUint64(userIDStr)
+	if userID == 0 {
+		c.JSON(400, gin.H{
+			"error": "用户ID无效",
+		})
+		return
+	}
+
+	// 从数据库查询用户
+	var user model.User
+	result := repository.DB.Select([]string{
+		"id", "username", "nickname", "email", "mobile", "introduction", 
+		"avatar_url", "theme_color", "background_url", "language", "created_at",
+	}).Where("id = ?", userID).First(&user)
+	
+	if result.Error != nil {
+		if result.Error.Error() == "record not found" {
+			c.JSON(404, gin.H{
+				"error": "用户不存在",
+			})
+		} else {
+			c.JSON(500, gin.H{
+				"error": "查询用户失败",
+			})
+		}
+		return
+	}
+
+	// 如果用户被封禁，但请求的是当前登录用户，则仍然返回用户信息
+	// 否则，如果用户被封禁登录，则不返回用户信息
+	if user.IsBanned {
+		c.JSON(404, gin.H{
+			"error": "用户不存在",
+		})
+		return
+	}
+
+	// 返回用户信息，不包含敏感信息
+	c.JSON(200, gin.H{
+		"user": user,
+	})
+}

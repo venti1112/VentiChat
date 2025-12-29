@@ -12,4 +12,6 @@ type Friend struct {
 	Status    string    `gorm:"type:enum('active','block');not null;default:'active'" json:"status"`
 	Unread    int       `gorm:"type:int;not null;default:0" json:"unread"`
 	CreatedAt time.Time `gorm:"type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"created_at"`
+	User      User      `gorm:"foreignKey:UserID;references:ID" json:"user"`
+	Friend    User      `gorm:"foreignKey:FriendID;references:ID" json:"friend"`
 }

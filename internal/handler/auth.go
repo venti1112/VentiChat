@@ -146,3 +146,51 @@ func recordLogin(userID uint64, ip, userAgent string) {
 		utils.Errorf("记录登录信息失败: %v", result.Error)
 	}
 }
+
+// LogoutUser 用户退出登录
+func LogoutUser(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	
+	if authHeader == "" {
+		c.JSON(401, gin.H{
+			"error": "缺少认证头",
+		})
+		return
+	}
+	
+	// 提取Bearer token
+	var tokenString string
+	if len(authHeader) >= 7 && authHeader[:7] == "Bearer " {
+		tokenString = authHeader[7:]
+	} else {
+		c.JSON(401, gin.H{
+			"error": "认证头格式错误",
+		})
+		return
+	}
+	
+	// 验证JWT令牌
+	_, err := validateToken(tokenString)  // 使用_忽略claims，因为我们只关心令牌是否有效
+	if err != nil {
+		c.JSON(401, gin.H{
+			"error": "无效的令牌",
+		})
+		return
+	}
+	
+	// 从Redis中删除该令牌
+	tokenKey := "token:" + tokenString
+	ctx := context.Background()
+	err = repository.RDB.Del(ctx, tokenKey).Err()
+	if err != nil {
+		utils.Errorf("删除令牌失败: %v", err)
+		c.JSON(500, gin.H{
+			"error": "删除令牌失败",
+		})
+		return
+	}
+	
+	c.JSON(200, gin.H{
+		"message": "退出登录成功",
+	})
+}

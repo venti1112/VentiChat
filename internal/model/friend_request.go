@@ -14,4 +14,6 @@ type FriendRequest struct {
 	HandledMessage string     `gorm:"type:text" json:"handled_message"`
 	CreatedAt      time.Time  `gorm:"type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"created_at"`
 	HandledAt      *time.Time `gorm:"type:timestamp" json:"handled_at"`
+	Requester      User       `gorm:"foreignKey:RequesterID;references:ID" json:"requester"`
+	Target         User       `gorm:"foreignKey:TargetID;references:ID" json:"target"`
 }

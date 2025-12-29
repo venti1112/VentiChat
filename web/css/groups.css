@@ -1,0 +1,127 @@
+/* 群聊管理页面样式 */
+
+.group-card {
+    cursor: pointer;
+    transition: transform 0.2s;
+    border: 1px solid #e0e0e0;
+}
+
+.group-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    border-color: #007bff;
+}
+
+.group-avatar {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.member-role {
+    font-size: 0.8em;
+    padding: 2px 6px;
+    border-radius: 10px;
+    color: white;
+}
+
+.role-owner {
+    background-color: #ff6b6b;
+}
+
+.role-admin {
+    background-color: #4ecdc4;
+}
+
+.role-member {
+    background-color: #a0a0a0;
+}
+
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    padding: 15px 20px;
+    border-radius: 5px;
+    color: white;
+    min-width: 250px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.notification-success {
+    background-color: #28a745;
+}
+
+.notification-error {
+    background-color: #dc3545;
+}
+
+.notification-info {
+    background-color: #17a2b8;
+}
+
+.chat-container {
+    height: 400px;
+    overflow-y: auto;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+}
+
+.message {
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    border-radius: 18px;
+    max-width: 70%;
+    word-wrap: break-word;
+}
+
+.message.sent {
+    background-color: #007bff;
+    color: white;
+    margin-left: auto;
+    text-align: right;
+    margin-right: 0;
+    margin-left: auto;
+    float: right;
+}
+
+.message.received {
+    background-color: #e9ecef;
+    color: #333;
+    margin-right: auto;
+    margin-left: 0;
+    float: left;
+}
+
+.message::after {
+    content: "";
+    display: table;
+    clear: both;
+}
+
+.request-item {
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+}
+
+.member-item {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+.member-item:last-child {
+    border-bottom: none;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .chat-container {
+        height: 300px;
+    }
+    
+    .group-card {
+        margin-bottom: 10px;
+    }
+}

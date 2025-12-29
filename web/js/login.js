@@ -42,6 +42,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 登录成功，保存token到localStorage
                 localStorage.setItem('token', data.token);
                 
+                // 保存用户ID到localStorage，供其他页面使用
+                if (data.user && data.user.id) {
+                    localStorage.setItem('userId', data.user.id);
+                }
+                
                 // 显示成功通知
                 showNotification('登录成功！', 'success');
                 
